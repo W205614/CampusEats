@@ -1,0 +1,28 @@
+# 编译产物
+**/target/
+*.class
+
+# uni-app 编译产物（微信小程序）
+/mp-weixin/
+
+# IDE 配置
+.idea
+*.iml
+
+# 测试文件
+*Test.java
+**/test/
+
+# 环境配置文件（含数据库 / Redis / OSS / 微信密钥）
+application-dev.yml
+application-*.yml
+
+# 日志
+*.log
+logs/
+
+# 系统文件
+.DS_Store
+
+# 本地数据库连接信息
+*.local.xml
