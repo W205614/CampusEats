@@ -34,6 +34,13 @@ public class EmployeeController {
     @Autowired
     private JwtProperties jwtProperties;
 
+    @PutMapping("/editPassword")
+    @ApiOperation("修改当前员工密码")
+    public Result editPassword(@RequestBody com.sky.dto.EmployeePasswordDTO dto) {
+        employeeService.editPassword(dto);
+        return Result.success();
+    }
+
     /**
      * 登录
      *
@@ -43,7 +50,7 @@ public class EmployeeController {
     @PostMapping("/login")
     @ApiOperation(value = "员工登录")
     public Result<EmployeeLoginVO> login(@RequestBody EmployeeLoginDTO employeeLoginDTO) {
-        log.info("员工登录：{}", employeeLoginDTO);
+        log.info("员工登录：{}", employeeLoginDTO.getUsername());
 
         Employee employee = employeeService.login(employeeLoginDTO);
 

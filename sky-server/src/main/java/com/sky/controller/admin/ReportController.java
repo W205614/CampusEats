@@ -41,6 +41,7 @@ public class ReportController {
             @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate begin,
             @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate end) {
         log.info("营业额数据统计: {}, {}", begin, end);
+        checkDates(begin, end);
         return Result.success(reportService.getTurnoverStatistics(begin, end));
     }
 
@@ -56,6 +57,7 @@ public class ReportController {
             @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate begin,
             @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate end) {
         log.info("用户统计: {}, {}", begin, end);
+        checkDates(begin, end);
         return Result.success(reportService.getUserStatistics(begin, end));
     }
 
@@ -71,6 +73,7 @@ public class ReportController {
             @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate begin,
             @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate end) {
         log.info("订单数据统计: {}, {}", begin, end);
+        checkDates(begin, end);
         return Result.success(reportService.getOrderStatistics(begin, end));
     }
 
@@ -86,6 +89,7 @@ public class ReportController {
             @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate begin,
             @DateTimeFormat(pattern = "yyyy-MM-dd") LocalDate end) {
         log.info("销量排名top10: {}, {}", begin, end);
+        checkDates(begin, end);
         return Result.success(reportService.getSalesTop10(begin, end));
     }
 
@@ -97,5 +101,12 @@ public class ReportController {
     @ApiOperation("导出运营数据报表")
     public void export(HttpServletResponse response) {
         reportService.exportBusinessData(response);
+    }
+
+    private void checkDates(LocalDate begin, LocalDate end) {
+        if (begin == null || end == null || end.isBefore(begin)
+                || java.time.temporal.ChronoUnit.DAYS.between(begin, end) > 365) {
+            throw new com.sky.exception.BaseException("请选择有效的统计起止日期，跨度不能超过366天");
+        }
     }
 }

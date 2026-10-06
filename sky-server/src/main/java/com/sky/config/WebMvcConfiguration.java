@@ -20,6 +20,8 @@ import springfox.documentation.spi.DocumentationType;
 import springfox.documentation.spring.web.plugins.Docket;
 
 import java.util.List;
+import org.springframework.beans.factory.annotation.Value;
+import java.nio.file.Paths;
 
 /**
  * 配置类，注册web层相关组件
@@ -27,6 +29,10 @@ import java.util.List;
 @Configuration
 @Slf4j
 public class WebMvcConfiguration extends WebMvcConfigurationSupport {
+    @Value("${sky.storage.upload-dir:./uploads}")
+    private String uploadDir;
+    @Value("${sky.storage.local-enabled:false}")
+    private boolean localStorage;
 
     @Autowired
     private JwtTokenAdminInterceptor jwtTokenAdminInterceptor;
@@ -94,6 +100,10 @@ public class WebMvcConfiguration extends WebMvcConfigurationSupport {
      * @param registry
      */
     protected void addResourceHandlers(ResourceHandlerRegistry registry) {
+        if (localStorage) {
+            String location = Paths.get(uploadDir).toAbsolutePath().normalize().toUri().toString();
+            registry.addResourceHandler("/uploads/**").addResourceLocations(location.endsWith("/") ? location : location + "/");
+        }
         registry.addResourceHandler("/doc.html").addResourceLocations("classpath:/META-INF/resources/");
         registry.addResourceHandler("/webjars/**").addResourceLocations("classpath:/META-INF/resources/webjars/");
     }

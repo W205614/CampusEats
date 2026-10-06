@@ -12,10 +12,18 @@
 # 测试文件
 *Test.java
 **/test/
+!**/src/test/
+!**/src/test/**
+# Original lesson samples require external services and remain local.
+**/src/test/java/com/sky/test/
 
 # 环境配置文件（含数据库 / Redis / OSS / 微信密钥）
 application-dev.yml
 application-*.yml
+!application-docker.yml
+.env
+/deploy/admin/
+/deploy/uploads/
 
 # 日志
 *.log

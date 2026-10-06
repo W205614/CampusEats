@@ -13,6 +13,9 @@ import com.sky.entity.Employee;
 import com.sky.exception.AccountLockedException;
 import com.sky.exception.AccountNotFoundException;
 import com.sky.exception.PasswordErrorException;
+import com.sky.exception.BaseException;
+import com.sky.dto.EmployeePasswordDTO;
+import com.sky.utils.PageValidation;
 import com.sky.mapper.EmployeeMapper;
 import com.sky.result.PageResult;
 import com.sky.service.EmployeeService;
@@ -39,6 +42,9 @@ public class EmployeeServiceImpl implements EmployeeService {
     public Employee login(EmployeeLoginDTO employeeLoginDTO) {
         String username = employeeLoginDTO.getUsername();
         String password = employeeLoginDTO.getPassword();
+        if (username == null || username.trim().isEmpty() || password == null || password.isEmpty()) {
+            throw new BaseException("请输入账号和密码");
+        }
 
         //1、根据用户名查询数据库中的数据
         Employee employee = employeeMapper.getByUsername(username);
@@ -102,11 +108,13 @@ public class EmployeeServiceImpl implements EmployeeService {
      */
     @Override
     public PageResult pageQuery(EmployeePageQueryDTO employeePageQueryDTO) {
+        PageValidation.check(employeePageQueryDTO.getPage(), employeePageQueryDTO.getPageSize());
         PageHelper.startPage(employeePageQueryDTO.getPage(), employeePageQueryDTO.getPageSize());
 
         Page<Employee> page = employeeMapper.pageQuery(employeePageQueryDTO);
         long total = page.getTotal();
         List<Employee> records = page.getResult();
+        records.forEach(employee -> employee.setPassword(null));
 
         return new PageResult(total, records);
     }
@@ -118,6 +126,9 @@ public class EmployeeServiceImpl implements EmployeeService {
      */
     @Override
     public void startOrStop(Integer status, Long id) {
+        if (status == null || (status != 0 && status != 1)) throw new BaseException("员工状态只能为0或1");
+        if (employeeMapper.getById(id) == null) throw new BaseException("员工不存在");
+        if (id.equals(BaseContext.getCurrentId()) && status == 0) throw new BaseException("不能禁用当前登录账号");
         Employee employee = Employee.builder()
                 .status(status)
                 .id(id)
@@ -133,6 +144,7 @@ public class EmployeeServiceImpl implements EmployeeService {
     @Override
     public Employee getById(Long id) {
         Employee employee = employeeMapper.getById(id);
+        if (employee == null) throw new BaseException("员工不存在");
         employee.setPassword("****");
         return employee;
     }
@@ -150,5 +162,19 @@ public class EmployeeServiceImpl implements EmployeeService {
         // employee.setUpdateUser(BaseContext.getCurrentId());
 
         employeeMapper.update(employee);
+    }
+
+    @Override
+    public void editPassword(EmployeePasswordDTO dto) {
+        if (dto.getOldPassword() == null || dto.getOldPassword().isEmpty()) throw new BaseException("请输入原密码");
+        if (dto.getNewPassword() == null || !dto.getNewPassword().matches("[A-Za-z0-9]{6,20}")) {
+            throw new BaseException("新密码须为6至20位字母或数字");
+        }
+        Employee employee = employeeMapper.getById(BaseContext.getCurrentId());
+        if (employee == null) throw new BaseException("员工不存在");
+        if (!DigestUtils.md5DigestAsHex(dto.getOldPassword().getBytes(java.nio.charset.StandardCharsets.UTF_8))
+                .equals(employee.getPassword())) throw new PasswordErrorException("原密码错误");
+        employeeMapper.update(Employee.builder().id(employee.getId()).password(
+                DigestUtils.md5DigestAsHex(dto.getNewPassword().getBytes(java.nio.charset.StandardCharsets.UTF_8))).build());
     }
 }

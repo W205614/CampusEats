@@ -13,6 +13,7 @@ import com.sky.utils.HttpClientUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Value;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
@@ -28,14 +29,17 @@ public class UserServiceImpl implements UserService {
     @Autowired
     private UserMapper userMapper;
 
+    @Value("${sky.demo.enabled:false}")
+    private boolean demoEnabled;
+
     /**
      * 微信登录
      * @param userLoginDTO
      * @return
      */
     @Override
-    public User wxLogin(UserLoginDTO userLoginDTO) {
-        String openid = getOpenid(userLoginDTO.getCode());
+    public synchronized User wxLogin(UserLoginDTO userLoginDTO) {
+        String openid = demoEnabled ? "campuseats-local-demo" : getOpenid(userLoginDTO.getCode());
 
         // 判断openid是否为空, 如果为空表示登录失败, 抛出业务异常
         if(openid == null) {

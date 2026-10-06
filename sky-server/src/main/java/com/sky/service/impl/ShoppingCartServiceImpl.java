@@ -32,6 +32,20 @@ public class ShoppingCartServiceImpl implements ShoppingCartService {
      */
     @Override
     public void addShoppingCart(ShoppingCartDTO shoppingCartDTO) {
+        if ((shoppingCartDTO.getDishId() == null) == (shoppingCartDTO.getSetmealId() == null)) {
+            throw new com.sky.exception.ShoppingCartBusinessException("请选择一种菜品或套餐");
+        }
+        if (shoppingCartDTO.getDishId() != null) {
+            Dish selected = dishMapper.getById(shoppingCartDTO.getDishId());
+            if (selected == null || !Integer.valueOf(1).equals(selected.getStatus())) {
+                throw new com.sky.exception.ShoppingCartBusinessException("菜品不存在或已停售");
+            }
+        } else {
+            Setmeal selected = setmealMapper.getById(shoppingCartDTO.getSetmealId());
+            if (selected == null || !Integer.valueOf(1).equals(selected.getStatus())) {
+                throw new com.sky.exception.ShoppingCartBusinessException("套餐不存在或已停售");
+            }
+        }
         //判断当前加入购物车的商品是否存在
         ShoppingCart shoppingCart = new ShoppingCart();
         BeanUtils.copyProperties(shoppingCartDTO,shoppingCart); //属性拷贝

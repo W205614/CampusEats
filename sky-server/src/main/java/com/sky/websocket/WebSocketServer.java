@@ -19,7 +19,7 @@ import java.util.Map;
 public class WebSocketServer {
 
     //存放会话对象
-    private static Map<String, Session> sessionMap = new HashMap();
+    private static final Map<String, Session> sessionMap = new java.util.concurrent.ConcurrentHashMap<>();
 
     /**
      * 连接建立成功调用的方法
@@ -61,7 +61,9 @@ public class WebSocketServer {
         for (Session session : sessions) {
             try {
                 //服务器向客户端发送消息
-                session.getBasicRemote().sendText(message);
+                synchronized (session) {
+                    if (session.isOpen()) session.getBasicRemote().sendText(message);
+                }
             } catch (Exception e) {
                 e.printStackTrace();
             }

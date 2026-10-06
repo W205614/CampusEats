@@ -74,6 +74,9 @@ public class OrderController {
     public Result<OrderVO> details(@PathVariable("id") Long id) {
         log.info("查询订单详情, 订单id为: {}", id);
         OrderVO orderVO = orderService.details(id);
+        if (!com.sky.context.BaseContext.getCurrentId().equals(orderVO.getUserId())) {
+            throw new com.sky.exception.OrderBusinessException("订单不存在");
+        }
         return Result.success(orderVO);
     }
 

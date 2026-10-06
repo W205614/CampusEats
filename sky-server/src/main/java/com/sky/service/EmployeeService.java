@@ -7,6 +7,7 @@ import com.sky.entity.Employee;
 import com.sky.result.PageResult;
 
 public interface EmployeeService {
+    void editPassword(com.sky.dto.EmployeePasswordDTO dto);
 
     /**
      * 员工登录

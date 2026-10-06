@@ -35,7 +35,7 @@ public class OrderTask {
                 orders.setStatus(Orders.CANCELLED);
                 orders.setCancelReason("订单超时, 自动取消");
                 orders.setCancelTime(LocalDateTime.now());
-                orderMapper.update(orders);
+                orderMapper.transition(orders, Orders.PENDING_PAYMENT);
             }
         }
     }
@@ -43,7 +43,7 @@ public class OrderTask {
     /**
      * 处理一直处于派送中状态的方法
      */
-    @Scheduled(cron = "0 0 1 * * ?") // 每分钟触发一次
+    @Scheduled(cron = "0 0 1 * * ?") // 每天凌晨1点检查
     public void processDeliveryOrder() {
         log.info("定时处理派送中订单: {}", LocalDateTime.now());
 
@@ -54,7 +54,8 @@ public class OrderTask {
         if(ordersList != null && ordersList.size() > 0) {
             for (Orders orders : ordersList) {
                 orders.setStatus(Orders.COMPLETED);
-                orderMapper.update(orders);
+                orders.setDeliveryTime(LocalDateTime.now());
+                orderMapper.transition(orders, Orders.DELIVERY_IN_PROGRESS);
             }
         }
     }

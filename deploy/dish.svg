@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300">
+  <rect width="400" height="300" rx="24" fill="#fff5e7"/>
+  <ellipse cx="200" cy="220" rx="115" ry="14" fill="#efd4b1"/>
+  <path d="M100 140h200c-8 63-41 88-100 88s-92-25-100-88" fill="#f4a442"/>
+  <ellipse cx="200" cy="140" rx="100" ry="18" fill="#ffd18b"/>
+  <path d="M163 115c-20-22 19-23 0-46m38 46c-20-22 19-23 0-46m38 46c-20-22 19-23 0-46" fill="none" stroke="#bd7741" stroke-width="6" stroke-linecap="round"/>
+  <text x="200" y="274" text-anchor="middle" font-family="sans-serif" font-size="18" fill="#895529">CampusEats · 示例图片</text>
+</svg>

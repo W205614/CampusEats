@@ -10,6 +10,8 @@ import com.sky.entity.Dish;
 import com.sky.entity.DishFlavor;
 import com.sky.entity.Setmeal;
 import com.sky.exception.DeletionNotAllowedException;
+import com.sky.exception.BaseException;
+import com.sky.utils.PageValidation;
 import com.sky.mapper.DishFlavorMapper;
 import com.sky.mapper.DishMapper;
 import com.sky.mapper.SetmealDishMapper;
@@ -44,6 +46,7 @@ public class DishServiceImpl implements DishService {
     @Override
     @Transactional
     public void saveWithFlavor(DishDTO dishDTO) {
+        validateDish(dishDTO);
         Dish dish = new Dish();
         BeanUtils.copyProperties(dishDTO, dish);
         // 向菜品表插入一条数据
@@ -69,6 +72,7 @@ public class DishServiceImpl implements DishService {
      */
     @Override
     public PageResult pageQuery(DishPageQueryDTO dishPageQueryDTO) {
+        PageValidation.check(dishPageQueryDTO.getPage(), dishPageQueryDTO.getPageSize());
         PageHelper.startPage(dishPageQueryDTO.getPage(), dishPageQueryDTO.getPageSize());
         Page<DishVO> page = dishMapper.pageQuery(dishPageQueryDTO);
         return new PageResult(page.getTotal(), page.getResult());
@@ -84,6 +88,7 @@ public class DishServiceImpl implements DishService {
         // 判断当前菜品是否能够删除--是否存在起售中的菜品
         for (Long id : ids) {
             Dish dish = dishMapper.getById(id);
+            if (dish == null) throw new BaseException("菜品不存在");
             if(dish.getStatus() == StatusConstant.ENABLE) {
                 // 当前菜品处于起售中, 不能删除
                 throw new DeletionNotAllowedException(MessageConstant.DISH_ON_SALE);
@@ -113,6 +118,7 @@ public class DishServiceImpl implements DishService {
     public DishVO getByIdWithFlavor(Long id) {
         // 根据id查询菜品数据
         Dish dish = dishMapper.getById(id);
+        if (dish == null) throw new BaseException("菜品不存在");
 
         // 根据菜品id查询口味数据
         List<DishFlavor> dishFlavors = dishFlavorMapper.getByDishId(id);
@@ -130,7 +136,10 @@ public class DishServiceImpl implements DishService {
      * @param dishDTO
      */
     @Override
+    @Transactional
     public void updateWithFlavor(DishDTO dishDTO) {
+        if (dishMapper.getById(dishDTO.getId()) == null) throw new BaseException("菜品不存在");
+        validateDish(dishDTO);
         Dish dish = new Dish();
         BeanUtils.copyProperties(dishDTO, dish);
 
@@ -157,6 +166,8 @@ public class DishServiceImpl implements DishService {
      */
     @Override
     public void stopOrStart(Integer status, Long id) {
+        if (status == null || (status != 0 && status != 1)) throw new BaseException("售卖状态只能为0或1");
+        if (dishMapper.getById(id) == null) throw new BaseException("菜品不存在");
         Dish dish = Dish.builder()
                 .status(status)
                 .id(id)
@@ -216,5 +227,12 @@ public class DishServiceImpl implements DishService {
         }
 
         return dishVOList;
+    }
+
+    private void validateDish(DishDTO dto) {
+        if (dto.getName() == null || dto.getName().trim().isEmpty() || dto.getCategoryId() == null
+                || dto.getPrice() == null || dto.getPrice().signum() <= 0) {
+            throw new BaseException("请填写菜品名称、分类和大于0的价格");
+        }
     }
 }

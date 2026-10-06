@@ -8,6 +8,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import com.sky.exception.AddressBookBusinessException;
 import java.util.List;
 
 @Service
@@ -32,6 +33,7 @@ public class AddressBookServiceImpl implements AddressBookService {
      * @param addressBook
      */
     public void save(AddressBook addressBook) {
+        validateAddress(addressBook);
         addressBook.setUserId(BaseContext.getCurrentId());
         addressBook.setIsDefault(0);
         addressBookMapper.insert(addressBook);
@@ -45,6 +47,7 @@ public class AddressBookServiceImpl implements AddressBookService {
      */
     public AddressBook getById(Long id) {
         AddressBook addressBook = addressBookMapper.getById(id);
+        requireOwnership(addressBook);
         return addressBook;
     }
 
@@ -54,6 +57,9 @@ public class AddressBookServiceImpl implements AddressBookService {
      * @param addressBook
      */
     public void update(AddressBook addressBook) {
+        getById(addressBook.getId());
+        validateAddress(addressBook);
+        addressBook.setUserId(BaseContext.getCurrentId());
         addressBookMapper.update(addressBook);
     }
 
@@ -64,6 +70,7 @@ public class AddressBookServiceImpl implements AddressBookService {
      */
     @Transactional
     public void setDefault(AddressBook addressBook) {
+        getById(addressBook.getId());
         //1、将当前用户的所有地址修改为非默认地址 update address_book set is_default = ? where user_id = ?
         addressBook.setIsDefault(0);
         addressBook.setUserId(BaseContext.getCurrentId());
@@ -80,7 +87,24 @@ public class AddressBookServiceImpl implements AddressBookService {
      * @param id
      */
     public void deleteById(Long id) {
+        getById(id);
         addressBookMapper.deleteById(id);
+    }
+
+    private void requireOwnership(AddressBook address) {
+        if (address == null || !BaseContext.getCurrentId().equals(address.getUserId())) {
+            throw new AddressBookBusinessException("收货地址不存在");
+        }
+    }
+
+    private void validateAddress(AddressBook address) {
+        if (address.getConsignee() == null || address.getConsignee().trim().isEmpty()
+                || address.getDetail() == null || address.getDetail().trim().isEmpty()) {
+            throw new AddressBookBusinessException("请填写收货人和详细地址");
+        }
+        if (address.getPhone() == null || !address.getPhone().matches("1[3-9][0-9]{9}")) {
+            throw new AddressBookBusinessException("请输入有效的11位手机号码");
+        }
     }
 
 }

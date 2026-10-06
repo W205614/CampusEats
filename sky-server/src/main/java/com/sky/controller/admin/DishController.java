@@ -12,6 +12,7 @@ import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -72,7 +73,7 @@ public class DishController {
         dishService.deleteBatch(ids);
 
         // 将所有的菜品缓存数据清理掉, 所有以dish_开头的key
-        cleanCache("dis_*");
+        cleanCache("dish_*");
         return Result.success();
     }
 
@@ -101,7 +102,7 @@ public class DishController {
         dishService.updateWithFlavor(dishDTO);
 
         // 将所有的菜品缓存数据清理掉, 所有以dish_开头的key
-        cleanCache("dis_*");
+        cleanCache("dish_*");
         return Result.success();
     }
 
@@ -112,12 +113,13 @@ public class DishController {
      * @return
      */
     @PostMapping ("/status/{status}")
+    @CacheEvict(cacheNames = "setmealCache", allEntries = true)
     public Result stopOrStart(@PathVariable Integer status, Long id) {
         log.info("菜品起售停售: {}, {}", status, id);
         dishService.stopOrStart(status, id);
 
         // 将所有的菜品缓存数据清理掉, 所有以dish_开头的key
-        cleanCache("dis_*");
+        cleanCache("dish_*");
         return Result.success();
     }
 

@@ -11,6 +11,8 @@ import com.sky.entity.Setmeal;
 import com.sky.entity.SetmealDish;
 import com.sky.exception.DeletionNotAllowedException;
 import com.sky.exception.SetmealEnableFailedException;
+import com.sky.exception.BaseException;
+import com.sky.utils.PageValidation;
 import com.sky.mapper.DishMapper;
 import com.sky.mapper.SetmealDishMapper;
 import com.sky.mapper.SetmealMapper;
@@ -43,6 +45,7 @@ public class SetmealServiceImpl implements SetmealService {
     @Override
     @Transactional
     public void saveWithDish(SetmealDTO setmealDTO) {
+        validateSetmeal(setmealDTO);
         Setmeal setmeal = new Setmeal();
         BeanUtils.copyProperties(setmealDTO, setmeal);
 
@@ -68,6 +71,7 @@ public class SetmealServiceImpl implements SetmealService {
      */
     @Override
     public PageResult pageQuery(SetmealPageQueryDTO setmealPageQueryDTO) {
+        PageValidation.check(setmealPageQueryDTO.getPage(), setmealPageQueryDTO.getPageSize());
         PageHelper.startPage(setmealPageQueryDTO.getPage(), setmealPageQueryDTO.getPageSize());
 
         Page<SetmealVO> page = setmealMapper.pageQuery(setmealPageQueryDTO);
@@ -82,9 +86,11 @@ public class SetmealServiceImpl implements SetmealService {
      * @param ids
      */
     @Override
+    @Transactional
     public void deleteBatch(List<Long> ids) {
         for (Long id : ids) {
             Setmeal setmeal = setmealMapper.getById(id);
+            if (setmeal == null) throw new BaseException("套餐不存在");
             if(StatusConstant.ENABLE == setmeal.getStatus()) {
                 // 起售中的套餐不能删除
                 throw new DeletionNotAllowedException(MessageConstant.SETMEAL_ON_SALE);
@@ -107,6 +113,7 @@ public class SetmealServiceImpl implements SetmealService {
     @Override
     public SetmealVO getByIdWithDish(Long id) {
         Setmeal setmeal = setmealMapper.getById(id);
+        if (setmeal == null) throw new BaseException("套餐不存在");
         List<SetmealDish> setmealDishes = setmealDishMapper.getBySetmealId(id);
 
         SetmealVO setmealVO = new SetmealVO();
@@ -121,7 +128,10 @@ public class SetmealServiceImpl implements SetmealService {
      * @param setmealDTO
      */
     @Override
+    @Transactional
     public void update(SetmealDTO setmealDTO) {
+        if (setmealMapper.getById(setmealDTO.getId()) == null) throw new BaseException("套餐不存在");
+        validateSetmeal(setmealDTO);
         Setmeal setmeal = new Setmeal();
         BeanUtils.copyProperties(setmealDTO, setmeal);
 
@@ -149,6 +159,8 @@ public class SetmealServiceImpl implements SetmealService {
      */
     @Override
     public void startOrStop(Integer status, Long id) {
+        if (status == null || (status != 0 && status != 1)) throw new BaseException("售卖状态只能为0或1");
+        if (setmealMapper.getById(id) == null) throw new BaseException("套餐不存在");
         // 套餐起售时, 判断套餐内是否有停售餐品, 如果有不能起售
         if(status == StatusConstant.ENABLE) {
             List<Dish> dishList = dishMapper.getBySetmealId(id);
@@ -185,5 +197,13 @@ public class SetmealServiceImpl implements SetmealService {
      */
     public List<DishItemVO> getDishItemById(Long id) {
         return setmealMapper.getDishItemBySetmealId(id);
+    }
+
+    private void validateSetmeal(SetmealDTO dto) {
+        if (dto.getName() == null || dto.getName().trim().isEmpty() || dto.getCategoryId() == null
+                || dto.getPrice() == null || dto.getPrice().signum() <= 0
+                || dto.getSetmealDishes() == null || dto.getSetmealDishes().isEmpty()) {
+            throw new BaseException("请填写套餐名称、分类、价格并选择菜品");
+        }
     }
 }

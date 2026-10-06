@@ -7,6 +7,7 @@ import com.sky.entity.Orders;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Select;
 import org.apache.ibatis.annotations.Update;
+import org.apache.ibatis.annotations.Param;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -14,6 +15,18 @@ import java.util.Map;
 
 @Mapper
 public interface OrderMapper {
+    @Update("update orders set status=#{order.status}, " +
+            "pay_status=COALESCE(#{order.payStatus}, pay_status), " +
+            "cancel_reason=COALESCE(#{order.cancelReason}, cancel_reason), " +
+            "rejection_reason=COALESCE(#{order.rejectionReason}, rejection_reason), " +
+            "cancel_time=COALESCE(#{order.cancelTime}, cancel_time), " +
+            "delivery_time=COALESCE(#{order.deliveryTime}, delivery_time) " +
+            "where id=#{order.id} and status=#{expectedStatus}")
+    int transition(@Param("order") Orders order, @Param("expectedStatus") Integer expectedStatus);
+    // Only one caller can move an unpaid order into the paid state.
+    @Update("update orders set status = 2, pay_status = 1, checkout_time = #{checkoutTime} " +
+            "where id = #{id} and user_id = #{userId} and status = 1 and pay_status = 0")
+    int markMockPaid(Long id, Long userId, LocalDateTime checkoutTime);
     /**
      * 向订单表插入数据
      * @param orders

@@ -277,6 +277,8 @@ public class ReportServiceImpl implements ReportService {
             }
 
             // 3. 通过输出流将Excel文件下载到客户端浏览器
+            response.setContentType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+            response.setHeader("Content-Disposition", "attachment; filename=campuseats-report-" + dateBegin + "-" + dateEnd + ".xlsx");
             ServletOutputStream out = response.getOutputStream();
             excel.write(out);
 

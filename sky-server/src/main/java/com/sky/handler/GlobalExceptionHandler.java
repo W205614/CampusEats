@@ -15,6 +15,17 @@ import java.sql.SQLIntegrityConstraintViolationException;
 @RestControllerAdvice
 @Slf4j
 public class GlobalExceptionHandler {
+    @ExceptionHandler({org.springframework.http.converter.HttpMessageNotReadableException.class,
+            org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class,
+            org.springframework.web.bind.MissingServletRequestParameterException.class})
+    public Result invalidRequest(Exception ex) {
+        return Result.error("请求参数不正确，请检查输入后重试");
+    }
+
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    public Result uploadTooLarge(Exception ex) {
+        return Result.error("图片过大，请选择10MB以内的图片");
+    }
 
     /**
      * 捕获业务异常

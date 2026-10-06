@@ -22,6 +22,8 @@ public class JwtTokenAdminInterceptor implements HandlerInterceptor {
 
     @Autowired
     private JwtProperties jwtProperties;
+    @Autowired
+    private com.sky.mapper.EmployeeMapper employeeMapper;
 
     /**
      * 校验jwt
@@ -46,9 +48,13 @@ public class JwtTokenAdminInterceptor implements HandlerInterceptor {
 
         //2、校验令牌
         try {
-            log.info("jwt校验:{}", token);
             Claims claims = JwtUtil.parseJWT(jwtProperties.getAdminSecretKey(), token);
             Long empId = Long.valueOf(claims.get(JwtClaimsConstant.EMP_ID).toString());
+            com.sky.entity.Employee employee = employeeMapper.getById(empId);
+            if (employee == null || !Integer.valueOf(1).equals(employee.getStatus())) {
+                response.setStatus(401);
+                return false;
+            }
             log.info("当前员工id：", empId);
             BaseContext.setCurrentId(empId);
             //3、通过，放行
@@ -58,5 +64,10 @@ public class JwtTokenAdminInterceptor implements HandlerInterceptor {
             response.setStatus(401);
             return false;
         }
+    }
+
+    @Override
+    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) {
+        BaseContext.removeCurrentId();
     }
 }
