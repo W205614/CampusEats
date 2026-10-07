@@ -182,6 +182,9 @@ public class CatalogService {
   @Transactional
   public void deleteCategory(long id) {
     Actor.admin();
+    // Serialize with product creation's FOR SHARE before checking references.
+    require(db.one("SELECT id FROM category WHERE id=? FOR UPDATE", id) != null,
+        404, "NOT_FOUND", "分类不存在");
     require(
         db.count(
                 "SELECT (SELECT COUNT(*) FROM dish WHERE category_id=?)+(SELECT COUNT(*) FROM"
@@ -193,6 +196,7 @@ public class CatalogService {
         "CATEGORY_IN_USE",
         "分类中仍有商品");
     require(db.update("DELETE FROM category WHERE id=?", id) == 1, 404, "NOT_FOUND", "分类不存在");
+    audit.write(Actor.current(), "CATEGORY_DELETE", id, "删除空分类");
   }
 
   @Transactional

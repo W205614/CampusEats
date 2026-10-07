@@ -11,10 +11,12 @@ import com.sky.infra.*;
 import com.sky.security.*;
 import com.sky.websocket.*;
 import java.math.*;
+import java.sql.DriverManager;
 import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicLong;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -766,5 +768,101 @@ class CommerceIntegrationTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.data.cartVersion").value("1"))
         .andExpect(jsonPath("$.data.items[0].itemId").value("2"));
+  }
+
+  @Test
+  void categoryDeletionWaitsForProductCreationAndRechecksReferences() throws Exception {
+    long category = catalog.category(null, new Category("并发分类", 1, 0, true));
+    var inserted = new CountDownLatch(1);
+    var commitCreation = new CountDownLatch(1);
+    var deletingStarted = new CountDownLatch(1);
+    var deletingConnection = new AtomicLong();
+    var pool = Executors.newFixedThreadPool(2);
+    var tx = new org.springframework.transaction.support.TransactionTemplate(manager);
+    try {
+      var creating = pool.submit(() -> {
+        act(admin);
+        try {
+          return tx.execute(status -> {
+            long product = catalog.save("DISH", null, new Product(
+                "并发餐品", category, new BigDecimal("12.00"), true, "", "", List.of(), List.of()));
+            inserted.countDown();
+            try {
+              assertTrue(commitCreation.await(15, TimeUnit.SECONDS));
+            } catch (InterruptedException ex) {
+              Thread.currentThread().interrupt();
+              throw new IllegalStateException(ex);
+            }
+            return product;
+          });
+        } finally {
+          SecurityContextHolder.clearContext();
+        }
+      });
+      assertTrue(inserted.await(10, TimeUnit.SECONDS));
+      var deleting = pool.submit(() -> {
+        act(admin);
+        try {
+          tx.executeWithoutResult(status -> {
+            deletingConnection.set(db.count("SELECT CONNECTION_ID()"));
+            deletingStarted.countDown();
+            catalog.deleteCategory(category);
+          });
+          return "DELETED";
+        } catch (BusinessException ex) {
+          return ex.code();
+        } finally {
+          SecurityContextHolder.clearContext();
+        }
+      });
+      assertTrue(deletingStarted.await(10, TimeUnit.SECONDS));
+      awaitMysqlLockWait(deletingConnection.get());
+      commitCreation.countDown();
+      long product = creating.get(15, TimeUnit.SECONDS);
+      assertEquals("CATEGORY_IN_USE", deleting.get(15, TimeUnit.SECONDS));
+      assertEquals(category, db.count("SELECT category_id FROM dish WHERE id=?", product));
+      assertEquals(1, db.count("SELECT COUNT(*) FROM category WHERE id=?", category));
+      assertEquals(0, db.count(
+          "SELECT COUNT(*) FROM dish d LEFT JOIN category c ON c.id=d.category_id WHERE c.id IS NULL"));
+      assertEquals(0, db.count(
+          "SELECT COUNT(*) FROM audit_log WHERE action='CATEGORY_DELETE' AND target_id=?", category));
+    } finally {
+      commitCreation.countDown();
+      pool.shutdownNow();
+      assertTrue(pool.awaitTermination(15, TimeUnit.SECONDS));
+      db.update("DELETE FROM dish WHERE category_id=?", category);
+      db.update("DELETE FROM category WHERE id=?", category);
+    }
+  }
+
+  private void awaitMysqlLockWait(long connectionId) throws Exception {
+    // Observe a real InnoDB wait before committing the competing transaction; no timing guess.
+    try (var connection = DriverManager.getConnection(mysql.getJdbcUrl(), "root", mysql.getPassword());
+        var statement = connection.prepareStatement(
+            "SELECT COUNT(*) FROM performance_schema.data_lock_waits w JOIN performance_schema.threads t"
+                + " ON t.THREAD_ID=w.REQUESTING_THREAD_ID WHERE t.PROCESSLIST_ID=?")) {
+      statement.setLong(1, connectionId);
+      long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
+      while (System.nanoTime() < deadline) {
+        try (var rows = statement.executeQuery()) {
+          rows.next();
+          if (rows.getLong(1) > 0) return;
+        }
+        TimeUnit.MILLISECONDS.sleep(20);
+      }
+      fail("Competing category deletion never entered an InnoDB lock wait");
+    }
+  }
+
+  @Test
+  void categoryDeletionAuditsOnlySuccessfulChanges() {
+    long category = catalog.category(null, new Category("删除审计分类", 1, 0, true));
+    catalog.deleteCategory(category);
+    assertEquals(0, db.count("SELECT COUNT(*) FROM category WHERE id=?", category));
+    assertEquals(1, db.count(
+        "SELECT COUNT(*) FROM audit_log WHERE action='CATEGORY_DELETE' AND target_id=?", category));
+    failure(404, () -> catalog.deleteCategory(category));
+    assertEquals(1, db.count(
+        "SELECT COUNT(*) FROM audit_log WHERE action='CATEGORY_DELETE' AND target_id=?", category));
   }
 }
