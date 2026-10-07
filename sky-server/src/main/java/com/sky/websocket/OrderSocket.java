@@ -57,6 +57,7 @@ public class OrderSocket extends TextWebSocketHandler {
     if (message.getPayloadLength() > 1024) session.close(CloseStatus.TOO_BIG_TO_PROCESS);
   }
 
+  /** Enqueue a best-effort hint; clients recover state by querying orders. */
   public void publish(String payload) {
     sender.execute(
         () -> {

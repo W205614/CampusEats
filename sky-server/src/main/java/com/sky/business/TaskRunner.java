@@ -92,6 +92,7 @@ public class TaskRunner {
       if (task.get("event_type").equals("CACHE_INVALIDATE"))
         cache.retry(json.map(String.valueOf(task.get("payload"))).get("key").toString());
       else
+        // Local sender acceptance is best effort, not a client delivery acknowledgement.
         socket.publish(
             json.write(
                 Map.of(
