@@ -721,7 +721,7 @@ class CommerceIntegrationTest {
     try {
       catalog.category(1L, new Category("校园热餐", 1, 1, true));
       assertEquals(
-          2,
+          3,
           db.count(
               "SELECT COUNT(*) FROM outbox_event WHERE event_type='CACHE_INVALIDATE' AND"
                   + " state='REQUESTED'"));
@@ -730,8 +730,9 @@ class CommerceIntegrationTest {
     }
     assertTrue(tasks.runEvent());
     assertTrue(tasks.runEvent());
+    assertTrue(tasks.runEvent());
     assertEquals(
-        2,
+        3,
         db.count(
             "SELECT COUNT(*) FROM outbox_event WHERE event_type='CACHE_INVALIDATE' AND"
                 + " state='SUCCEEDED'"));
@@ -742,7 +743,7 @@ class CommerceIntegrationTest {
               status.setRollbackOnly();
             });
     assertEquals(
-        2, db.count("SELECT COUNT(*) FROM outbox_event WHERE event_type='CACHE_INVALIDATE'"));
+        3, db.count("SELECT COUNT(*) FROM outbox_event WHERE event_type='CACHE_INVALIDATE'"));
     assertEquals("校园热餐", db.one("SELECT name FROM category WHERE id=1").get("name"));
   }
 
@@ -864,5 +865,60 @@ class CommerceIntegrationTest {
     failure(404, () -> catalog.deleteCategory(category));
     assertEquals(1, db.count(
         "SELECT COUNT(*) FROM audit_log WHERE action='CATEGORY_DELETE' AND target_id=?", category));
+  }
+
+  @Test
+  void categoryAvailabilityChangesInvalidateDependentSetmeals() {
+    assertFalse(catalog.menu(2, "SETMEAL").isEmpty());
+    new org.springframework.transaction.support.TransactionTemplate(manager).executeWithoutResult(status -> {
+      catalog.category(1L, new Category("校园热餐", 1, 1, false));
+      status.setRollbackOnly();
+    });
+    assertEquals(0, db.count("SELECT COUNT(*) FROM outbox_event WHERE event_type='CACHE_INVALIDATE'"));
+    assertFalse(catalog.menu(2, "SETMEAL").isEmpty());
+    try {
+      catalog.category(1L, new Category("校园热餐", 1, 1, false));
+      assertTrue(catalog.menu(2, "SETMEAL").isEmpty());
+      assertEquals(1, db.count(
+          "SELECT COUNT(*) FROM outbox_event WHERE event_type='CACHE_INVALIDATE'"
+              + " AND JSON_UNQUOTE(JSON_EXTRACT(payload,'$.key'))='menu:SETMEAL:2'"));
+      catalog.category(1L, new Category("校园热餐", 1, 1, true));
+      assertFalse(catalog.menu(2, "SETMEAL").isEmpty());
+      assertEquals(2, db.count(
+          "SELECT COUNT(*) FROM outbox_event WHERE event_type='CACHE_INVALIDATE'"
+              + " AND JSON_UNQUOTE(JSON_EXTRACT(payload,'$.key'))='menu:SETMEAL:2'"));
+    } finally {
+      db.update("UPDATE category SET status=1 WHERE id=1");
+    }
+  }
+
+  @Test
+  void dishRenameAndCategoryMoveInvalidateDependentSetmealMetadata() {
+    var source = db.one("SELECT * FROM dish WHERE id=1");
+    var flavors = db.rows("SELECT name,value FROM dish_flavor WHERE dish_id=1 ORDER BY id").stream()
+        .map(row -> new Flavor(row.get("name").toString(), json.strings(row.get("value").toString())))
+        .toList();
+    var original = new Product(source.get("name").toString(), Db.id(source, "category_id"),
+        (BigDecimal) source.get("price"), true, (String) source.get("description"),
+        (String) source.get("image"), flavors, List.of());
+    long movedCategory = catalog.category(null, new Category("套餐菜品迁移分类", 1, 20, true));
+    assertFalse(catalog.menu(2, "SETMEAL").isEmpty());
+    try {
+      catalog.save("DISH", 1L, new Product("套餐组成新名称", movedCategory, original.price(), true,
+          original.description(), original.image(), flavors, List.of()));
+      var meal = ViewFactory.product(catalog.menu(2, "SETMEAL").getFirst());
+      assertEquals("套餐组成新名称", meal.components().stream()
+          .filter(component -> component.dishId() == 1L).findFirst().orElseThrow().currentName());
+      assertEquals(1, db.count(
+          "SELECT COUNT(*) FROM outbox_event WHERE event_type='CACHE_INVALIDATE'"
+              + " AND JSON_UNQUOTE(JSON_EXTRACT(payload,'$.key'))='menu:SETMEAL:2'"));
+      catalog.category(movedCategory, new Category("套餐菜品迁移分类", 1, 20, false));
+      assertTrue(catalog.menu(2, "SETMEAL").isEmpty());
+      catalog.category(movedCategory, new Category("套餐菜品迁移分类", 1, 20, true));
+      assertFalse(catalog.menu(2, "SETMEAL").isEmpty());
+    } finally {
+      catalog.save("DISH", 1L, original);
+      catalog.deleteCategory(movedCategory);
+    }
   }
 }

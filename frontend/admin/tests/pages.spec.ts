@@ -137,6 +137,51 @@ test('管理端分类、菜品口味、图片、套餐及编辑删除，H5显示
   await remove(page, category);
 });
 
+test('菜品分类停用与恢复刷新另一分类的套餐菜单，改名刷新组成信息', async ({ page, browser, request }) => {
+  const suffix = Date.now().toString(36);
+  const dishCategoryName = '联动菜品分类' + suffix, mealCategoryName = '联动套餐分类' + suffix;
+  const dishName = '联动餐品' + suffix, renamed = '联动改名餐品' + suffix, mealName = '联动套餐' + suffix;
+  for (const name of [dishCategoryName, mealCategoryName, dishName, renamed, mealName]) catalogFixtures.add(name);
+  const dishCategory = await admin(request, '/categories', 'POST', { name: dishCategoryName, type: 1, sort: 100, enabled: true });
+  const mealCategory = await admin(request, '/categories', 'POST', { name: mealCategoryName, type: 2, sort: 101, enabled: true });
+  const product = { name: dishName, categoryId: dishCategory.id, price: '12.00', enabled: true,
+    description: '缓存联动验收', image: '', flavors: [], components: [] };
+  const dish = await admin(request, '/products/DISH', 'POST', product);
+  await admin(request, '/products/SETMEAL', 'POST', { name: mealName, categoryId: mealCategory.id,
+    price: '20.00', enabled: true, description: '缓存联动验收', image: '', flavors: [],
+    components: [{ dishId: dish.id, copies: 1 }] });
+  const userPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
+  try {
+    await userLogin(userPage);
+    await userPage.getByText(mealCategoryName, { exact: true }).click();
+    const meal = userPage.locator('.card').filter({ hasText: mealName });
+    await expect(meal).toBeVisible();
+    await login(page);
+    await page.getByRole('link', { name: '分类管理', exact: true }).click();
+    for (const enabled of [false, true]) {
+      await row(page, dishCategoryName).getByRole('button', { name: '编辑' }).click();
+      await field(page.getByRole('dialog'), '启用状态').locator('.el-switch').click();
+      await save(page);
+      await expect(row(page, dishCategoryName)).toContainText(enabled ? '启用' : '停用');
+      const menuResponse = userPage.waitForResponse(r => r.url().includes('/menu/items?categoryId=' + mealCategory.id));
+      await userPage.reload();
+      await userPage.getByText(mealCategoryName, { exact: true }).click();
+      expect((await menuResponse).status()).toBe(200);
+      if (enabled) await expect(meal).toBeVisible();
+      else await expect(meal).toHaveCount(0);
+    }
+    await admin(request, '/products/DISH/' + dish.id, 'PUT', { ...product, name: renamed });
+    const refreshed = userPage.waitForResponse(r => r.url().includes('/menu/items?categoryId=' + mealCategory.id));
+    await userPage.reload();
+    await userPage.getByText(mealCategoryName, { exact: true }).click();
+    const result = await (await refreshed).json();
+    expect(result.data.find((x: any) => x.name === mealName).components[0].currentName).toBe(renamed);
+    await expect(meal).toBeVisible();
+  } finally {
+    await userPage.close();
+  }
+});
+
 test('楼栋启停、当日及默认配额、营业开关影响H5选餐', async ({ page, browser, request }) => {
   const name = '页面楼栋' + Date.now().toString(36);
   const shop = await admin(request, '/shop');
