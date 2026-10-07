@@ -1,8 +1,8 @@
 package com.sky.security;
 
 import com.sky.common.BusinessException;
+import java.time.Clock;
 import java.util.*;
-import java.util.concurrent.ConcurrentHashMap;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.script.DefaultRedisScript;
 import org.springframework.stereotype.Component;
@@ -10,9 +10,11 @@ import org.springframework.stereotype.Component;
 @Component
 public class RateLimits {
   private final StringRedisTemplate redis;
-  private final Map<String, Window> local = new ConcurrentHashMap<>();
+  private final Clock clock;
+  private static final int LOCAL_CAPACITY = 10000;
+  private final Map<String, Window> local = new HashMap<>();
 
-  private record Window(long start, int count) {}
+  private record Window(long expiresAt, long count) {}
 
   private static final DefaultRedisScript<Long> INCR =
       new DefaultRedisScript<>(
@@ -20,8 +22,9 @@ public class RateLimits {
               + " end; return n",
           Long.class);
 
-  public RateLimits(StringRedisTemplate redis) {
+  public RateLimits(StringRedisTemplate redis, Clock clock) {
     this.redis = redis;
+    this.clock = clock;
   }
 
   public void check(String key, int max, int seconds) {
@@ -31,21 +34,23 @@ public class RateLimits {
           Objects.requireNonNull(
               redis.execute(INCR, List.of("campus:rate:" + key), String.valueOf(seconds)));
     } catch (Exception ex) {
-      long now = System.currentTimeMillis();
-      if (local.size() > 10000)
-        local.entrySet().removeIf(e -> now - e.getValue().start() > seconds * 1000L);
-      if (local.size() >= 10000 && !local.containsKey(key))
-        throw new BusinessException(503, "RATE_LIMIT_BUSY", "服务繁忙，请稍后重试");
-      count =
-          local
-              .compute(
-                  key,
-                  (k, v) ->
-                      v == null || now - v.start() > seconds * 1000L
-                          ? new Window(now, 1)
-                          : new Window(v.start(), v.count() + 1))
-              .count();
+      count = fallbackCount(key, seconds);
     }
     BusinessException.require(count <= max, 429, "RATE_LIMITED", "操作过于频繁，请稍后重试");
+  }
+
+  private synchronized long fallbackCount(String key, int seconds) {
+    long now = clock.millis();
+    // Reclaim at the boundary before admission; each key keeps its own window lifetime.
+    if (local.size() >= LOCAL_CAPACITY)
+      local.entrySet().removeIf(entry -> now >= entry.getValue().expiresAt());
+    var window = local.get(key);
+    if (window == null || now >= window.expiresAt()) {
+      if (window == null && local.size() >= LOCAL_CAPACITY)
+        throw new BusinessException(503, "RATE_LIMIT_BUSY", "服务繁忙，请稍后重试");
+      window = new Window(now + seconds * 1000L, 1);
+    } else window = new Window(window.expiresAt(), window.count() + 1);
+    local.put(key, window);
+    return window.count();
   }
 }
