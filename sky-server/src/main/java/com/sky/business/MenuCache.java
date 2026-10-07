@@ -4,6 +4,7 @@ import com.sky.infra.*;
 import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 import java.util.function.Supplier;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -17,6 +18,7 @@ public class MenuCache {
   private final Clock clock;
   private final TransactionTemplate retryTx;
   private final Semaphore fallback = new Semaphore(20);
+  private final ReentrantReadWriteLock[] stripes = new ReentrantReadWriteLock[256];
 
   public MenuCache(
       StringRedisTemplate redis,
@@ -31,10 +33,22 @@ public class MenuCache {
     this.json = json;
     this.db = db;
     this.clock = clock;
+    for (int i = 0; i < stripes.length; i++) stripes[i] = new ReentrantReadWriteLock(true);
+  }
+
+  public List<Map<String, Object>> load(String key, Supplier<List<Map<String, Object>>> loader) {
+    var lock = stripe(key).readLock();
+    lock.lock();
+    try {
+      return readAndFill(key, loader);
+    } finally {
+      lock.unlock();
+    }
   }
 
   @SuppressWarnings("unchecked")
-  public List<Map<String, Object>> load(String key, Supplier<List<Map<String, Object>>> loader) {
+  private List<Map<String, Object>> readAndFill(
+      String key, Supplier<List<Map<String, Object>>> loader) {
     try {
       String hit = redis.opsForValue().get("campus:" + key);
       if (hit != null) {
@@ -80,7 +94,7 @@ public class MenuCache {
             @Override
             public void afterCommit() {
               try {
-                redis.delete("campus:" + key);
+                retry(key);
               } catch (Exception ignored) {
               }
             }
@@ -90,7 +104,7 @@ public class MenuCache {
 
   public void invalidate(String key) {
     try {
-      redis.delete("campus:" + key);
+      retry(key);
     } catch (Exception ex) {
       LocalDateTime now = LocalDateTime.now(clock);
       retryTx.executeWithoutResult(
@@ -106,6 +120,17 @@ public class MenuCache {
   }
 
   public void retry(String key) {
-    redis.delete("campus:" + key);
+    // In one instance, deletion must follow every older in-flight fill, including Outbox retries.
+    var lock = stripe(key).writeLock();
+    lock.lock();
+    try {
+      redis.delete("campus:" + key);
+    } finally {
+      lock.unlock();
+    }
+  }
+
+  private ReentrantReadWriteLock stripe(String key) {
+    return stripes[(key.hashCode() & Integer.MAX_VALUE) % stripes.length];
   }
 }
