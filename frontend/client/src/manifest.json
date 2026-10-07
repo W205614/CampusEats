@@ -1,0 +1,25 @@
+{
+  "name": "CampusEats",
+  "appid": "__UNI__CAMPUS_EATS",
+  "description": "校园点餐演示，模拟支付",
+  "versionName": "1.0.0",
+  "versionCode": "100",
+  "transformPx": false,
+  "mp-weixin": {
+    "appid": "",
+    "setting": {
+      "urlCheck": false
+    },
+    "usingComponents": true
+  },
+  "h5": {
+    "router": {
+      "mode": "history",
+      "base": "/app/"
+    },
+    "title": "CampusEats · 校园点餐"
+  },
+  "uniStatistics": {
+    "enable": false
+  }
+}

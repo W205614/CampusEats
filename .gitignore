@@ -34,3 +34,11 @@ logs/
 
 # 本地数据库连接信息
 *.local.xml
+
+# v1 source builds and protected local evidence
+**/node_modules/
+**/dist/
+**/test-results/
+**/playwright-report/
+.local/
+frontend/client/.env.local

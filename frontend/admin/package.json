@@ -1,0 +1,28 @@
+{
+  "name": "campuseats-admin",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "vue-tsc --noEmit && vite build",
+    "typecheck": "vue-tsc --noEmit",
+    "test": "playwright test",
+    "generate:types": "node ../../scripts/generate-contracts.mjs"
+  },
+  "dependencies": {
+    "vue": "3.5.43",
+    "pinia": "4.0.3",
+    "vue-router": "5.3.1",
+    "element-plus": "2.14.7"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "6.0.9",
+    "vite": "8.3.3",
+    "typescript": "5.9.3",
+    "vue-tsc": "3.3.12",
+    "@playwright/test": "1.63.0",
+    "openapi-typescript": "7.13.0",
+    "@types/node": "24.10.1"
+  }
+}

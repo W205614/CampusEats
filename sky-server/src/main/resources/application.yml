@@ -1,59 +1,75 @@
 server:
   port: 8080
-
+  shutdown: graceful
+  forward-headers-strategy: framework
+  tomcat:
+    max-swallow-size: 5MB
+    threads:
+      max: 80
+      min-spare: 8
+    accept-count: 100
+    max-connections: 200
 spring:
   profiles:
-    active: dev
-  main:
-    allow-circular-references: true
+    default: local
   datasource:
-    druid:
-      driver-class-name: ${sky.datasource.driver-class-name}
-      url: jdbc:mysql://${sky.datasource.host}:${sky.datasource.port}/${sky.datasource.database}?serverTimezone=Asia/Shanghai&useUnicode=true&characterEncoding=utf-8&zeroDateTimeBehavior=convertToNull&useSSL=false&allowPublicKeyRetrieval=true
-      username: ${sky.datasource.username}
-      password: ${sky.datasource.password}
-  redis:
-    host: ${sky.redis.host}
-    port: ${sky.redis.port}
-    password: ${sky.redis.password}
-    database: ${sky.redis.database}
-
+    url: ${DB_URL:jdbc:mysql://127.0.0.1:13383/sky_take_out?serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false}
+    username: ${DB_USER:campus}
+    password: ${MYSQL_PASSWORD:}
+    hikari:
+      transaction-isolation: TRANSACTION_READ_COMMITTED
+      maximum-pool-size: 20
+      minimum-idle: 20
+      connection-timeout: 3000
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:16383}
+      password: ${REDIS_PASSWORD:}
+      connect-timeout: 1s
+      timeout: 1s
+  task:
+    scheduling:
+      pool:
+        size: 3
+  flyway:
+    baseline-on-migrate: false
+    clean-disabled: true
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db
+      show-details: never
+  health:
+    redis:
+      enabled: false
 mybatis:
-  #mapper配置文件
-  mapper-locations: classpath:mapper/*.xml
-  type-aliases-package: com.sky.entity
   configuration:
-    #开启驼峰命名
-    map-underscore-to-camel-case: true
-
+    map-underscore-to-camel-case: false
+springdoc:
+  swagger-ui:
+    path: /docs
+campus:
+  jwt-secret: ${JWT_ADMIN_SECRET:}
+  demo-admin-password: ${DEMO_ADMIN_PASSWORD:}
+  uploads: ${UPLOADS_PATH:./.local/uploads}
+  allowed-origins: ${ALLOWED_ORIGINS:http://localhost:18083,http://127.0.0.1:18083,http://localhost:5173,http://localhost:5174}
+  wechat-appid: ${WECHAT_APPID:}
+  wechat-secret: ${WECHAT_SECRET:}
+  tasks-enabled: ${TASKS_ENABLED:true}
 logging:
   level:
-    com:
-      sky:
-        mapper: debug
-        service: info
-        controller: info
-
-sky:
-  jwt:
-    # 设置jwt签名加密时使用的秘钥
-    admin-secret-key: itcast
-    # 设置jwt过期时间
-    admin-ttl: 7200000
-    # 设置前端传递过来的令牌名称
-    admin-token-name: token
-    user-secret-key: itheima
-    user-ttl: 7200000
-    user-token-name: authentication
-  alioss:
-    endpoint: ${sky.alioss.endpoint}
-    access-key-id: ${sky.alioss.access-key-id}
-    access-key-secret: ${sky.alioss.access-key-secret}
-    bucket-name: ${sky.alioss.bucket-name}
-  wechat:
-    appid: ${sky.wechat.appid}
-    secret: ${sky.wechat.secret}
-  shop:
-    address: ${sky.shop.address}
-  baidu:
-    ak: ${sky.baidu.ak}
+    com.sky: INFO
+    org.springframework.security: WARN

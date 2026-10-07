@@ -1,0 +1,17 @@
+{
+  "reviewedAt": "2026-10-07",
+  "expiresOn": "2026-11-07",
+  "reason": "GHSA-vfj7-8cjw-p6xm has no patched braces release. These packages run only in the trusted uni-app build pipeline; production serves static assets with Nginx. Do not accept untrusted glob patterns or expose the development server.",
+  "packages": [
+    "@dcloudio/uni-cli-shared",
+    "@dcloudio/uni-cloud",
+    "@dcloudio/vite-plugin-uni",
+    "braces",
+    "chokidar",
+    "fast-glob",
+    "micromatch"
+  ],
+  "advisories": [
+    "https://github.com/advisories/GHSA-vfj7-8cjw-p6xm"
+  ]
+}

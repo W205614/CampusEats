@@ -1,0 +1,64 @@
+{
+  "pages": [
+    {
+      "path": "pages/menu/index",
+      "style": {
+        "navigationBarTitleText": "CampusEats · 校园点餐"
+      }
+    },
+    {
+      "path": "pages/cart/index",
+      "style": {
+        "navigationBarTitleText": "购物车"
+      }
+    },
+    {
+      "path": "pages/addresses/index",
+      "style": {
+        "navigationBarTitleText": "校园地址"
+      }
+    },
+    {
+      "path": "pages/checkout/index",
+      "style": {
+        "navigationBarTitleText": "确认订单"
+      }
+    },
+    {
+      "path": "pages/orders/index",
+      "style": {
+        "navigationBarTitleText": "我的订单"
+      }
+    },
+    {
+      "path": "pages/login/index",
+      "style": {
+        "navigationBarTitleText": "登录"
+      }
+    }
+  ],
+  "globalStyle": {
+    "navigationBarTextStyle": "black",
+    "navigationBarBackgroundColor": "#fffaf3",
+    "backgroundColor": "#f7f5f1"
+  },
+  "tabBar": {
+    "color": "#82786b",
+    "selectedColor": "#cf5c25",
+    "backgroundColor": "#fffaf3",
+    "list": [
+      {
+        "pagePath": "pages/menu/index",
+        "text": "点餐"
+      },
+      {
+        "pagePath": "pages/cart/index",
+        "text": "购物车"
+      },
+      {
+        "pagePath": "pages/orders/index",
+        "text": "订单"
+      }
+    ]
+  }
+}

@@ -1,0 +1,57 @@
+{
+  "name": "campuseats-client",
+  "private": true,
+  "version": "1.0.0",
+  "scripts": {
+    "dev:h5": "uni --host 127.0.0.1 --port 5174",
+    "build:h5": "uni build",
+    "build:mp-weixin": "uni build -p mp-weixin",
+    "typecheck": "vue-tsc --noEmit"
+  },
+  "dependencies": {
+    "@dcloudio/uni-app": "3.0.0-5020420260813003",
+    "@dcloudio/uni-components": "3.0.0-5020420260813003",
+    "@dcloudio/uni-h5": "3.0.0-5020420260813003",
+    "@dcloudio/uni-mp-weixin": "3.0.0-5020420260813003",
+    "vue": "3.5.43",
+    "pinia": "4.0.3",
+    "vue-i18n": "9.14.5"
+  },
+  "devDependencies": {
+    "@dcloudio/types": "3.4.31",
+    "@dcloudio/uni-cli-shared": "3.0.0-5020420260813003",
+    "@dcloudio/vite-plugin-uni": "3.0.0-5020420260813003",
+    "@dcloudio/uni-stacktracey": "3.0.0-5020420260813003",
+    "typescript": "5.9.3",
+    "vite": "7.3.7",
+    "vue-tsc": "3.3.12",
+    "@vue/runtime-core": "3.5.43"
+  },
+  "overrides": {
+    "vite": "$vite",
+    "rollup": "4.64.0",
+    "vue": "$vue",
+    "vue-i18n": "$vue-i18n",
+    "@vue/shared": "3.4.21",
+    "@vue/compiler-dom": "3.4.21",
+    "@vue/compiler-core": "3.4.21",
+    "@vue/compiler-sfc": "3.4.21",
+    "@vue/server-renderer": "3.5.43",
+    "@intlify/core-base": "9.14.5",
+    "postcss": "8.5.29",
+    "source-map-js": "1.2.2",
+    "ws": "8.22.0",
+    "jpeg-js": "0.4.4",
+    "unimport": "5.7.0",
+    "@intlify/vue-devtools": "9.14.1",
+    "@intlify/message-resolver": "9.1.11",
+    "@intlify/message-compiler": "9.14.5",
+    "adm-zip": "0.6.1",
+    "express": "4.22.3"
+  },
+  "optionalDependencies": {
+    "@rollup/rollup-win32-x64-msvc": "4.64.0",
+    "@rollup/rollup-linux-x64-gnu": "4.64.0",
+    "@rollup/rollup-linux-arm64-gnu": "4.64.0"
+  }
+}
