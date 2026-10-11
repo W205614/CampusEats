@@ -1,114 +1,244 @@
-# CampusEats
+# CampusEats · 校园点餐与供餐管理
 
-单校区、单店的校园点餐工程演示。Java 单体 + MySQL + Redis；Vue 3 管理端、uni-app 微信小程序与 H5。**支付和退款均为模拟，不发生真实资金交易。**
+[![Verify CampusEats](https://github.com/W205614/CampusEats/actions/workflows/verify.yml/badge.svg?branch=master)](https://github.com/W205614/CampusEats/actions/workflows/verify.yml)
 
-## 启动
+基于 Spring Boot、Vue 3 和 uni-app 的校园点餐应用。用户查看每日餐品、选择口味并下单，运营员接单和派送，配送员处理分配给自己的订单；管理员维护餐品、供餐份数、配送楼栋与营业规则。
 
-需要 Docker Desktop/Linux Engine、Java 21、Maven、Node 24，PowerShell 7。首次运行：
+项目面向**单校区、单店、单实例**工程演示，重点是订单、配额、退款任务和权限的一致性。**支付与退款均为模拟，不发生真实资金交易。**
+
+[功能特点](#功能特点) · [界面预览](#界面预览) · [技术栈与架构](#技术栈与架构) · [快速开始](#快速开始) · [核心实现](#核心实现) · [项目结构与开发验证](#项目结构与开发验证) · [运行边界与文档导航](#运行边界与文档导航)
+
+## 功能特点
+
+| 使用者 | 功能 |
+|---|---|
+| 点餐用户 | 菜品与套餐、口味选择、每日剩余份数、购物车、楼栋地址、下单与模拟支付、订单查询与取消、再来一单 |
+| 运营员 | 订单查询、接单备餐、拒单、派单及配送状态处理；管理入口按角色限制 |
+| 配送员 | 只查看和操作分配给自己的订单，开始配送、确认送达 |
+| 管理员 | 分类、菜品、套餐与图片，默认及当日配额，楼栋启停，营业时段与费用，员工角色，退款和通知任务，审计查询与 XLSX 统计导出 |
+
+供餐按菜品计数，套餐占用组成菜品的份数。下单保存当时的商品、费用和地址快照；菜单改价或删除地址不会改写历史订单。页面提供实时通知与定时查询，配送超时只标记待处理，不自动视为送达。
+
+## 界面预览
+
+以下截图于 **2026-10-11** 从本机运行版本截取，展示演示数据；统计数字不代表真实营业结果。H5 截图不代表微信真机验收。
+
+### 用户端点餐
+
+<img src="docs/images/h5-menu.png" alt="H5 点餐页面：菜品、价格与每日剩余份数" width="390">
+
+### 管理端菜品维护
+
+![管理端菜品管理：图片、售价、默认每日份数和启停操作](docs/images/admin-catalog.png)
+
+### 经营统计
+
+![经营统计：销量、范围汇总、每日明细与 Excel 导出](docs/images/admin-reports.png)
+
+## 技术栈与架构
+
+| 部分 | 技术 | 职责 |
+|---|---|---|
+| 业务后端 | Java 21、Spring Boot 4.1.1、Spring Security、MyBatis / JDBC、Flyway | 接口、权限、计价、交易、配额、迁移及后台任务 |
+| 持久化与缓存 | MySQL 8.4、Redis 7.4 | MySQL 保存业务事实；Redis 提供菜单缓存、限流和一次性连接票据 |
+| 管理端 | Vue 3、TypeScript、Element Plus、Vite | 运营工作台与角色入口 |
+| 用户端 | uni-app、Vue 3、TypeScript | H5 与微信小程序源码及构建 |
+| 部署与验证 | Docker Compose、Nginx、JUnit、Testcontainers、Playwright、GitHub Actions | 源码构建、回归、页面验收与部署检查 |
+
+```mermaid
+flowchart TD
+    Admin["Vue 管理端：管理员 / 运营员 / 配送员"] -->|HTTP / WebSocket| Web["Nginx :18083"]
+    User["uni-app 用户端：H5 / 微信小程序"] -->|HTTP| Web
+    Web -->|API / 订单通知| Server["Java 单体：接口、权限、业务与后台任务"]
+    Server -->|订单、配额、会话、任务、审计| DB[(MySQL)]
+    Server -->|菜单缓存、限流、一次性票据| Cache[(Redis)]
+    Server -->|校验后保存| Files["上传图片持久卷"]
+```
+
+日常 Compose 包含 `mysql`、`redis`、`server`、`web` 四个容器，默认仅 Nginx 绑定宿主机 `127.0.0.1:18083`。管理端与 H5 使用同源接口；小程序需要配置设备可访问的 HTTPS 地址。
+
+Controller 处理协议与参数校验，业务服务处理权限、状态和事务。MyBatis 负责订单、目录的批量读取，JDBC 明确执行条件更新与行锁，共用数据源和 Spring 事务。退款及 Outbox 任务运行在同一个 Java 服务中，不额外部署消息队列。
+
+## 快速开始
+
+### 1. 准备环境并启动
+
+需要 Docker Desktop / Linux Engine 与 Compose；默认启动脚本还需要 Java 21、Maven 和 PowerShell 7。本地前端开发及独立构建脚本需要 Node.js 24 与 npm，CI 使用 Node.js 24.19.0。
+
+在仓库根目录执行：
 
 ```powershell
 ./scripts/start.ps1
+docker compose ps
 ```
 
-脚本生成本机配置和独立的演示管理员密码，执行真实数据库测试，再从源码构建并启动四个容器。
+首次运行会从 `.env.example` 生成本机 `.env` 和独立的演示管理员密码，执行后端测试，再从源码构建并启动四个容器。首次下载依赖与构建镜像需要网络。
 
-- 管理端：http://localhost:18083/admin/
-- H5：http://localhost:18083/app/
-- 管理员：`admin`，初始密码见本机 `.local/demo-credentials.txt`。
-- 用户端三个演示账户互相独立。演示登录仅在 `demo` profile 启用。
-- 默认关店：在管理端“营业规则”确认费用与时段后打开营业开关。
-- 使用独立的 `campuseats-v1` 数据卷，原 `campuseats` 数据卷保留。
-- 修改 `.env` 中初始密码不会重置已有管理员。旧数据中的 MD5 密码在首次登录迁移并要求改密。
+### 2. 访问演示环境
 
-## 业务规则
+| 入口 | 地址 / 账号 |
+|---|---|
+| 管理端 | http://localhost:18083/admin/ |
+| H5 用户端 | http://localhost:18083/app/ |
+| 管理员 | `admin`，初始密码见本机 `.local/demo-credentials.txt` |
+| 点餐用户 | 在 H5 登录页选择三个相互独立的演示账户之一 |
 
-下单服务端计价并保存商品、费用和收货地址快照。请求键防重复下单；购物车版本防覆盖。每日供餐按菜品计数，套餐扣组成菜品份数。
+首次默认关店。在管理端“营业规则”确认费用和时段后打开营业开关；管理员创建运营员、配送员账户后，可用对应角色登录工作台。
 
-下单预占，接单转消耗；接单前取消、拒单、支付超时返还，接单后取消不自动返还。已支付订单取消后进入模拟退款任务，任务成功后才标记退款。
+演示登录仅在 `demo` profile 启用。修改 `.env` 的初始密码不会重置已有管理员；已有旧 MD5 密码在成功登录后迁移，并要求改密。`.env` 和本机凭据不提交 Git。
 
-配送员只查看和操作自己的订单。配送超时标记待处理，不自动冒充送达。实时通知断线时页面继续查询数据库状态。
+### 3. 常用操作
 
-## 代码结构
+```powershell
+docker compose logs --tail 100 server web
+docker compose stop
+docker compose up -d --wait
+```
 
-- `sky-common`：公共异常与哈希工具；`sky-pojo`：请求、响应契约；`sky-server`：接口、安全、业务服务与数据库访问。
-- `frontend/admin`：Vue 管理端；`frontend/client`：uni-app 用户端；`frontend/contracts`：API 类型、展示映射与共享错误类。
-- `deploy`、`compose.yaml`：源码镜像构建与 Nginx 入口；`scripts`：构建、验收、备份、恢复及可选压测；`docs`：架构和历史证据。
+停止再启动继续使用原持久卷。更新源码后使用启动脚本重建；脚本会为当时的旧应用镜像保留回滚标签。数据库迁移涉及的回退需结合已验证备份，不能只切换镜像。
 
-业务服务按购物车、计价、订单、配额、目录和后台任务组织。保留直接可读的业务判断，不引入通用 CRUD 框架或合并两端不同的请求实现。
+## 核心实现
 
-## 开发与验证
+### 重复提交与响应丢失
+
+下单前由服务端生成报价，提交携带 `cartVersion`、`quoteHash` 和 `Idempotency-Key`。数据库对用户与请求键建立唯一约束；同键同内容返回原订单，同键换内容返回冲突。购物车版本防止并发修改被覆盖，报价变化要求用户重新确认。
+
+客户端无法确认提交是否成功时，保留原请求键，通过 `orders/by-request/{key}` 查询；未找到才以原键和原请求重试。订单、快照、配额流水、购物车清理、审计和 Outbox 在同一事务中提交。
+
+### 每日配额与取消规则
+
+配额按营业日期和菜品维护，套餐先合并组成数量，再按菜品 ID 顺序处理。数据库条件更新限制可用份数，订单与配额变更共享事务，避免并发超卖或失败后留下孤立扣减。
+
+下单预占、接单转消耗；接单前取消、拒单及支付超时释放预占。接单后取消不自动返还已消耗份数。释放依据原配额流水的营业日期，跨午夜也不会返还到错误日期。
+
+### 退款任务与中断恢复
+
+已支付订单取消后创建持久化模拟退款任务，不直接标记退款完成。后台任务带租约和领取标识，失败有限重试，达到上限后由管理员重试；过期租约可以重新领取。仅在模拟网关成功并更新数据库后，订单才进入已退款状态。
+
+这是本项目模拟支付链路的恢复机制；真实支付网关的对账、回调与资金验收不在当前范围。
+
+### 缓存和实时连接异常
+
+目录变更在事务中写入缓存失效 Outbox，提交后立即尝试删除相关缓存，后台任务补偿失败。单实例内用固定分片读写锁协调回填与失效，避免旧查询在失效完成后重新写回旧菜单；最终下单仍以数据库校验为准。
+
+Redis 不可用时菜单回源数据库，限流转入本机有界窗口。订单通知使用 WebSocket 与一次性票据；断线后页面继续定时查询数据库。Outbox 发送成功表示本机发送队列接收，不能据此确认客户端收到；客户端按 `eventId` 去重并重查订单状态。
+
+### 权限和会话撤销
+
+服务端检查用户数据归属、员工角色和配送订单分配关系。每次请求校验账户状态及数据库会话，注销、改密或角色 / 启用状态变更撤销旧会话。前端隐藏入口只改善交互，不能代替服务端授权。
+
+WebSocket 校验允许的 Origin 和短期一次性票据，拒绝票据重放。接口统一返回 `code/message/data/requestId`；金额和长整型 ID 使用字符串，减少两端序列化差异。
+
+## 项目结构与开发验证
+
+### 项目结构
+
+```text
+CampusEats/
+├── sky-common/                  # 公共异常与哈希工具
+├── sky-pojo/                    # 请求、响应及校验契约
+├── sky-server/
+│   └── src/
+│       ├── main/java/com/sky/
+│       │   ├── web/             # HTTP 接口与异常响应
+│       │   ├── security/        # 认证、会话、权限与限流
+│       │   ├── business/        # 购物车、报价、订单、配额及后台任务
+│       │   ├── mapper/          # MyBatis 批量读取
+│       │   ├── infra/           # 数据库、序列化、种子数据等基础设施
+│       │   └── websocket/       # 票据与订单通知
+│       ├── main/resources/db/migration/ # Flyway 增量迁移
+│       └── test/                # 数据库集成与缓存、限流回归
+├── frontend/
+│   ├── admin/                   # Vue 管理端与 Playwright 流程
+│   ├── client/                  # uni-app 用户端
+│   └── contracts/               # OpenAPI、生成类型、展示映射与共享 ApiError
+├── deploy/                      # Web 镜像、Nginx 与演示图片
+├── scripts/                     # 构建、验收、备份、恢复及可选压测
+├── docs/                        # 架构、运行手册、截图与验收记录
+└── compose.yaml                 # 四服务部署与持久卷
+```
+
+三个 Maven 模块及业务服务边界保留，不引入通用 CRUD 框架。两端共享契约与 `ApiError`，各自保留 `fetch`、`uni.request` 和会话处理。旧实现与无引用资源已移出当前目录，可通过[整理前提交](https://github.com/W205614/CampusEats/tree/f85f3e7faf36b9ef3bd8d6e4a58c33155b3a18e8)追溯；Flyway 迁移保留。
+
+### 本地开发
+
+```powershell
+./scripts/build-frontends.ps1
+npm run dev --prefix frontend/admin
+npm run dev:h5 --prefix frontend/client
+```
+
+构建脚本安装锁定依赖，执行用户端类型检查及管理端、H5、小程序构建；管理端 build 自带类型检查。开发代理默认连接本机 `8080`，可用 `API_PROXY` 指定后端；默认 Compose 不发布该端口，需要单独运行本地后端或显式配置开发端口映射。
+
+小程序构建产物为 `frontend/client/dist/build/mp-weixin`，用微信开发者工具导入。AppID、设备可访问的 HTTPS 后端及合法请求域名配置见[部署手册](docs/v1-deployment.md#微信小程序)。
+
+### 自动化验证
 
 ```powershell
 mvn -B -ntp verify
 ./scripts/build-frontends.ps1
+npx --prefix frontend/admin playwright install chromium
 npm run test --prefix frontend/admin
+./scripts/smoke.ps1
 node scripts/check-websocket.mjs
 node scripts/generate-contracts.mjs --fetch
+git diff --exit-code -- frontend/contracts/openapi.json frontend/contracts/openapi.ts
 ```
 
-测试使用 Testcontainers 创建独立 MySQL/Redis，包含真实并发、交易回滚、权限和迁移场景。浏览器测试需要已启动的本机演示环境。生成的 API 类型及 OpenAPI 快照放在 `frontend/contracts`。
+后端测试用 Testcontainers 创建独立 MySQL / Redis。浏览器、烟测、WebSocket 及运行中契约比较需要已启动的本机演示环境；`--fetch` 会更新契约文件，上面的差异检查用于发现接口变化。
 
-测试按风险分工：真实数据库测试验证业务一致性与迁移，隔离测试验证缓存竞态和限流边界，浏览器测试验证实际页面流程，烟测验证部署入口与鉴权。不同层次的覆盖不按“重复测试”删除。备份恢复、故障演练和容量测试按需运行，不并入每次页面回归。
+| 测试层 | 当前数量 | 验证职责 |
+|---|---|---|
+| 真实数据库集成 | 39 | 37 项业务回归 + 2 项迁移：幂等、配额竞争、状态、事务、权限与数据保留 |
+| 隔离回归 | 8 | 3 项缓存竞态 + 5 项限流边界与并发计数 |
+| Chromium 页面 | 10 条流程 | 送达、退款、响应丢失恢复、商品与套餐、菜单联动、营业 / 配额、地址 / 购物车、两种员工角色、统计下载与查询 |
+| 部署与协议检查 | 独立脚本 | 入口跳转与端口、鉴权、WebSocket 安全、运行中 OpenAPI 比较 |
 
-浏览器公共辅助代码在 `frontend/admin/tests/helpers.ts`。每个测试保存并恢复营业配置，写入用户数据的测试要求购物车原本为空，并恢复默认地址、清理自己的地址和购物车。订单通过取消/退款收尾，测试员工和楼栋停用，关联历史及审计保留。登录仅对明确的 `RATE_LIMITED` 响应等待窗口恢复，其他错误直接失败；单个测试最多 90 秒，继续保持单 worker。测试源码也纳入管理端类型检查。
+同一功能的事务测试和页面测试验证不同风险，不按数量压缩。浏览器辅助代码在 `frontend/admin/tests/helpers.ts`，保持单 worker，保存并恢复营业配置；涉及演示用户的流程要求原购物车为空，并恢复原默认地址。测试资源独立命名，失败也执行收尾：清理自己的地址和购物车，取消未完成订单并等待退款，停用测试员工 / 楼栋，保留业务历史与审计。
 
-2026-10-11 冗余整理后的本机验收：
+### 最新验收摘要
 
-| 检查 | 实际结果 |
+**2026-10-11，代码整理提交 `8ce4f15` 的本机验收：**
+
+| 检查 | 结果 |
 |---|---|
-| 代码整理 | 移除 191 个旧实现及无引用资源文件；共享错误类、登录/配置/请求辅助逻辑；消除管理端重复类型检查 |
-| 后端回归 | 修改前、修改后均为 47 项通过，失败/错误/跳过均为 0；未删减当前业务场景 |
-| 浏览器 | 最终源码构建后 10/10 通过；营业配置、原默认地址和空购物车恢复到测试前状态 |
-| 源码构建与接口 | 管理端、H5、小程序构建通过；两端类型检查、运行中 OpenAPI 比较、WebSocket 安全检查通过 |
-| 容器与数据 | 四个最终容器健康；独立备份恢复通过；重启后业务表校验和、上传文件哈希一致；订单归属及配额检查通过 |
-| 清理 | 删除本项目 4 个旧镜像引用及对应旧镜像；42 个其他项目容器、205 个原有数据卷核对保留；清理后烟测通过 |
+| 后端 | 修改前、修改后均 47 项通过，失败 / 错误 / 跳过均为 0 |
+| 页面与构建 | Chromium 10/10；管理端、H5、小程序构建及两端类型检查通过 |
+| 接口与安全 | 运行中 OpenAPI 比较、WebSocket Origin / 单次票据 / 重放检查及烟测通过 |
+| 容器与数据 | 四个容器健康；独立备份恢复通过；重启后业务表校验和与上传文件哈希一致，归属、孤立记录及配额检查通过 |
+| GitHub CI | [该代码提交的 Actions 运行成功](https://github.com/W205614/CampusEats/actions/runs/38108301733) |
 
-入口跳转已修复：访问 `http://localhost:18083/` 使用相对跳转进入管理端，保留端口；CI 增加了相应烟测。首轮浏览器的 8/10 失败来自测试集中登录触发既有限流，已修正测试等待方式，未放宽服务端限制。详细证据见[本次整理验收](docs/cleanup-verification-20261011.md)。本轮未重跑容量压测或全面故障演练；下表是历史结果。
+首轮浏览器为 **8 项通过、2 项失败**，集中登录触发既有限流。修正测试辅助逻辑后，仅对明确的 `RATE_LIMITED` 响应等待窗口恢复，其他错误仍失败；生产限流未放宽，最终完整流程通过。详细过程与旧镜像清理状态见[本次整理验收](docs/cleanup-verification-20261011.md)。
 
-2026-10-07 历史本机验收：
+以上是已有代码验收，文档更新不作为一次新的业务验收。本轮未重跑容量压测或全面故障演练；历史负载、数据集及结果见[一致性与恢复验收](docs/consistency-verification-20261007.md)。CI 徽章展示 `master` 工作流状态，具体结果以对应提交为准。
 
-| 检查 | 实际结果 |
-|---|---|
-| 后端回归测试 | 47 项通过：39 项真实数据库、8 项隔离回归；失败/错误/跳过均为 0 |
-| Chromium 实际页面 | 10 条流程通过：送达、退款、提交恢复、商品/套餐/图片、分类与套餐缓存联动、楼栋/配额/营业、地址/购物车/快照、两种员工角色、统计导出与审计 |
-| 源码构建 | 管理端、H5、微信小程序通过；两端类型检查通过 |
-| 运行恢复 | 独立备份恢复、Redis/MySQL 故障、过期任务租约恢复及 WebSocket 安全检查通过 |
-| 容量测试 | 1 万订单/5 万明细；50 并发持续 10 分钟达到首轮门槛，具体负载、机器和指标见验收记录 |
+## 运行边界与文档导航
 
-支付/退款仅为模拟；微信开发者工具预览、真机和真实微信登录尚未验收。用户端仍有 7 项高危构建依赖告警，按限定范围接受至 2026-11-07，见[依赖安全记录](docs/frontend-security-review.md)。远端 CI 结果以 GitHub 对应提交的 Actions 为准。
+- 单校区、单店、单 Java 实例，不包含多商户结算、跨主机高可用或水平扩容验收。
+- 支付 / 退款为模拟；微信开发者工具预览、真机及真实微信登录尚未验收。小程序编译成功不能替代真机结果。
+- 实时通知是尽力发送，数据库订单状态是事实来源；配送超时需要人工处理。
+- 用户端仍有 7 项高危构建依赖告警，按限定范围接受至 2026-11-07，不代表零漏洞。约束与复查入口见[依赖安全记录](docs/frontend-security-review.md)。
 
-管理端开发：`npm run dev --prefix frontend/admin`；H5 开发：`npm run dev:h5 --prefix frontend/client`。默认代理本机8080，可用 `API_PROXY` 指定后端。
-
-小程序导入 `frontend/client/dist/build/mp-weixin`。真实微信登录/真机需要自己的 AppID、可访问的 HTTPS 后端及合法请求域名，详见部署文档。编译成功不代表真机已通过。
-
-## 运行与恢复
+数据库、上传文件和私有配置需成套备份，再恢复到独立临时环境核对。备份包含敏感数据，不提交 Git。已有数据库迁移必须先备份、检查冲突并在恢复克隆中显式验证 Flyway 基线，应用不自动接管未知非空数据库。
 
 ```powershell
 ./scripts/backup.ps1
 ./scripts/restore-check.ps1 -BackupDirectory E:/project/CampusEats/.local/backups/具体备份目录
-./scripts/recovery-check.ps1
-./scripts/load.ps1
 ```
 
-备份包括数据库、上传文件与本机配置；恢复检查使用独立临时容器。故障演练会短暂停止本机演示依赖。容量测试使用独立 `campuseats-load-时间戳` 环境和固定数据集，不修改演示数据。运行后保留结果并停止测试容器。
+故障演练 `./scripts/recovery-check.ps1` 会短暂中断本机演示依赖；容量测试 `./scripts/load.ps1` 使用独立项目和固定数据集。这些按需运行，详细步骤见部署与验收文档。
 
-整理旧容器时，先完成备份和独立恢复验证，再执行：
+当前演示保留 `campuseats-v1` 四个服务及业务持久卷。2026-10-11 按用户选择删除旧应用镜像和历史回滚标签，数据备份继续保留；后续启动脚本重建仍会保留当时镜像。清理必须按项目、镜像引用与挂载核对，禁止全局 prune 或对业务项目执行 `docker compose down -v`。旧容器整理脚本的使用条件见[部署手册](docs/v1-deployment.md)。
 
-```powershell
-./scripts/consolidate-containers.ps1 -VerifiedBackupDirectory E:/project/CampusEats/.local/backups/具体备份目录
-```
+| 文档 | 内容 |
+|---|---|
+| [架构与接口约定](docs/v1-architecture.md) | 交易、任务、权限、缓存和接口协议 |
+| [部署、迁移与恢复](docs/v1-deployment.md) | 本机部署、小程序配置、旧库迁移、备份及演练 |
+| [2026-10-11 整理与验收](docs/cleanup-verification-20261011.md) | 删除与合并内容、测试修正、数据核对及 Docker 清理 |
+| [一致性与降级恢复验收](docs/consistency-verification-20261007.md) | 历史并发、缓存竞态、恢复和容量证据 |
+| [实施与验收记录](docs/v1-verification.md) | 历史实施、构建及运行证据 |
+| [依赖安全记录](docs/frontend-security-review.md) | 前端依赖约束、风险例外与审计命令 |
+| [原始审查](docs/enterprise-review-20261007.md) | 历史问题及后续整改背景 |
 
-脚本按本仓库的 Compose 项目标签和路径校验范围，只移除已停止的旧版、压测容器，并要求最终 4 个容器健康。数据库与上传卷、回滚镜像和本机证据保留。当前演示仅保留 `campuseats-v1` 的 MySQL、Redis、Java、Nginx 四个容器。
-
-2026-10-11 本次清理按明确选择删除旧镜像及回滚标签，不另存镜像归档；Docker 中仅保留本项目最终镜像及运行所需的 MySQL/Redis 镜像。本机数据备份保存在受保护且被 Git 忽略的 `.local/backups/20261011-before-cleanup` 和 `.local/backups/20261011-final`。后续运行启动脚本仍会在重建前保留当时镜像，清理应继续按项目范围核对，不能全局 prune。
-
-已有数据库必须先备份、检查冲突、在恢复克隆中显式建立 Flyway 基线，再验证迁移。应用不自动为任意非空数据库建立基线，也不自动删除冲突数据。不要对有业务数据的项目执行 `docker compose down -v`。
-
-- [部署、迁移与恢复](docs/v1-deployment.md)
-- [架构与接口约定](docs/v1-architecture.md)
-- [实施与验收记录](docs/v1-verification.md)
-- [一致性与降级恢复修复验收](docs/consistency-verification-20261007.md)
-- [原始审查](docs/enterprise-review-20261007.md)
-
-旧实现、课程补丁、旧初始化 SQL、无引用 PNG 和报表模板已移出当前目录，可通过[整理前提交](https://github.com/W205614/CampusEats/tree/f85f3e7faf36b9ef3bd8d6e4a58c33155b3a18e8)追溯。当前 Flyway 迁移仍完整保留；历史文档中的路径和指标以对应历史提交为准。
+历史文档中的路径、指标和实现以其注明的提交为准。
 
