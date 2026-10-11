@@ -1,51 +1,35 @@
-import { test, expect, type Page, type Locator, type APIRequestContext } from '@playwright/test';
+import { type Page, type Locator } from '@playwright/test';
+import { test, expect, adminLogin as login, userLogin as loginUser } from './helpers';
 import fs from 'node:fs';
 import { randomBytes } from 'node:crypto';
 
-const config = Object.fromEntries(fs.readFileSync('../../.env', 'utf8').split(/\r?\n/)
-  .filter(l => l.includes('=') && !l.startsWith('#'))
-  .map(l => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]));
-const password = process.env.ADMIN_PASSWORD || config.DEMO_ADMIN_PASSWORD;
-let token = '';
 const catalogFixtures = new Set<string>();
-async function admin(request: APIRequestContext, path: string, method = 'GET', data?: unknown) {
-  const response = await request.fetch('/api/v1/admin' + path, {
-    method, data, headers: { Authorization: 'Bearer ' + token },
-  });
-  const result = await response.json();
-  expect(result.code).toBe('OK');
-  return result.data;
-}
-test.beforeAll(async ({ request }) => {
-  const response = await request.post('/api/v1/admin/auth/login', { data: { username: 'admin', password } });
-  const login = await response.json();
-  expect(login.code).toBe('OK');
-  token = login.data.token;
-});
-test.afterEach(async ({ request }) => {
-  for (const type of ['SETMEAL', 'DISH']) {
-    for (const product of await admin(request, '/products/' + type)) {
+const buildingFixtures = new Set<string>();
+const employeeFixtures = new Set<string>();
+test.afterEach(async ({ admin }) => {
+  for (const type of catalogFixtures.size ? ['SETMEAL', 'DISH'] : []) {
+    for (const product of await admin('/products/' + type)) {
       if (catalogFixtures.has(product.name)) {
-        if (product.status === 1) await admin(request, '/products/' + type + '/' + product.id, 'PUT', { ...product, enabled: false, flavors: product.flavors || [], components: product.components || [] });
-        await admin(request, '/products/' + type + '/' + product.id, 'DELETE');
+        if (product.status === 1) await admin('/products/' + type + '/' + product.id, 'PUT', { ...product, enabled: false, flavors: product.flavors || [], components: product.components || [] });
+        await admin('/products/' + type + '/' + product.id, 'DELETE');
       }
     }
   }
-  for (const category of await admin(request, '/categories')) {
-    if (catalogFixtures.has(category.name)) await admin(request, '/categories/' + category.id, 'DELETE');
+  for (const category of catalogFixtures.size ? await admin('/categories') : []) {
+    if (catalogFixtures.has(category.name)) await admin('/categories/' + category.id, 'DELETE');
+  }
+  for (const building of buildingFixtures.size ? await admin('/buildings') : []) {
+    if (buildingFixtures.has(building.name)) await admin('/buildings/' + building.id, 'PUT', { ...building, enabled: false });
+  }
+  for (const employee of employeeFixtures.size ? await admin('/employees') : []) {
+    if (employeeFixtures.has(employee.username)) await admin('/employees/' + employee.id, 'PUT', { ...employee, enabled: false });
   }
   catalogFixtures.clear();
+  buildingFixtures.clear();
+  employeeFixtures.clear();
 });
-async function login(page: Page, username = 'admin', secret = password!) {
-  await page.goto('/admin/');
-  await page.getByPlaceholder('员工账户').fill(username);
-  await page.getByPlaceholder('启动脚本生成的初始密码').fill(secret);
-  await page.getByRole('button', { name: '登录工作台' }).click();
-}
 async function userLogin(page: Page) {
-  await page.goto('/app/pages/login/index');
-  await page.getByText('进入演示用户 3', { exact: true }).click();
-  await expect(page.getByText('今天，也好好吃饭。', { exact: true })).toBeVisible();
+  await loginUser(page, 3);
   await page.getByText('校园热餐', { exact: true }).click();
 }
 function field(root: Page | Locator, label: string) {
@@ -75,7 +59,7 @@ async function remove(page: Page, name: string) {
   await expect(row(page, name)).toHaveCount(0);
 }
 
-test('管理端分类、菜品口味、图片、套餐及编辑删除，H5显示保存结果', async ({ page, browser, request }) => {
+test('管理端分类、菜品口味、图片、套餐及编辑删除，H5显示保存结果', async ({ page, browser, admin }) => {
   const suffix = Date.now().toString(36);
   const category = '页面分类' + suffix, dish = '页面餐品' + suffix, meal = '页面套餐' + suffix;
   for (const name of [category, dish, meal]) catalogFixtures.add(name);
@@ -122,7 +106,7 @@ test('管理端分类、菜品口味、图片、套餐及编辑删除，H5显示
   await page.getByRole('link', { name: '套餐管理', exact: true }).click();
   await page.getByRole('button', { name: '新增套餐' }).click();
   await field(dialog, '名称').getByRole('textbox').fill(meal);
-  const categories = await admin(request, '/categories');
+  const categories = await admin('/categories');
   await select(dialog, '所属分类', categories.find((x: any) => x.type === 2).name, page);
   await field(dialog, '售价（元）').getByRole('spinbutton').fill('20');
   await page.getByRole('button', { name: '添加菜品' }).click();
@@ -137,17 +121,17 @@ test('管理端分类、菜品口味、图片、套餐及编辑删除，H5显示
   await remove(page, category);
 });
 
-test('菜品分类停用与恢复刷新另一分类的套餐菜单，改名刷新组成信息', async ({ page, browser, request }) => {
+test('菜品分类停用与恢复刷新另一分类的套餐菜单，改名刷新组成信息', async ({ page, browser, admin }) => {
   const suffix = Date.now().toString(36);
   const dishCategoryName = '联动菜品分类' + suffix, mealCategoryName = '联动套餐分类' + suffix;
   const dishName = '联动餐品' + suffix, renamed = '联动改名餐品' + suffix, mealName = '联动套餐' + suffix;
   for (const name of [dishCategoryName, mealCategoryName, dishName, renamed, mealName]) catalogFixtures.add(name);
-  const dishCategory = await admin(request, '/categories', 'POST', { name: dishCategoryName, type: 1, sort: 100, enabled: true });
-  const mealCategory = await admin(request, '/categories', 'POST', { name: mealCategoryName, type: 2, sort: 101, enabled: true });
+  const dishCategory = await admin('/categories', 'POST', { name: dishCategoryName, type: 1, sort: 100, enabled: true });
+  const mealCategory = await admin('/categories', 'POST', { name: mealCategoryName, type: 2, sort: 101, enabled: true });
   const product = { name: dishName, categoryId: dishCategory.id, price: '12.00', enabled: true,
     description: '缓存联动验收', image: '', flavors: [], components: [] };
-  const dish = await admin(request, '/products/DISH', 'POST', product);
-  await admin(request, '/products/SETMEAL', 'POST', { name: mealName, categoryId: mealCategory.id,
+  const dish = await admin('/products/DISH', 'POST', product);
+  await admin('/products/SETMEAL', 'POST', { name: mealName, categoryId: mealCategory.id,
     price: '20.00', enabled: true, description: '缓存联动验收', image: '', flavors: [],
     components: [{ dishId: dish.id, copies: 1 }] });
   const userPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
@@ -170,7 +154,7 @@ test('菜品分类停用与恢复刷新另一分类的套餐菜单，改名刷�
       if (enabled) await expect(meal).toBeVisible();
       else await expect(meal).toHaveCount(0);
     }
-    await admin(request, '/products/DISH/' + dish.id, 'PUT', { ...product, name: renamed });
+    await admin('/products/DISH/' + dish.id, 'PUT', { ...product, name: renamed });
     const refreshed = userPage.waitForResponse(r => r.url().includes('/menu/items?categoryId=' + mealCategory.id));
     await userPage.reload();
     await userPage.getByText(mealCategoryName, { exact: true }).click();
@@ -182,18 +166,19 @@ test('菜品分类停用与恢复刷新另一分类的套餐菜单，改名刷�
   }
 });
 
-test('楼栋启停、当日及默认配额、营业开关影响H5选餐', async ({ page, browser, request }) => {
+test('楼栋启停、当日及默认配额、营业开关影响H5选餐', async ({ page, browser, admin }) => {
   const name = '页面楼栋' + Date.now().toString(36);
-  const shop = await admin(request, '/shop');
-  const dishes = await admin(request, '/products/DISH');
+  buildingFixtures.add(name);
+  const shop = await admin('/shop');
+  const dishes = await admin('/products/DISH');
   const source = dishes.find((x: any) => x.name === '番茄鸡蛋饭');
   const fixtureName = '页面餐品quota' + Date.now().toString(36);
   catalogFixtures.add(fixtureName);
-  await admin(request, '/products/DISH', 'POST', { name: fixtureName, categoryId: source.categoryId,
+  await admin('/products/DISH', 'POST', { name: fixtureName, categoryId: source.categoryId,
     price: '12.00', enabled: true, description: '页面配额验收', image: '', flavors: [], components: [] });
-  const target = (await admin(request, '/products/DISH')).find((x: any) => x.name === fixtureName);
+  const target = (await admin('/products/DISH')).find((x: any) => x.name === fixtureName);
   const date = new Date().toLocaleDateString('sv-SE', { timeZone: 'Asia/Shanghai' });
-  const quotas = await admin(request, '/quotas?date=' + date);
+  const quotas = await admin('/quotas?date=' + date);
   const before = quotas.find((x: any) => x.dishId === target.id);
   await login(page);
   await page.getByRole('link', { name: '配送楼栋', exact: true }).click();
@@ -209,7 +194,7 @@ test('楼栋启停、当日及默认配额、营业开关影响H5选餐', async 
   await row(page, target.name).getByRole('button', { name: '调整配额' }).click();
   await page.getByRole('dialog').getByRole('spinbutton').fill(String(Number(before.reserved) + Number(before.consumed)));
   await save(page);
-  const soldOut = await admin(request, '/quotas?date=' + date);
+  const soldOut = await admin('/quotas?date=' + date);
   expect(Number(soldOut.find((x: any) => x.dishId === target.id).remaining)).toBe(0);
   const userPage = await browser.newPage({ viewport: { width: 390, height: 844 } });
   try {
@@ -224,7 +209,7 @@ test('楼栋启停、当日及默认配额、营业开关影响H5选餐', async 
     await page.getByRole('dialog').getByRole('spinbutton').fill(String(Number(before.defaultQuota) + 1));
     await page.getByText('默认每日份数', { exact: true }).click();
     await save(page);
-    const updated = await admin(request, '/products/DISH');
+    const updated = await admin('/products/DISH');
     expect(Number(updated.find((x: any) => x.id === target.id).defaultQuota)).toBe(Number(before.defaultQuota) + 1);
     await page.getByRole('link', { name: '营业规则', exact: true }).click();
     await field(page, '人工营业开关').locator('.el-switch').click();
@@ -241,18 +226,19 @@ test('楼栋启停、当日及默认配额、营业开关影响H5选餐', async 
     await userPage.reload();
     await expect(userPage.getByText('正在营业', { exact: true })).toBeVisible();
   } finally {
-    await admin(request, '/shop', 'PUT', shop);
-    await admin(request, '/quotas?date=' + date, 'PUT', { dishId: target.id, total: before.total, defaultQuota: false });
-    await admin(request, '/quotas?date=' + date, 'PUT', { dishId: target.id, total: before.defaultQuota, defaultQuota: true });
+    await admin('/shop', 'PUT', shop);
+    await admin('/quotas?date=' + date, 'PUT', { dishId: target.id, total: before.total, defaultQuota: false });
+    await admin('/quotas?date=' + date, 'PUT', { dishId: target.id, total: before.defaultQuota, defaultQuota: true });
     await userPage.close();
   }
 });
 
-test('H5地址编辑默认删除、再来一单、购物车数量与清空', async ({ page }) => {
+test('H5地址编辑默认删除、再来一单、购物车数量与清空', async ({ page, demoData }) => {
+  await demoData.trackAccount(3);
   await page.setViewportSize({ width: 390, height: 844 });
   await userLogin(page);
   await page.goto('/app/pages/addresses/index');
-  const name = '地址验收' + Date.now().toString(36);
+  const name = demoData.name;
   await page.getByText('新增地址', { exact: true }).click();
   await page.getByRole('textbox').nth(0).fill('901');
   await page.getByRole('textbox').nth(1).fill(name);
@@ -308,6 +294,7 @@ test('H5地址编辑默认删除、再来一单、购物车数量与清空', asy
 for (const role of ['运营员', '配送员']) {
   test(`${role}页面登录、强制改密、隐藏管理入口及禁用后撤销会话`, async ({ page, browser }) => {
     const username = 'ui-' + randomBytes(5).toString('hex');
+    employeeFixtures.add(username);
     const initial = randomBytes(24).toString('hex'), changed = randomBytes(24).toString('hex');
     await login(page);
     await page.getByRole('link', { name: '员工与角色', exact: true }).click();

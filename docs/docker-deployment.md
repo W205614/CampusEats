@@ -1,3 +1,5 @@
+> 历史记录：本文所引用的课程实现及旧部署资源已于 2026-10-11 移出当前目录，可在[整理前提交](https://github.com/W205614/CampusEats/tree/f85f3e7faf36b9ef3bd8d6e4a58c33155b3a18e8)中追溯。当前运行与验证以 README 为准。
+
 # Docker Desktop 部署与小程序接入
 
 ## 当前访问方式

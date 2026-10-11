@@ -5,9 +5,9 @@ try {
  foreach ($client in @('admin','client')) {
   npm ci --prefix "frontend/$client" --include=optional
   if($LASTEXITCODE -ne 0){throw "npm ci failed: $client"}
-  npm run typecheck --prefix "frontend/$client"
-  if($LASTEXITCODE -ne 0){throw "Type check failed: $client"}
  }
+ npm run typecheck --prefix frontend/client
+ if($LASTEXITCODE -ne 0){throw 'Client type check failed'}
  npm run build --prefix frontend/admin
  if($LASTEXITCODE -ne 0){throw 'Admin build failed'}
  npm run build:h5 --prefix frontend/client

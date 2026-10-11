@@ -36,6 +36,9 @@ jobs:
         run: ./scripts/start.ps1 -SkipVerify
       - name: Compare live API schema
         run: node scripts/generate-contracts.mjs --fetch && git diff --exit-code -- frontend/contracts/openapi.json frontend/contracts/openapi.ts
+      - name: Check deployment smoke and root redirect
+        shell: pwsh
+        run: ./scripts/smoke.ps1
       - run: npx --prefix frontend/admin playwright install --with-deps chromium
       - run: npm run test --prefix frontend/admin
       - run: node scripts/check-websocket.mjs

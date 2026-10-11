@@ -1,3 +1,5 @@
+> 历史记录：本文所引用的课程实现及旧部署资源已于 2026-10-11 移出当前目录，可在[整理前提交](https://github.com/W205614/CampusEats/tree/f85f3e7faf36b9ef3bd8d6e4a58c33155b3a18e8)中追溯。当前运行与验证以 README 为准。
+
 # CampusEats 项目审查
 
 审查基线：仓库初始提交 `c5b0631`，以实际 `git log` 输出为准；本次审查日期为 2026-10-06。范围为本仓库 Java 后端、给定微信小程序编译代码、配套 SQL 与管理端，目标是 Docker Desktop 上的本地演示运行。

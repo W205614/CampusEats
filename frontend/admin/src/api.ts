@@ -1,16 +1,8 @@
 import { useSession } from "./stores/session";
 import { ElMessage } from "element-plus";
 import type { Envelope } from "../../contracts/models";
-export class ApiError extends Error {
-  constructor(
-    public code: string,
-    message: string,
-    public requestId: string,
-    public status: number,
-  ) {
-    super(message);
-  }
-}
+import { ApiError } from "../../contracts/api-error";
+export { ApiError } from "../../contracts/api-error";
 export async function api<T>(
   path: string,
   options: RequestInit = {},

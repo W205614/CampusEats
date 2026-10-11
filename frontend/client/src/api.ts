@@ -1,5 +1,7 @@
 import { useSession } from "./stores/session";
 import type { Envelope } from "../../contracts/models";
+import { ApiError } from "../../contracts/api-error";
+export { ApiError } from "../../contracts/api-error";
 export function base() {
   let origin = import.meta.env.VITE_API_BASE || "";
   // #ifndef H5
@@ -9,16 +11,6 @@ export function base() {
 }
 export const image = (path: string) =>
   path?.startsWith("/") ? base() + path : path;
-export class ApiError extends Error {
-  constructor(
-    public code: string,
-    message: string,
-    public requestId: string,
-    public status: number,
-  ) {
-    super(message);
-  }
-}
 export function api<T>(
   path: string,
   method: "GET" | "POST" | "PUT" | "DELETE" = "GET",
