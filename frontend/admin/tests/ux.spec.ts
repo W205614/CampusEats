@@ -23,6 +23,32 @@ test('root opens ordering and users can switch login entrances without editing t
   expect(await page.evaluate(() => JSON.parse(sessionStorage.getItem('campus-user') || 'null')?.role)).toBe('USER');
 });
 
+test('users can reach every login action with Tab and complete demo login using the keyboard', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('link', { name: '登录点餐', exact: true }).click();
+  await expect(page).toHaveURL(/\/app\/pages\/login\/index$/);
+  await expect(page.getByText('进入演示用户 1', { exact: true })).toBeVisible();
+  for (const action of ['进入演示用户 1', '进入演示用户 2', '进入演示用户 3', '使用微信登录']) {
+    await page.keyboard.press('Tab');
+    await expect(page.getByText(action, { exact: true })).toBeFocused();
+  }
+  await page.keyboard.press('Space');
+  await expect(page.getByText('微信登录请使用已配置微信应用的小程序；浏览器可选择演示账户。', { exact: true })).toBeVisible();
+  for (let i = 0; i < 3; i++) await page.keyboard.press('Shift+Tab');
+  await expect(page.getByText('进入演示用户 1', { exact: true })).toBeFocused();
+  const loggedIn = page.waitForResponse(response => response.url().endsWith('/user/auth/demo'));
+  await page.keyboard.press('Enter');
+  const response = await loggedIn;
+  expect(response.ok()).toBeTruthy();
+  expect(response.request().postDataJSON().account).toBe(1);
+  const login = await response.json();
+  await expect(page.getByRole('link', { name: login.data.name, exact: true })).toBeVisible();
+  await expect(page.getByText('默认校区 ▾', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => JSON.parse(sessionStorage.getItem('campus-user') || 'null')?.role)).toBe('USER');
+  expect(await page.evaluate(id => JSON.parse(sessionStorage.getItem('campus-user') || 'null')?.id === id, login.data.id)).toBeTruthy();
+  expect(await page.evaluate(() => sessionStorage.getItem('campus-admin'))).toBeNull();
+});
+
 test('switching between ordering and workbench preserves their independent sessions', async ({ page, adminSession, userSession }) => {
   await page.goto('/');
   await page.evaluate(({ admin, user }) => {

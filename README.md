@@ -47,7 +47,7 @@ docker compose ps
 
 初始平台账号为 `admin`，密码保存在本机 `.local/demo-credentials.txt`。演示店长为 `manager1` 至 `manager4`，运营员为 `operator1` 至 `operator4`，配送员为 `courier1`、`courier1b`、`courier2`、`courier2b`。新建演示员工首次登录必须改密；已有账号保留原密码，修改 `.env` 不会重置已有账号。
 
-演示种子补充两个校区、每校区两家店及对应角色，不覆盖现有商品或营业配置。新店默认关闭接单，先配置营业时间和费用，再打开接单开关。H5 登录页提供三个彼此独立的演示用户。
+演示种子补充两个校区、每校区两家店及对应角色，不覆盖现有商品或营业配置。新店默认关闭接单，先配置营业时间和费用，再打开接单开关。H5 登录页提供三个彼此独立的演示用户，支持键盘 Tab／Enter／Space；微信登录需使用已配置微信应用的小程序，H5 会明确说明。
 
 默认仅绑定 `127.0.0.1:18083`，手机不能直接使用该地址。微信小程序构建产物不等同于微信真机验收。
 
@@ -103,6 +103,6 @@ node scripts/check-websocket.mjs
 
 [架构与接口](docs/platform-architecture.md) · [升级与回滚](docs/platform-deployment.md) · [本轮验收记录](docs/platform-verification-20261015.md) · [入口与体验完善](docs/frontend-experience-20261015.md)
 
-本轮本地验证通过84项后端、28项浏览器、6项构建兼容及8项审计规则回归；另完成7个页面在390／768／1440三种宽度下的21组体验检查、WebSocket与独立备份恢复。CI 会从源码重复后端回归、两端构建与类型检查、接口契约比对、依赖审计、浏览器和 WebSocket 验证，再暂停写入并完成独立备份恢复及恢复后的冒烟检查。[查看 GitHub Actions](https://github.com/W205614/CampusEats/actions/workflows/verify.yml)。这些检查不等同于生产容量或微信真机验证。
+本轮本地验证通过84项后端、29项浏览器、6项构建兼容及8项审计规则回归；另完成不同屏宽的体验检查、WebSocket与独立备份恢复。最后复验修复了H5登录无法纯键盘操作的问题，新增用例实际按Tab、Space、Enter完成登录。[复验范围与证据](docs/final-verification-20261015.md)。CI 会从源码重复后端回归、两端构建与类型检查、接口契约比对、依赖审计、浏览器和 WebSocket 验证，再暂停写入并完成独立备份恢复及恢复后的冒烟检查。[查看 GitHub Actions](https://github.com/W205614/CampusEats/actions/workflows/verify.yml)。这些检查不等同于生产容量或微信真机验证。
 
 用户端通过受版本与文件哈希约束的构建适配，将文件匹配替换为 tinyglobby、监听升级为 chokidar 4、二维码图像处理升级为 Jimp 1，移除 braces 和旧 phin 依赖路径。两端当前 npm 审计均为0项已知漏洞；已撤销旧例外，CI 拒绝任何级别的新发现。适配仅覆盖锁定的 uni-app 工具链，更新框架时必须复核补丁和兼容回归；审计结果不等同于全面安全认证。[依赖安全复核与升级证据](docs/dependency-security-20261015.md)。历史 v1 文档与旧压测／故障脚本保留作追溯，旧脚本入口已阻断执行，避免调用已下线的单店接口或重建日常服务。
