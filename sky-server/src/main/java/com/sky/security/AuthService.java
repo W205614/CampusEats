@@ -163,6 +163,8 @@ public class AuthService {
       out.put("id", String.valueOf(id));
       out.put("name", row.get("name"));
       out.put("role", type.equals("USER") ? "USER" : row.get("role"));
+      out.put("storeId", type.equals("USER") ? null : row.get("store_id"));
+      out.put("campusId", type.equals("USER") ? null : row.get("campus_id"));
       out.put("mustChangePassword", type.equals("ADMIN") && Db.bool(row, "must_change_password"));
       return out;
     } catch (Exception ex) {
@@ -209,7 +211,9 @@ public class AuthService {
           type,
           type.equals("USER") ? "USER" : String.valueOf(row.get("role")),
           claims.getJWTID(),
-          type.equals("ADMIN") && Db.bool(row, "must_change_password"));
+          type.equals("ADMIN") && Db.bool(row, "must_change_password"),
+          type.equals("USER") || row.get("store_id") == null ? null : Db.id(row, "store_id"),
+          type.equals("USER") || row.get("campus_id") == null ? null : Db.id(row, "campus_id"));
     } catch (BusinessException ex) {
       throw ex;
     } catch (org.springframework.dao.DataAccessException ex) {

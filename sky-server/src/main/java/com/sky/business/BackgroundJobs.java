@@ -50,7 +50,8 @@ public class BackgroundJobs {
     try {
       for (var row :
           db.rows(
-              "SELECT id FROM orders WHERE status=1 AND pay_expires_at<=? ORDER BY id LIMIT 100",
+              "SELECT id FROM orders WHERE checkout_id IS NULL AND status=1 AND pay_expires_at<=?"
+                  + " ORDER BY id LIMIT 100",
               LocalDateTime.now(clock)))
         try {
           orders.expire(Db.id(row, "id"));

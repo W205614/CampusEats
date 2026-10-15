@@ -3,7 +3,18 @@ package com.sky.security;
 import com.sky.common.BusinessException;
 import org.springframework.security.core.context.SecurityContextHolder;
 
-public record Actor(long id, String type, String role, String jti, boolean mustChangePassword) {
+public record Actor(
+    long id,
+    String type,
+    String role,
+    String jti,
+    boolean mustChangePassword,
+    Long storeId,
+    Long campusId) {
+  public Actor(long id, String type, String role, String jti, boolean mustChangePassword) {
+    this(id, type, role, jti, mustChangePassword, null, null);
+  }
+
   public static Actor current() {
     var a = SecurityContextHolder.getContext().getAuthentication();
     BusinessException.require(

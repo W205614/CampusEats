@@ -38,6 +38,7 @@ import org.testcontainers.mysql.MySQLContainer;
 @SpringBootTest(
     properties = {
       "spring.profiles.active=demo",
+      "campus.legacy-api=true",
       "campus.jwt-secret=test-only-signing-secret-at-least-thirty-two-bytes",
       "campus.demo-admin-password=TestAdmin!2026",
       "campus.tasks-enabled=false",

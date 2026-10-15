@@ -1,5 +1,6 @@
 param([int[]]$Users=@(20,50,100),[string]$OtherDuration='2m',[string]$MainDuration='10m',[string]$WarmupDuration='30s',[ValidatePattern('^campuseats-load[-a-z0-9]*$')][string]$ProjectName=('campuseats-load-'+(Get-Date -Format 'yyyyMMddHHmmss')))
 $ErrorActionPreference='Stop'
+throw 'Historical v1 load fixture is retired: its single-store schema and APIs do not apply to the multi-campus platform. No load-capacity result is claimed for the current version.'
 $taskRoot=Split-Path $PSScriptRoot -Parent
 Push-Location $taskRoot
 try {

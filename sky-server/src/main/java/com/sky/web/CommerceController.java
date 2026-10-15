@@ -10,6 +10,9 @@ import java.util.*;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
+    name = "campus.legacy-api",
+    havingValue = "true")
 public class CommerceController {
   private final CartService cart;
   private final AddressService addresses;

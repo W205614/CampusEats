@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Component
 @Profile("demo")
+@org.springframework.core.annotation.Order(10)
 public class DemoSeed implements ApplicationRunner {
   private final Db db;
   private final AuthService auth;
@@ -37,7 +38,7 @@ public class DemoSeed implements ApplicationRunner {
       db.update(
           "INSERT INTO"
               + " employee(id,name,username,password,role,status,phone,sex,id_number,must_change_password,create_time,update_time)"
-              + " VALUES(1,'管理员','admin',?,'ADMIN',1,'','','',false,?,?)",
+              + " VALUES(1,'管理员','admin',?,'PLATFORM_ADMIN',1,'','','',false,?,?)",
           auth.encodePassword(password),
           LocalDateTime.now(clock),
           LocalDateTime.now(clock));

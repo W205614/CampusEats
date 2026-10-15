@@ -1,3 +1,5 @@
+> 历史单店版本文档。当前多校区版本请使用 [平台架构](platform-architecture.md) 与 [升级说明](platform-deployment.md)。
+
 # CampusEats v1 架构与接口
 
 ## 模块与业务边界

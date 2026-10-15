@@ -19,7 +19,7 @@ public class AddressService {
   public List<Map<String, Object>> list(long user) {
     var rows =
         db.rows(
-            "SELECT a.id,a.building_id,b.name"
+            "SELECT a.id,a.building_id,b.campus_id,b.name"
                 + " building_name,a.room,a.consignee,a.phone,(a.id=u.default_address_id)"
                 + " is_default,b.enabled FROM address_book a JOIN user u ON u.id=a.user_id LEFT"
                 + " JOIN campus_building b ON b.id=a.building_id WHERE a.user_id=? ORDER BY a.id"
@@ -44,9 +44,16 @@ public class AddressService {
 
   @Transactional
   public long save(long user, Long id, Address input) {
-    var building = db.one("SELECT * FROM campus_building WHERE id=? FOR SHARE", input.buildingId());
+    var building =
+        db.one(
+            "SELECT b.*,c.enabled campus_enabled FROM campus_building b JOIN campus c ON"
+                + " c.id=b.campus_id WHERE b.id=? FOR SHARE",
+            input.buildingId());
     require(
-        building != null && Db.bool(building, "enabled"), 400, "OUTSIDE_DELIVERY", "请选择配送范围内的楼栋");
+        building != null && Db.bool(building, "enabled") && Db.bool(building, "campus_enabled"),
+        400,
+        "OUTSIDE_DELIVERY",
+        "请选择配送范围内的楼栋");
     if (id == null) {
       long created =
           db.insert(

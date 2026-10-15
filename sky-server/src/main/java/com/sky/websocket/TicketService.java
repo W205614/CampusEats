@@ -51,7 +51,15 @@ public class TicketService {
               id,
               LocalDateTime.now(clock))
           != 1) return null;
-      return new Actor(id, "ADMIN", row.get("role").toString(), jti, false);
+      var employee = db.one("SELECT role,store_id,campus_id FROM employee WHERE id=?", id);
+      return new Actor(
+          id,
+          "ADMIN",
+          employee.get("role").toString(),
+          jti,
+          false,
+          employee.get("store_id") == null ? null : Db.id(employee, "store_id"),
+          employee.get("campus_id") == null ? null : Db.id(employee, "campus_id"));
     } catch (Exception ex) {
       return null;
     }

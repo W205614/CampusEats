@@ -1,205 +1,235 @@
 <script setup lang="ts">
-import { ref } from "vue";
-import { onShow } from "@dcloudio/uni-app";
-import { api, toast, loggedIn, uuid, ApiError, confirm } from "../../api";
-import { useSession } from "../../stores/session";
-import type { Cart, Address, Quote, Order, SubmitRequest, PreviewRequest, Id } from "../../../../contracts/models";
-const store = useSession(),
+import { ref } from 'vue';
+import { onShow } from '@dcloudio/uni-app';
+import { api, toast, loggedIn, uuid, ApiError } from '../../api';
+import { useSession } from '../../stores/session';
+import {
+  cents,
+  type Cart,
+  type Address,
+  type Coupon,
+  type Selection,
+  type Quote,
+  type Checkout,
+  type CheckoutInput,
+} from '../../../../contracts/platform';
+const session = useSession(),
+  carts = ref<Cart[]>([]),
   addresses = ref<Address[]>([]),
-  index = ref(0),
+  wallet = ref<Coupon[]>([]),
+  selections = ref<Selection[]>([]),
+  platformCoupon = ref<string | null>(null),
+  remark = ref(''),
   quote = ref<Quote>(),
-  remark = ref(""),
   busy = ref(false),
-  cartVersion = ref("0"),
-  pending = ref<{userId:Id|undefined;key:string;body:SubmitRequest}>();
-function readPending() {
-  try {
-    const v = uni.getStorageSync("campus-pending-submit");
-    pending.value = v?.userId === store.session?.id ? v : undefined;
-  } catch {}
+  pending = ref<{ key: string; body: CheckoutInput }>();
+const pendingKey = () => 'checkout-pending-' + session.session?.id;
+function invalidate() {
+  quote.value = undefined;
 }
 async function load() {
   if (!loggedIn()) return;
-  readPending();
   try {
-    const cart = await api<Cart>("/cart");
-    cartVersion.value = cart.cartVersion;
-    addresses.value = await api<Address[]>("/addresses");
-    const d = addresses.value.findIndex((x) => x.isDefault);
-    if (d >= 0) index.value = d;
-    if (pending.value) return;
-    if (addresses.value[index.value]) await preview();
+    pending.value = uni.getStorageSync(pendingKey()) || undefined;
+    const selected = (uni.getStorageSync('checkout-stores') as string[]) || [];
+    [carts.value, addresses.value, wallet.value] = await Promise.all([
+      api<Cart[]>('/carts'),
+      api<Address[]>('/addresses'),
+      api<Coupon[]>('/wallet'),
+    ]);
+    carts.value = carts.value.filter((c) => selected.includes(c.storeId) && c.items.length);
+    selections.value = carts.value.map(
+      (c) =>
+        selections.value.find(
+          (s) => s.storeId === c.storeId && s.cartVersion === c.cartVersion,
+        ) || {
+          storeId: c.storeId,
+          cartVersion: c.cartVersion,
+          fulfillment: 'PICKUP',
+          addressId: null,
+          couponId: null,
+        },
+    );
+    invalidate();
   } catch (e) {
     toast(e);
   }
 }
+function eligible(c: Cart) {
+  return addresses.value.filter((a) => a.campusId === c.campusId);
+}
+function coupons(store?: string) {
+  return wallet.value.filter(
+    (c) => c.state === 'AVAILABLE' && (store ? c.storeId === store : !c.storeId),
+  );
+}
+function fulfillment(s: Selection, e: { detail: { value: unknown } }) {
+  s.fulfillment = Number(e.detail.value) ? 'PICKUP' : 'DELIVERY';
+  s.addressId = null;
+  invalidate();
+}
+function couponChange(s: Selection, e: { detail: { value: unknown } }) {
+  s.couponId = coupons(s.storeId)[Number(e.detail.value) - 1]?.id || null;
+  invalidate();
+}
+const input = (): CheckoutInput => ({
+  stores: selections.value,
+  platformCouponId: platformCoupon.value,
+  remark: remark.value,
+});
 async function preview() {
-  quote.value = undefined;
-  const address = addresses.value[index.value];
-  if (!address) return;
-  try {
-    quote.value = await api<Quote>("/checkout/preview", "POST", {
-      addressId: address.id,
-      cartVersion: cartVersion.value,
-    } satisfies PreviewRequest);
-  } catch (e) {
-    toast(e);
-  }
-}
-async function finish(order: Order) {
-  uni.removeStorageSync("campus-pending-submit");
-  pending.value = undefined;
-  uni.showToast({ title: "订单已创建，待模拟支付", icon: "none" });
-  uni.switchTab({ url: "/pages/orders/index" });
-}
-async function recover() {
-  if (!pending.value || busy.value) return;
   busy.value = true;
   try {
-    await finish(await api<Order>("/orders/by-request/" + pending.value.key));
+    quote.value = await api<Quote>('/checkouts/preview', 'POST', input());
   } catch (e) {
-    if (e instanceof ApiError && e.status === 404) {
-      try {
-        await finish(
-          await api<Order>("/orders", "POST", pending.value.body, {
-            "Idempotency-Key": pending.value.key,
-          }),
-        );
-      } catch (next) {
-        await handleError(next);
-      }
-    } else toast(e);
+    toast(e);
   } finally {
     busy.value = false;
   }
 }
-async function handleError(e: unknown) {
-  toast(e);
-  if (
-    e instanceof ApiError &&
-    e.status >= 400 &&
-    e.status < 500 &&
-    e.status !== 429
-  ) {
-    uni.removeStorageSync("campus-pending-submit");
+function finish() {
+  uni.removeStorageSync(pendingKey());
+  pending.value = undefined;
+  uni.switchTab({ url: '/pages/orders/index' });
+}
+async function send() {
+  if (!pending.value) return;
+  await api<Checkout>('/checkouts', 'POST', pending.value.body, {
+    'Idempotency-Key': pending.value.key,
+  });
+  finish();
+}
+function releaseRejectedRequest(e: unknown) {
+  if (e instanceof ApiError && e.status >= 400 && e.status < 500) {
+    uni.removeStorageSync(pendingKey());
     pending.value = undefined;
-    await load();
+    quote.value = undefined;
   }
 }
 async function submit() {
   if (!quote.value || busy.value) return;
   busy.value = true;
-  if (
-    !(await confirm(
-      "订单合计 ¥" + quote.value.total + "。支付为模拟，无真实资金交易。",
-    ))
-  ) {
-    busy.value = false;
-    return;
-  }
-  const request = {
-    userId: store.session?.id,
-    key: uuid(),
-    body: {
-      addressId: addresses.value[index.value]!.id,
-      cartVersion: quote.value.cartVersion,
-      quoteHash: quote.value.quoteHash,
-      remark: remark.value,
-    } satisfies SubmitRequest,
-  };
-  pending.value = request;
-  uni.setStorageSync("campus-pending-submit", request);
   try {
-    await finish(
-      await api<Order>("/orders", "POST", request.body, {
-        "Idempotency-Key": request.key,
-      }),
-    );
+    pending.value = {
+      key: uuid(),
+      body: JSON.parse(JSON.stringify({ ...input(), quoteHash: quote.value.quoteHash })),
+    };
+    uni.setStorageSync(pendingKey(), pending.value);
+    await send();
   } catch (e) {
-    await handleError(e);
+    releaseRejectedRequest(e);
+    toast(e);
   } finally {
     busy.value = false;
   }
 }
-onShow(load);
-
+async function recover() {
+  if (!pending.value || busy.value) return;
+  busy.value = true;
+  try {
+    try {
+      await api<Checkout>('/checkouts/by-request/' + pending.value.key);
+      finish();
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 404) {
+        try {
+          await send();
+        } catch (rejected) {
+          releaseRejectedRequest(rejected);
+          throw rejected;
+        }
+      }
+      else throw e;
+    }
+  } catch (e) {
+    toast(e);
+  } finally {
+    busy.value = false;
+  }
+}
 const navTo = (url: string) => uni.navigateTo({ url });
-const tabTo = (url: string) => uni.switchTab({ url });
+onShow(load);
 </script>
 <template>
   <view class="screen"
-    ><view class="section-title" style="margin-top: 0">确认这份校园餐</view
+    ><view class="title">确认合并订单</view
+    ><view class="notice">一次模拟支付，各店分别履约。任一家店校验失败时整批不创建。</view
     ><view v-if="pending" class="card"
-      ><view class="card-name">上次提交结果待确认</view
-      ><view class="muted" style="margin: 20rpx 0"
-        >先查询或使用原请求重试，避免重复下单。</view
-      ><button
-        class="primary"
-        :loading="busy"
-        :disabled="busy"
-        @click="recover"
-      >
-        查询并恢复订单
-      </button></view
+      ><view>上次提交结果尚未确认，请先恢复查询。</view
+      ><button class="primary" :loading="busy" @click="recover">查询并恢复原请求</button></view
     ><template v-else
-      ><view class="card"
-        ><view class="row"
-          ><view class="card-name">送到哪里</view
-          ><text class="tap" @click="navTo('/pages/addresses/index')"
-            >管理地址</text
-          ></view
+      ><view class="card" v-for="(c, index) in carts" :key="c.storeId"
+        ><view class="section-title">{{ c.campusName }} · {{ c.storeName }}</view
         ><picker
-          v-if="addresses.length"
-          :range="
-            addresses.map(
-              (a) => (a.buildingName || '地址待完善') + ' ' + (a.room || ''),
-            )
-          "
-          :value="index"
-          @change="
-            index = Number($event.detail.value);
-            preview();
-          "
-          ><view class="line"
-            >{{ addresses[index]?.buildingName }}
-            {{ addresses[index]?.room }}　⌄</view
+          :range="['校区配送', '到店自取']"
+          :value="selections[index]?.fulfillment === 'PICKUP' ? 1 : 0"
+          @change="fulfillment(selections[index]!, $event)"
+          ><view class="row"
+            ><text>履约方式</text
+            ><text class="tap"
+              >{{ selections[index]?.fulfillment === 'PICKUP' ? '到店自取' : '校区配送' }} ▾</text
+            ></view
           ></picker
-        ><view v-else class="muted" style="margin-top: 20rpx"
-          >先新增一个校园地址。</view
-        ><view class="muted"
-          >{{ addresses[index]?.consignee }} {{ addresses[index]?.phone }}</view
-        ></view
-      ><view class="card" v-if="quote"
-        ><view class="card-name">餐品与费用</view
-        ><view class="line row" v-for="item in quote.items" :key="item.id"
-          ><view>{{ item.name }} ×{{ item.quantity }}</view
-          ><text
-            >¥{{ (Number(item.price) * item.quantity).toFixed(2) }}</text
-          ></view
-        ><view class="line row"
-          ><text>配送费</text><text>¥{{ quote.deliveryFee }}</text></view
-        ><view class="line row"
-          ><text>包装费</text><text>¥{{ quote.packagingFee }}</text></view
-        ><view class="row" style="margin-top: 25rpx"
-          ><text>合计</text><text class="price">¥{{ quote.total }}</text></view
+        ><picker
+          v-if="selections[index]?.fulfillment === 'DELIVERY'"
+          :range="eligible(c).map((a) => a.buildingName + ' ' + a.room + ' ' + a.consignee)"
+          @change="
+            selections[index]!.addressId = eligible(c)[Number($event.detail.value)]?.id || null;
+            invalidate();
+          "
+          ><view class="field-label tap"
+            >{{
+              eligible(c).find((a) => a.id === selections[index]?.addressId)?.buildingName ||
+              '选择本校区收货地址'
+            }}
+            ▾</view
+          ></picker
+        ><picker
+          :range="['不使用店铺券', ...coupons(c.storeId).map((c) => c.name)]"
+          @change="couponChange(selections[index]!, $event)"
+          ><view class="field-label tap"
+            >店铺优惠券：{{
+              wallet.find((w) => w.id === selections[index]?.couponId)?.name || '不使用'
+            }}
+            ▾</view
+          ></picker
+        ><view class="muted" v-for="i in c.items" :key="i.id"
+          >{{ i.name }} × {{ i.quantity }}</view
         ></view
       ><view class="card"
-        ><view class="field-label" style="margin-top: 0">备注</view
-        ><input
-          class="field"
+        ><text class="tap" @click="navTo('/pages/addresses/index')">管理各校区收货地址</text
+        ><picker
+          :range="['不使用平台券', ...coupons().map((c) => c.name)]"
+          @change="
+            platformCoupon = coupons()[Number($event.detail.value) - 1]?.id || null;
+            invalidate();
+          "
+          ><view class="field-label tap"
+            >平台优惠券：{{ wallet.find((w) => w.id === platformCoupon)?.name || '不使用' }} ▾</view
+          ></picker
+        ><textarea
           v-model="remark"
           maxlength="100"
-          placeholder="可填写用餐备注" /></view
-      ><view class="notice"
-        >下单后预占供餐份数。15分钟内未支付自动取消；接单前取消返还份数，接单后不自动返还。</view
-      ><button
-        class="primary"
-        :loading="busy"
-        :disabled="!quote || busy"
-        @click="submit"
-      >
-        提交订单 · 稍后模拟支付
-      </button></template
+          placeholder="订单备注"
+          @input="invalidate"
+        /></view
+      ><button class="secondary" :disabled="!selections.length || busy" @click="preview">
+        计算报价</button
+      ><view class="card" v-if="quote"
+        ><view v-for="p in quote.stores" :key="p.storeId" style="margin-bottom: 28rpx"
+          ><text style="font-weight: bold">{{ p.storeName }}</text
+          ><view class="muted"
+            >商品 ¥{{ cents(p.subtotalCents) }} · 店券 −¥{{ cents(p.shopDiscountCents) }} · 平台券
+            −¥{{ cents(p.platformDiscountCents) }}</view
+          ><view class="muted"
+            >配送 ¥{{ cents(p.deliveryCents) }} · 包装 ¥{{ cents(p.packagingCents) }}</view
+          ><view>本店应付 ¥{{ cents(p.totalCents) }}</view></view
+        ><view class="row"
+          ><text>合计</text><text class="price">¥{{ cents(quote.totalCents) }}</text></view
+        ><button class="primary" :loading="busy" @click="submit">
+          提交订单，随后模拟支付
+        </button></view
+      ></template
     ></view
   >
 </template>

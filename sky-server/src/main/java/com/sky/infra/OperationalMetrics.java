@@ -33,7 +33,7 @@ public class OperationalMetrics {
       degraded.set(1);
     }
     try {
-      refundFailures.set(db.count("SELECT COUNT(*) FROM refund_task WHERE state='FAILED'"));
+      refundFailures.set(db.count("SELECT COUNT(*) FROM refund_request WHERE state='FAILED'"));
       outboxBacklog.set(db.count("SELECT COUNT(*) FROM outbox_event WHERE state<>'SUCCEEDED'"));
     } catch (Exception ignored) {
     }

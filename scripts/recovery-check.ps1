@@ -1,4 +1,5 @@
 $ErrorActionPreference='Stop'
+throw 'Historical v1 fault drill is retired: it uses unscoped APIs and must not recreate current services. Use PlatformConcurrencyTest and the backup/restore checks documented in README.'
 $taskRoot=Split-Path $PSScriptRoot -Parent
 Push-Location $taskRoot
 try {

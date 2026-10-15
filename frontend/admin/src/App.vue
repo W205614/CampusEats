@@ -1,24 +1,45 @@
 <script setup lang="ts">
-import { ref } from "vue";
-import { useSession } from "./stores/session";
-import { api, body, notifyError } from "./api";
-import { roles, type Session } from "../../contracts/models";
-import { useRouter } from "vue-router";
-const store = useSession(),
-  router = useRouter();
-const username = ref("admin"),
-  password = ref(""),
-  busy = ref(false);
+import { computed, ref, watch } from 'vue';
+import { useRouter } from 'vue-router';
+import { useSession } from './stores/session';
+import { api, body, notifyError } from './api';
+import { request } from './platform-api';
+import { selectedStore } from './context';
+import { homeFor } from './router';
+import { roles, type Session } from '../../contracts/models';
+import type { Store } from '../../contracts/platform';
+const session = useSession(),
+  router = useRouter(),
+  username = ref('admin'),
+  password = ref(''),
+  busy = ref(false),
+  stores = ref<Store[]>([]),
+  storesLoaded = ref(false);
+const role = computed(() => session.session?.role || '');
+async function load() {
+  storesLoaded.value = false;
+  if (!session.session || role.value === 'DELIVERER') return;
+  try {
+    stores.value = await request<Store[]>('/merchant/stores');
+    if (!stores.value.some((s) => s.id === selectedStore.value))
+      selectedStore.value = stores.value[0]?.id || '';
+    storesLoaded.value = true;
+  } catch (e) {
+    notifyError(e);
+  }
+}
+watch(() => session.session?.token, load, { immediate: true });
+watch(selectedStore, (v) => localStorage.setItem('campus-store', v));
 async function login() {
   busy.value = true;
   try {
-    const value = await api<Session>("/auth/login", {
-      method: "POST",
+    const value = await api<Session>('/auth/login', {
+      method: 'POST',
       body: body({ username: username.value, password: password.value }),
     });
-    store.set(value);
-    password.value = "";
-    router.push(value.mustChangePassword ? "/password" : "/");
+    session.set(value);
+    password.value = '';
+    router.push(value.mustChangePassword ? '/password' : homeFor(value.role));
   } catch (e) {
     notifyError(e);
   } finally {
@@ -27,103 +48,94 @@ async function login() {
 }
 async function logout() {
   try {
-    await api("/auth/logout", { method: "POST" });
+    await api('/auth/logout', { method: 'POST' });
   } catch {}
-  store.set(null);
-  router.push("/");
+  session.set(null);
+  router.push('/');
 }
-const links = [
-  ["/", "运营概览"],
-  ["/orders", "订单与配送"],
-  ["/catalog/DISH", "菜品管理"],
-  ["/catalog/SETMEAL", "套餐管理"],
-  ["/catalog/CATEGORY", "分类管理"],
-  ["/operations/quotas", "每日供餐"],
-  ["/operations/buildings", "配送楼栋"],
-  ["/operations/shop", "营业规则"],
-  ["/operations/employees", "员工与角色"],
-  ["/operations/refund", "退款任务"],
-  ["/operations/outbox", "通知任务"],
-  ["/reports", "经营统计"],
-  ["/operations/audit", "操作记录"],
-];
+const links = computed(() => {
+  if (role.value === 'DELIVERER') return [['/orders', '抢单与配送']];
+  const base = [
+    ['/', '校区与店铺'],
+    ['/orders', '订单履约'],
+    ['/operations/aftersales', '售后处理'],
+    ['/operations/reviews', '用户评价'],
+  ];
+  if (role.value !== 'OPERATOR')
+    base.push(
+      ['/catalog', '商品与配额'],
+      ['/marketing', '营销管理'],
+      ['/operations/staff', '员工管理'],
+      ['/operations/refunds', '退款任务'],
+      ['/operations/outbox', '通知任务'],
+      ['/reports', '经营统计'],
+      ['/operations/audit', '操作记录'],
+    );
+  if (role.value === 'PLATFORM_ADMIN') base.push(['/operations/buildings', '校区楼栋']);
+  return base;
+});
 </script>
 <template>
-  <div v-if="!store.session" class="login-shell">
+  <div v-if="!session.session" class="login-shell">
     <section class="login-story">
       <div class="brand">C<span>CampusEats</span></div>
       <p class="eyebrow">校园里的每一餐</p>
-      <h1>供餐有数，<br />配送有序。</h1>
-      <p>从每日份数到订单送达，<br />在一个工作台里看清校园供餐。</p>
-      <div class="story-note">单校区 · 单店运营 · 模拟支付</div>
+      <h1>多家好店，<br />一份安心。</h1>
+      <p>连接校区、店铺与配送，<br />让每一餐都有清楚的去向。</p>
+      <div class="story-note">多校区 · 独立店铺 · 模拟支付</div>
     </section>
     <section class="login-form">
-      <p class="eyebrow">运营工作台</p>
+      <p class="eyebrow">校园供餐平台</p>
       <h2>欢迎回来</h2>
-      <p class="muted">使用管理员、运营员或配送员账户登录。</p>
+      <p class="muted">平台管理员、店长、运营员及配送员统一登录。</p>
       <el-form @submit.prevent="login"
         ><el-form-item label="账户"
-          ><el-input
-            v-model="username"
-            autocomplete="username"
-            placeholder="员工账户" /></el-form-item
+          ><el-input v-model="username" autocomplete="username" /></el-form-item
         ><el-form-item label="密码"
           ><el-input
             v-model="password"
             type="password"
             show-password
-            autocomplete="current-password"
-            placeholder="启动脚本生成的初始密码" /></el-form-item
-        ><el-button
-          type="primary"
-          native-type="submit"
-          :loading="busy"
-          class="wide"
+            autocomplete="current-password" /></el-form-item
+        ><el-button type="primary" native-type="submit" :loading="busy"
           >登录工作台</el-button
         ></el-form
       >
-      <p class="muted small">
-        初始账户信息保存在本机 .local/demo-credentials.txt。
-      </p>
+      <p class="muted small">演示账号使用本机生成的初始密码，首次员工登录须改密。</p>
     </section>
   </div>
   <div v-else class="workspace">
     <aside class="sidebar">
       <div class="brand">
-        C<span>CampusEats<small>校园供餐工作台</small></span>
+        C<span>CampusEats<small>校园供餐平台</small></span>
       </div>
       <nav>
-        <router-link
-          v-for="link in links.filter(
-            (x) =>
-              store.session?.role === 'ADMIN' ||
-              ['/', '/orders'].includes(x[0]!),
-          )"
-          :key="link[0]"
-          :to="link[0]!"
-          >{{ link[1] }}</router-link
-        >
+        <router-link v-for="link in links" :key="link[0]" :to="link[0]!">{{ link[1] }}</router-link>
       </nav>
-      <div class="sidebar-foot"><span class="dot"></span> 模拟支付环境</div>
+      <div class="sidebar-foot">模拟支付与退款</div>
     </aside>
     <main class="main">
       <header class="topbar">
-        <span class="muted"
-          >校园供餐 /
-          {{
-            String(router.currentRoute.value.path).includes("orders")
-              ? "订单配送"
-              : "运营管理"
-          }}</span
-        >
+        <el-select
+          v-if="role !== 'DELIVERER'"
+          v-model="selectedStore"
+          placeholder="选择店铺"
+          style="width: 260px"
+          ><el-option
+            v-for="s in stores"
+            :key="s.id"
+            :value="s.id"
+            :label="s.campusName + ' / ' + s.name" /></el-select
+        ><span v-else>校区配送工作台</span>
         <div>
-          <span>{{ store.session.name }} · {{ roles[store.session.role] }}</span
-          ><el-button text @click="router.push('/password')">改密</el-button
+          {{ session.session.name }} · {{ roles[role] }}
+          <el-button text @click="router.push('/password')">改密</el-button
           ><el-button text @click="logout">退出</el-button>
         </div>
       </header>
       <div class="content">
-        <router-view :key="router.currentRoute.value.path" />
+        <router-view v-if="router.currentRoute.value.path === '/password' || (role === 'DELIVERER' ? router.currentRoute.value.path === '/orders' : storesLoaded)" :key="router.currentRoute.value.path + selectedStore" @stores-changed="load" />
+        <section v-else class="panel"><p>正在读取授权店铺；加载失败时可重试。</p><el-button @click="load">重新加载店铺</el-button></section>
       </div>
     </main>
   </div>

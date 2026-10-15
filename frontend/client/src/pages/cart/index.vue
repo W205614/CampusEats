@@ -1,34 +1,37 @@
 <script setup lang="ts">
-import { ref, computed } from "vue";
-import { onShow } from "@dcloudio/uni-app";
-import { api, toast, loggedIn, confirm } from "../../api";
-import type { Cart, CartItem } from "../../../../contracts/models";
-const cart = ref<Cart>({ cartVersion: "0", items: [] }),
-  busy = ref(false),
-  subtotal = computed(() =>
-    cart.value.items
-      .reduce((n, x) => n + Number(x.price || 0) * x.quantity, 0)
-      .toFixed(2),
-  );
+import { ref } from 'vue';
+import { onShow } from '@dcloudio/uni-app';
+import { api, toast, loggedIn, confirm } from '../../api';
+import type { Cart, CartItem } from '../../../../contracts/platform';
+const carts = ref<Cart[]>([]),
+  selected = ref<string[]>([]),
+  busy = ref(false);
 async function load() {
   if (!loggedIn()) return;
   try {
-    cart.value = await api<Cart>("/cart");
+    carts.value = (await api<Cart[]>('/carts')).filter((c) => c.items.length);
+    selected.value = selected.value.filter((id) => carts.value.some((c) => c.storeId === id));
   } catch (e) {
     toast(e);
   }
 }
-async function change(item: CartItem, delta: number) {
+function toggle(id: string) {
+  selected.value = selected.value.includes(id)
+    ? selected.value.filter((x) => x !== id)
+    : [...selected.value, id];
+}
+async function change(c: Cart, item: CartItem, delta: number) {
   if (busy.value) return;
   busy.value = true;
   try {
-    cart.value = await api<Cart>("/cart/items", "POST", {
-      cartVersion: cart.value.cartVersion,
+    await api('/stores/' + c.storeId + '/cart/items', 'POST', {
+      cartVersion: c.cartVersion,
       itemType: item.itemType,
       itemId: item.itemId,
       flavors: item.flavors,
       delta,
     });
+    await load();
   } catch (e) {
     toast(e);
     await load();
@@ -36,71 +39,49 @@ async function change(item: CartItem, delta: number) {
     busy.value = false;
   }
 }
-async function clear() {
-  if (!(await confirm("清空当前账户的购物车？"))) return;
+function checkout() {
+  uni.setStorageSync('checkout-stores', selected.value);
+  uni.navigateTo({ url: '/pages/checkout/index' });
+}
+async function clearCart(c: Cart) {
+  if (!(await confirm('清空这家店的购物车？'))) return;
   try {
-    cart.value = await api<Cart>("/cart/clear", "POST", {
-      version: cart.value.cartVersion,
-    });
+    await api('/stores/' + c.storeId + '/cart/clear', 'POST', { version: c.cartVersion });
+    await load();
   } catch (e) {
     toast(e);
-    await load();
   }
 }
 onShow(load);
-
-const navTo = (url: string) => uni.navigateTo({ url });
-const tabTo = (url: string) => uni.switchTab({ url });
 </script>
 <template>
   <view class="screen"
-    ><view class="row"
-      ><view class="section-title" style="margin-top: 0">我的购物车</view
-      ><text v-if="cart.items.length" class="tap" @click="clear"
-        >清空</text
-      ></view
-    ><view class="card" v-for="item in cart.items" :key="item.id"
-      ><view class="row"
+    ><view class="title">我的购物车</view
+    ><view class="subtitle">每店购物车独立保存，可勾选多个校区的店铺合并结算。</view
+    ><view class="card" v-for="c in carts" :key="c.storeId"
+      ><view class="row" @click="toggle(c.storeId)"
+        ><text style="font-weight: bold">{{ c.campusName }} · {{ c.storeName }}</text
+        ><text class="option" :class="{ selected: selected.includes(c.storeId) }">{{
+          selected.includes(c.storeId) ? '已选择' : '选择此店'
+        }}</text></view
+      ><text class="tap" @click="clearCart(c)">清空本店</text
+      ><view v-for="i in c.items" :key="i.id" class="row" style="margin-top: 30rpx"
         ><view
-          ><view class="card-name">{{ item.name || "商品已删除" }}</view
-          ><view class="muted">{{
-            Object.values(item.flavors).join(" / ")
-          }}</view
-          ><view class="price" style="margin-top: 15rpx"
-            >¥{{ item.price || "—" }}</view
-          ></view
-        ><view class="quantity"
-          ><button :disabled="busy" @click="change(item, -1)">−</button
-          ><text>{{ item.quantity }}</text
-          ><button
-            :disabled="busy || item.quantity >= 50"
-            @click="change(item, 1)"
-          >
-            +
+          ><view>{{ i.name }}</view
+          ><view class="muted">{{ Object.values(i.flavors || {}).join(' / ') }}</view
+          ><text>¥{{ i.price }}</text></view
+        ><view class="row"
+          ><button class="secondary small-button" :disabled="busy" @click="change(c, i, -1)">
+            −</button
+          ><text style="margin: 0 20rpx">{{ i.quantity }}</text
+          ><button class="secondary small-button" :disabled="busy" @click="change(c, i, 1)">
+            ＋
           </button></view
         ></view
-      ><view class="notice" v-if="item.status !== 1" style="margin: 20rpx 0 0"
-        >当前商品不可售，请移除后再结算。</view
       ></view
-    ><view v-if="!cart.items.length" class="empty"
-      ><view class="empty-title">还没有选餐品</view
-      ><view style="margin-bottom: 30rpx">去菜单看看，选一份今天想吃的。</view
-      ><button class="primary" @click="tabTo('/pages/menu/index')">
-        去点餐
-      </button></view
-    ><view v-else
-      ><view class="notice">餐品小计不含配送与包装费，结算时由服务端确认。</view
-      ><view class="sticky-summary row"
-        ><view
-          ><view class="muted" style="color: #c6cabc">餐品小计</view
-          ><text class="price">¥{{ subtotal }}</text></view
-        ><button
-          class="primary small-button"
-          @click="navTo('/pages/checkout/index')"
-        >
-          去结算
-        </button></view
-      ></view
-    ></view
+    ><view v-if="!carts.length" class="empty">购物车还是空的，去挑一份喜欢的餐吧。</view
+    ><button v-if="carts.length" class="primary" :disabled="!selected.length" @click="checkout">
+      合并结算 {{ selected.length }} 家店
+    </button></view
   >
 </template>

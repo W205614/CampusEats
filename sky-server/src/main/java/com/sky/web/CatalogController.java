@@ -11,6 +11,9 @@ import org.springframework.http.*;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
+    name = "campus.legacy-api",
+    havingValue = "true")
 public class CatalogController {
   private final CatalogService catalog;
   private final EmployeeService employees;

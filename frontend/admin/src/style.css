@@ -344,3 +344,8 @@ h3 {
     font-size: 25px;
   }
 }
+
+.page-head{display:flex;align-items:center;justify-content:space-between;gap:24px;margin-bottom:28px}.page-head h1{margin:0 0 12px;font-size:28px}.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:24px}.metrics .metric{background:#fff;border:1px solid #e6e8e2;border-radius:12px;padding:20px}.metrics .metric span,.metrics .metric strong{display:block}.metrics .metric strong{font-size:26px;margin-top:12px}input[type=date],input[type=datetime-local]{font:inherit;padding:9px;border:1px solid #dcdfe6;border-radius:6px;max-width:100%}.toolbar{flex-wrap:wrap}.panel+.panel{margin-top:20px}@media(max-width:700px){.page-head{align-items:flex-start;flex-direction:column}.topbar{gap:12px;flex-wrap:wrap}.metrics{grid-template-columns:repeat(2,1fr)}}
+
+/* The existing topbar flex rule must not shrink the select component wrapper. */
+.topbar > .el-select { display: inline-block; }

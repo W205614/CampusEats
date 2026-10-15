@@ -1,324 +1,287 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from "vue";
-import { api, body, notifyError } from "../api";
-import { useSession } from "../stores/session";
-import {
-  statuses,
-  when,
-  type Order,
-  type Page,
-} from "../../../contracts/models";
-import { ElMessageBox, ElMessage } from "element-plus";
-const store = useSession(),
-  rows = ref<Order[]>([]),
-  total = ref(0),
-  page = ref(1),
-  status = ref<number>(),
-  query = ref(""),
-  busy = ref(false),
-  detail = ref<Order>(),
-  drawer = ref(false),
+import { ref, onMounted, onUnmounted, computed } from 'vue';
+import { request } from '../platform-api';
+import { notifyError } from '../api';
+import { selectedStore } from '../context';
+import { useSession } from '../stores/session';
+import { readPages } from '../../../contracts/paging';
+import { orderStatus, states, cents, type Order } from '../../../contracts/platform';
+const session = useSession(),
+  courier = computed(() => session.session?.role === 'DELIVERER'),
+  orders = ref<Order[]>([]),
+  pool = ref<
+    { id: string; orderId: string; version: string; storeName: string; buildingName: string }[]
+  >([]),
   couriers = ref<{ id: string; name: string }[]>([]),
-  courier = ref("");
-let timer: ReturnType<typeof setInterval>,
-  socket: WebSocket | undefined,
-  retry: ReturnType<typeof setTimeout> | undefined,
-  stopped = false;
-const seen = new Set<string>();
-async function load() {
+  courierId = ref(''),
+  selected = ref<Order>(),
+  reason = ref(''),
+  code = ref(''),
+  busy = ref(false),
+  socket = ref<WebSocket>(),
+  timer = ref<ReturnType<typeof setInterval>>(),
+  loading = ref(false),
+  hasMore = ref(false);
+let loadedPages = 1;
+async function load(pages = loadedPages) {
+  if (loading.value) return;
+  loading.value = true;
   try {
-    const params = new URLSearchParams({
-      page: String(page.value),
-      size: "20",
-      query: query.value,
-    });
-    if (status.value) params.set("status", String(status.value));
-    const result = await api<Page<Order>>("/orders?" + params);
-    rows.value = result.records;
-    total.value = Number(result.total);
+    const path = courier.value ? '/courier/orders' : '/merchant/stores/' + selectedStore.value + '/orders';
+    const result = await readPages((before) => request<Order[]>(path + (before ? '?beforeId=' + before : '')), pages);
+    orders.value = result.items;
+    hasMore.value = result.hasMore;
+    loadedPages = pages;
+    if (courier.value) pool.value = await request<typeof pool.value>('/courier/pool');
+    else
+      couriers.value = await request<typeof couriers.value>(
+        '/merchant/stores/' + selectedStore.value + '/couriers',
+      );
+    if (selected.value) selected.value = orders.value.find((o) => o.id === selected.value?.id);
   } catch (e) {
     notifyError(e);
+  } finally {
+    loading.value = false;
   }
 }
-async function open(row: Order) {
-  try {
-    detail.value = await api<Order>("/orders/" + row.id);
-    courier.value = detail.value.courierId || "";
-    drawer.value = true;
-  } catch (e) {
-    notifyError(e);
-  }
-}
-async function action(action: string) {
-  if (!detail.value || busy.value) return;
-  let reason = "";
-  if (["cancel", "reject"].includes(action)) {
-    try {
-      reason = (
-        await ElMessageBox.prompt(
-          "填写原因，已支付订单会进入模拟退款流程。",
-          "确认" + (action === "cancel" ? "取消" : "拒单"),
-          { inputValidator: (v) => !!v?.trim() || "请填写原因" },
-        )
-      ).value;
-    } catch {
-      return;
-    }
-  }
+const loadMore = () => load(loadedPages + 1);
+const refresh = () => load(1);
+async function action(o: Order, name: string) {
+  if (busy.value) return;
   busy.value = true;
   try {
-    detail.value = await api<Order>(
-      "/orders/" + detail.value.id + "/" + action,
+    const result = await request<{ verified?: boolean }>(
+      (courier.value ? '/courier' : '/merchant') + '/orders/' + o.id + '/actions/' + name,
+      'POST',
       {
-        method: "POST",
-        body: body({
-          version: detail.value.version,
-          reason,
-          courierId: action === "assign" ? courier.value : null,
-        }),
+        version: o.version,
+        reason: reason.value || undefined,
+        courierId: courierId.value || null,
+        code: code.value || null,
       },
     );
-    ElMessage.success("订单状态已更新");
+    if (result?.verified === false) throw new Error('核销码不正确，错误次数已记录');
+    reason.value = '';
+    code.value = '';
     await load();
   } catch (e) {
     notifyError(e);
-    if (detail.value) await open(detail.value);
   } finally {
     busy.value = false;
   }
 }
-async function connect() {
-  if (stopped || store.session?.role === "DELIVERER") return;
+async function claim(t: (typeof pool.value)[number]) {
   try {
-    const { ticket } = await api<{ ticket: string }>("/ws-ticket", {
-      method: "POST",
-    });
-    if (stopped) return;
-    socket = new WebSocket(
-      (location.protocol === "https:" ? "wss://" : "ws://") +
-        location.host +
-        "/ws/orders?ticket=" +
-        ticket,
-    );
-    socket.onmessage = (e) => {
-      const event = JSON.parse(e.data);
-      if (seen.has(event.eventId)) return;
-      seen.add(event.eventId);
-      if (seen.size > 200) seen.clear();
-      load();
-    };
-    socket.onclose = () => {
-      if (!stopped) retry = setTimeout(connect, 5000);
-    };
-  } catch {
-    if (!stopped) retry = setTimeout(connect, 15000);
+    await request('/courier/tasks/' + t.id + '/claim', 'POST', { version: t.version });
+    await load();
+  } catch (e) {
+    notifyError(e);
+  }
+}
+async function unassign(o: Order) {
+  try {
+    await request('/platform/orders/' + o.id + '/unassign', 'POST', { version: o.version });
+    await load();
+  } catch (e) {
+    notifyError(e);
+  }
+}
+async function reset(o: Order) {
+  try {
+    await request('/platform/orders/' + o.id + '/reset-pickup', 'POST');
+    await load();
+  } catch (e) {
+    notifyError(e);
   }
 }
 onMounted(async () => {
   await load();
-  if (store.session?.role !== "DELIVERER")
+  timer.value = setInterval(load, 15000);
+  if (!courier.value)
     try {
-      couriers.value = await api("/couriers");
-    } catch {}
-  timer = setInterval(load, 15000);
-  connect();
+      const result = await request<{ ticket: string }>('/admin/ws-ticket', 'POST');
+      socket.value = new WebSocket(
+        (location.protocol === 'https:' ? 'wss://' : 'ws://') +
+          location.host +
+          '/ws/orders?ticket=' +
+          result.ticket,
+      );
+      socket.value.onmessage = () => load();
+    } catch {
+      /* Polling remains active. */
+    }
 });
 onUnmounted(() => {
-  stopped = true;
-  clearInterval(timer);
-  clearTimeout(retry);
-  socket?.close();
+  if (timer.value) clearInterval(timer.value);
+  socket.value?.close();
 });
 </script>
 <template>
-  <div class="page-heading">
+  <section class="page-head">
     <div>
-      <h2>订单与配送</h2>
-      <p class="muted">每15秒自动更新 · 配送员只查看自己的订单</p>
+      <h1>{{ courier ? '抢单与配送' : '店铺订单' }}</h1>
+      <p class="muted">
+        {{ courier ? '仅展示本校区可抢任务和本人订单。' : '每店独立接单、备餐、配送或自取核销。' }}
+        每15秒同步。
+      </p>
     </div>
-    <el-button @click="load">刷新订单</el-button>
-  </div>
-  <section class="panel">
-    <div class="toolbar">
-      <el-select
-        v-model="status"
-        clearable
-        placeholder="全部状态"
-        style="width: 150px"
-        @change="
-          page = 1;
-          load();
-        "
-        ><el-option
-          v-for="(label, id) in statuses"
-          :key="id"
-          :label="label"
-          :value="Number(id)" /></el-select
-      ><el-input
-        v-model="query"
-        placeholder="订单号前缀 / 完整手机号"
-        style="width: 260px"
-        clearable
-        @keyup.enter="
-          page = 1;
-          load();
-        "
-      /><el-button
-        @click="
-          page = 1;
-          load();
-        "
-        >查询</el-button
-      >
-    </div>
-    <el-table :data="rows" @row-click="open"
-      ><el-table-column
-        prop="number"
-        label="订单号"
-        min-width="180"
-        show-overflow-tooltip
-      /><el-table-column label="餐品" min-width="180"
-        ><template #default="{ row }">{{
-          row.details?.map((d: any) => d.name + " ×" + d.number).join("、")
-        }}</template></el-table-column
-      ><el-table-column label="状态" width="110"
+    <el-button :loading="loading" @click="refresh">刷新</el-button>
+  </section>
+  <section v-if="courier" class="panel">
+    <h2>校区抢单池</h2>
+    <el-table :data="pool"
+      ><el-table-column prop="storeName" label="取餐店铺" /><el-table-column
+        prop="buildingName"
+        label="送达楼栋"
+      /><el-table-column label="操作"
         ><template #default="{ row }"
-          ><el-tag
-            :type="
-              row.status === 6
-                ? 'info'
-                : row.status === 5
-                  ? 'success'
-                  : 'warning'
-            "
-            >{{ statuses[row.status] }}</el-tag
-          ></template
-        ></el-table-column
-      ><el-table-column label="金额" width="100"
-        ><template #default="{ row }"
-          >¥{{ row.amount }}</template
-        ></el-table-column
-      ><el-table-column
-        prop="address"
-        label="配送地址"
-        min-width="180"
-      /><el-table-column label="下单时间" min-width="170"
-        ><template #default="{ row }">{{
-          when(row.orderTime)
-        }}</template></el-table-column
-      ><el-table-column width="80"
-        ><template #default="{ row }"
-          ><el-button text type="primary" @click.stop="open(row)"
-            >详情</el-button
-          ></template
+          ><el-button type="primary" @click="claim(row)">抢单</el-button></template
         ></el-table-column
       ></el-table
-    ><el-pagination
-      class="paging"
-      v-model:current-page="page"
-      :page-size="20"
-      :total="total"
-      layout="total,prev,pager,next"
-      @current-change="load"
-    />
+    >
   </section>
-  <el-drawer v-model="drawer" title="订单详情" size="540px"
-    ><template v-if="detail"
-      ><h3>
-        {{ statuses[detail.status] }}
-        <el-tag v-if="detail.deliveryOverdue" type="danger">配送超时</el-tag>
-      </h3>
-      <p class="muted small">{{ detail.number }}</p>
-      <div class="order-summary">
-        <div><label>配送地址</label>{{ detail.address || "历史地址未知" }}</div>
-        <div>
-          <label>收货人</label>{{ detail.consignee }} {{ detail.phone }}
-        </div>
-        <div><label>下单时间</label>{{ when(detail.orderTime) }}</div>
-        <div>
-          <label>支付状态</label
-          >{{
-            detail.payStatus === 2
-              ? "已退款"
-              : detail.payStatus === 1
-                ? "已支付"
-                : "待支付"
-          }}
-        </div>
-      </div>
-      <div class="status-note" v-if="detail.snapshotSource !== 'ORIGINAL'">
-        历史订单地址来源：{{
-          detail.snapshotSource === "LEGACY_BACKFILL"
-            ? "当前地址补录，不能确认原始地址"
-            : "旧记录"
-        }}
-      </div>
-      <el-divider />
-      <div class="rank" v-for="item in detail.details" :key="item.id">
-        <span>{{ item.name }} ×{{ item.number }}</span
-        ><span>¥{{ item.amount }}</span>
-      </div>
-      <div class="rank">
-        <strong>订单总额</strong><strong>¥{{ detail.amount }}</strong>
-      </div>
-      <p class="muted small" style="margin-top: 14px">
-        备注：{{ detail.remark || "无" }}
+  <section class="panel">
+    <el-table :data="orders" @row-click="selected = $event"
+      ><el-table-column prop="number" label="订单" min-width="170" /><el-table-column
+        prop="storeName"
+        label="店铺"
+      /><el-table-column label="状态"
+        ><template #default="{ row }"
+          >{{ orderStatus[row.status]
+          }}{{ row.ready && row.status === 3 ? ' · 已备餐' : '' }}</template
+        ></el-table-column
+      ><el-table-column label="履约"
+        ><template #default="{ row }">{{
+          row.fulfillment === 'PICKUP' ? '到店自取' : '校区配送'
+        }}</template></el-table-column
+      ><el-table-column prop="amount" label="应付 / 元" /><el-table-column label="退款"
+        ><template #default="{ row }">¥{{ cents(row.refundedCents) }}</template></el-table-column
+      ><el-table-column label="操作"
+        ><template #default="{ row }"
+          ><el-button text @click.stop="selected = row">处理订单</el-button></template
+        ></el-table-column
+      ></el-table
+    >
+  </section>
+  <el-button v-if="hasMore" :loading="loading" @click="loadMore">加载更早订单</el-button>
+  <el-drawer
+    :model-value="!!selected"
+    title="订单详情与操作"
+    size="620px"
+    @close="selected = undefined"
+    ><template v-if="selected"
+      ><h2>{{ selected.number }}</h2>
+      <p>
+        {{ orderStatus[selected.status] }} ·
+        {{ selected.fulfillment === 'PICKUP' ? '自取' : '配送' }}
       </p>
-      <div class="status-note" v-if="detail.refund">
-        退款：{{ detail.refund.state }} · 已重试 {{ detail.refund.attempts }} 次
-      </div>
+      <p>{{ selected.consignee }} {{ selected.phone }} {{ selected.address }}</p>
+      <el-table :data="selected.details"
+        ><el-table-column prop="name" label="商品" /><el-table-column
+          prop="number"
+          label="数量"
+        /><el-table-column label="商品实付"
+          ><template #default="{ row }">¥{{ cents(row.lineTotalCents) }}</template></el-table-column
+        ></el-table
+      >
       <div class="toolbar" style="margin-top: 24px">
-        <template v-if="store.session?.role !== 'DELIVERER'"
+        <template v-if="!courier"
           ><el-button
-            v-if="detail.status === 2"
+            v-if="selected.status === 2"
             type="primary"
-            :loading="busy"
-            @click="action('accept')"
+            :disabled="busy"
+            @click="action(selected, 'accept')"
             >接单备餐</el-button
           ><el-button
-            v-if="detail.status === 2"
+            v-if="selected.status === 3 && !selected.ready"
+            type="primary"
             :disabled="busy"
-            @click="action('reject')"
-            >拒单</el-button
+            @click="action(selected, 'ready')"
+            >备餐完成</el-button
           ><el-button
-            v-if="detail.status <= 3"
-            type="danger"
-            plain
-            :disabled="busy"
-            @click="action('cancel')"
-            >取消订单</el-button
-          ><template v-if="detail.status === 3"
-            ><el-select
-              v-model="courier"
-              placeholder="选择配送员"
-              style="width: 180px"
-              ><el-option
-                v-for="c in couriers"
-                :key="c.id"
-                :label="c.name"
-                :value="c.id" /></el-select
-            ><el-button :disabled="!courier || busy" @click="action('assign')"
-              >派单</el-button
-            ></template
+            v-if="
+              selected.status === 3 &&
+              selected.ready &&
+              selected.fulfillment === 'DELIVERY' &&
+              !selected.courierId
+            "
+            @click="action(selected, 'publish')"
+            >发布抢单任务</el-button
           ></template
-        ><el-button
-          v-if="
-            detail.status === 3 &&
-            detail.courierId &&
-            store.session?.role !== 'OPERATOR'
-          "
-          type="primary"
-          :loading="busy"
-          @click="action('dispatch')"
-          >开始配送</el-button
-        ><el-button
-          v-if="detail.status === 4 && store.session?.role !== 'OPERATOR'"
-          type="primary"
-          :loading="busy"
-          @click="action('complete')"
-          >确认送达</el-button
+        ><template v-else
+          ><el-button
+            v-if="selected.status === 3"
+            type="primary"
+            @click="action(selected, 'pickup')"
+            >确认取餐</el-button
+          ><el-button
+            v-if="selected.status === 4"
+            type="primary"
+            @click="action(selected, 'complete')"
+            >确认送达</el-button
+          ></template
         >
-      </div></template
+      </div>
+      <template
+        v-if="
+          !courier &&
+          selected.status === 3 &&
+          selected.ready &&
+          selected.fulfillment === 'DELIVERY' &&
+          !selected.courierId
+        "
+        ><h3>人工派单</h3>
+        <div class="toolbar">
+          <el-select v-model="courierId" placeholder="本校区配送员"
+            ><el-option
+              v-for="c in couriers"
+              :key="c.id"
+              :value="c.id"
+              :label="c.name" /></el-select
+          ><el-button :disabled="!courierId" @click="action(selected, 'assign')"
+            >指派配送</el-button
+          >
+        </div></template
+      ><template
+        v-if="
+          !courier && selected.status === 3 && selected.ready && selected.fulfillment === 'PICKUP'
+        "
+        ><h3>自取核销</h3>
+        <div class="toolbar">
+          <el-input v-model="code" maxlength="8" placeholder="输入用户出示的8位核销码" /><el-button
+            :disabled="!code || busy"
+            @click="action(selected, 'verify')"
+            >核销</el-button
+          ><el-button
+            v-if="session.session?.role === 'PLATFORM_ADMIN'"
+            text
+            @click="reset(selected)"
+            >重置核销码</el-button
+          >
+        </div></template
+      >
+      <div
+        class="toolbar"
+        v-if="!courier && (selected.status === 2 || (selected.status === 3 && !selected.ready))"
+      >
+        <el-input v-model="reason" placeholder="拒单或取消原因" maxlength="200" /><el-button
+          type="danger"
+          :disabled="!reason || busy"
+          @click="action(selected, selected.status === 2 ? 'reject' : 'cancel')"
+          >{{ selected.status === 2 ? '拒单并退款' : '取消并退款' }}</el-button
+        >
+      </div>
+      <el-button
+        v-if="
+          session.session?.role === 'PLATFORM_ADMIN' && selected.status === 3 && selected.courierId
+        "
+        @click="unassign(selected)"
+        >撤回配送分配</el-button
+      >
+      <h3>退款进度</h3>
+      <p v-for="r in selected.refunds" :key="r.id">
+        ¥{{ cents(r.amountCents) }} · {{ states[r.state] || r.state }}
+      </p></template
     ></el-drawer
   >
 </template>

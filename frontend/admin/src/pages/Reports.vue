@@ -1,105 +1,113 @@
 <script setup lang="ts">
-import { ref, onMounted } from "vue";
-import { api, download, notifyError } from "../api";
-const today = new Date(),
-  prior = new Date(Date.now() - 29 * 86400000),
-  dates = ref([
-    prior.toLocaleDateString("sv-SE"),
-    today.toLocaleDateString("sv-SE"),
-  ]);
-const daily = ref<any[]>([]),
-  top = ref<any[]>([]);
+import { ref, onMounted } from 'vue';
+import { request, exportReport } from '../platform-api';
+import { notifyError } from '../api';
+import { useSession } from '../stores/session';
+import { selectedStore } from '../context';
+import { localDate } from '../dates';
+import { cents, type Campus } from '../../../contracts/platform';
+interface Report {
+  metrics: Record<string, string | number>;
+  daily: { date: string; paidCents: string; paymentCount: number }[];
+  stores: { storeName: string; paidCents: string; childOrderCount: number }[];
+}
+const session = useSession(),
+  begin = ref(localDate(new Date(Date.now() - 6 * 86400000))),
+  end = ref(localDate()),
+  level = ref('STORE'),
+  campus = ref(''),
+  campuses = ref<Campus[]>([]),
+  report = ref<Report>();
+const names: Record<string, string> = {
+  paymentCount: '合单支付笔数',
+  childOrderCount: '店铺子订单数',
+  paidCents: '支付额',
+  refundedCents: '成功退款额',
+  netCents: '净收款',
+  shopDiscountCents: '店铺优惠',
+  platformDiscountCents: '平台优惠',
+  completed: '完成订单数',
+  completedCents: '完成单成交额',
+};
+function path() {
+  return (
+    (level.value === 'STORE'
+      ? '/merchant/reports?storeId=' + selectedStore.value
+      : '/platform/reports?' + (campus.value ? 'campusId=' + campus.value : '')) +
+    '&begin=' +
+    begin.value +
+    '&end=' +
+    end.value
+  );
+}
 async function load() {
-  if (!dates.value?.length) return;
   try {
-    const result = await api<{ daily: any[]; top10: any[] }>(
-      "/reports?begin=" + dates.value[0] + "&end=" + dates.value[1],
-    );
-    daily.value = result.daily;
-    top.value = result.top10;
+    report.value = await request<Report>(path());
   } catch (e) {
     notifyError(e);
   }
 }
-async function exportFile() {
+async function download() {
   try {
-    await download(
-      "/reports/export?begin=" + dates.value[0] + "&end=" + dates.value[1],
-    );
+    const pathValue = path();
+    await exportReport(pathValue.replace('/reports?', '/reports/export?'));
   } catch (e) {
     notifyError(e);
   }
 }
-onMounted(load);
+onMounted(async () => {
+  if (session.session?.role === 'PLATFORM_ADMIN')
+    campuses.value = await request<Campus[]>('/platform/campuses');
+  await load();
+});
 </script>
 <template>
-  <div class="page-heading">
+  <section class="page-head">
     <div>
-      <h2>经营统计</h2>
-      <p class="muted">营业额统计已完成且已支付的订单。</p>
+      <h1>经营统计</h1>
+      <p class="muted">支付与退款按各自发生日期统计，合单支付按结算单去重。</p>
     </div>
-    <el-button @click="exportFile">导出 Excel</el-button>
-  </div>
-  <div class="toolbar">
-    <el-date-picker
-      v-model="dates"
-      type="daterange"
-      value-format="YYYY-MM-DD"
-      start-placeholder="开始日期"
-      end-placeholder="结束日期"
-    /><el-button type="primary" @click="load">查看统计</el-button>
-  </div>
-  <div class="two-columns">
-    <section class="panel">
-      <h3>销售前十</h3>
-      <div v-if="!top.length" class="muted">当前日期范围暂无已完成订单。</div>
-      <div class="rank" v-for="(item, i) in top" :key="item.name">
-        <span
-          ><span class="muted">{{ String(i + 1).padStart(2, "0") }}　</span
-          >{{ item.name }}</span
-        ><strong>{{ item.quantity }} 份</strong>
-      </div>
-    </section>
-    <section class="panel">
-      <h3>范围汇总</h3>
-      <div class="rank">
-        <span>订单数</span
-        ><strong>{{ daily.reduce((n, x) => n + Number(x.orders), 0) }}</strong>
-      </div>
-      <div class="rank">
-        <span>完成订单</span
-        ><strong>{{
-          daily.reduce((n, x) => n + Number(x.completed), 0)
-        }}</strong>
-      </div>
-      <div class="rank">
-        <span>营业额</span
-        ><strong
-          >¥{{
-            daily.reduce((n, x) => n + Number(x.turnover), 0).toFixed(2)
-          }}</strong
-        >
-      </div>
-      <div class="rank">
-        <span>新增用户</span
-        ><strong>{{
-          daily.reduce((n, x) => n + Number(x.newUsers), 0)
-        }}</strong>
-      </div>
-    </section>
-  </div>
+    <el-button @click="download">导出 Excel</el-button>
+  </section>
   <section class="panel">
-    <h3>每日明细</h3>
-    <el-table :data="daily"
+    <div class="toolbar">
+      <el-select
+        v-if="session.session?.role === 'PLATFORM_ADMIN'"
+        v-model="level"
+        style="width: 160px"
+        ><el-option value="STORE" label="当前店铺" /><el-option
+          value="PLATFORM"
+          label="平台 / 校区" /></el-select
+      ><el-select v-if="level === 'PLATFORM'" v-model="campus" clearable placeholder="全部校区"
+        ><el-option v-for="c in campuses" :key="c.id" :value="c.id" :label="c.name" /></el-select
+      ><input type="date" v-model="begin" /><span>至</span
+      ><input type="date" v-model="end" /><el-button type="primary" @click="load">查询</el-button>
+    </div>
+  </section>
+  <div v-if="report" class="metrics">
+    <section class="metric" v-for="(value, key) in report.metrics" :key="key">
+      <span>{{ names[key] || key }}</span
+      ><strong>{{ String(key).endsWith('Cents') ? '¥' + cents(value) : value }}</strong>
+    </section>
+  </div>
+  <section class="panel" v-if="report">
+    <h2>每日支付</h2>
+    <el-table :data="report.daily"
       ><el-table-column prop="date" label="日期" /><el-table-column
-        prop="orders"
-        label="订单" /><el-table-column
-        prop="completed"
-        label="已完成" /><el-table-column label="营业额"
-        ><template #default="{ row }"
-          >¥{{ Number(row.turnover).toFixed(2) }}</template
-        ></el-table-column
-      ><el-table-column prop="newUsers" label="新增用户"
-    /></el-table>
+        prop="paymentCount"
+        label="支付笔数"
+      /><el-table-column label="支付额"
+        ><template #default="{ row }">¥{{ cents(row.paidCents) }}</template></el-table-column
+      ></el-table
+    >
+    <h2>店铺分布</h2>
+    <el-table :data="report.stores"
+      ><el-table-column prop="storeName" label="店铺" /><el-table-column
+        prop="childOrderCount"
+        label="子订单数"
+      /><el-table-column label="支付额"
+        ><template #default="{ row }">¥{{ cents(row.paidCents) }}</template></el-table-column
+      ></el-table
+    >
   </section>
 </template>

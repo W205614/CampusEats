@@ -12,7 +12,11 @@ public class OpenApiConfiguration {
   @Bean
   OpenAPI api() {
     return new OpenAPI()
-        .info(new Info().title("CampusEats v1").version("1.0").description("单校区点餐演示；所有支付退款均为模拟"))
+        .info(
+            new Info()
+                .title("CampusEats Platform")
+                .version("2.0")
+                .description("多校区独立店铺平台，单体单实例；支付与退款均为模拟"))
         .components(
             new Components()
                 .addSecuritySchemes(
@@ -55,7 +59,13 @@ public class OpenApiConfiguration {
                                 || path.endsWith("/auth/wechat")
                                 || path.startsWith("/api/v1/user/menu")
                                 || path.equals("/api/v1/user/shop")
-                                || path.equals("/api/v1/user/buildings")))
+                                || path.equals("/api/v1/user/buildings")
+                                || path.equals("/api/v1/user/campuses")
+                                || path.equals("/api/v1/user/stores")
+                                || path.equals("/api/v1/user/search")
+                                || path.matches("/api/v1/user/campuses/[^/]+/buildings")
+                                || path.matches(
+                                    "/api/v1/user/stores/[^/]+/(products|categories|reviews)")))
                               op.addSecurityItem(new SecurityRequirement().addList("bearer"));
                             op.getResponses()
                                 .forEach(

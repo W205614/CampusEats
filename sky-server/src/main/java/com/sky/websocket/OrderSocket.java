@@ -59,6 +59,7 @@ public class OrderSocket extends TextWebSocketHandler {
 
   /** Enqueue a best-effort hint; clients recover state by querying orders. */
   public void publish(String payload) {
+    Long storeId = eventStore(payload);
     sender.execute(
         () -> {
           for (var entry : sessions.entrySet()) {
@@ -69,7 +70,9 @@ public class OrderSocket extends TextWebSocketHandler {
                 sessions.remove(entry.getKey());
                 continue;
               }
-              if (session.isOpen()) session.sendMessage(new TextMessage(payload));
+              Actor actor = (Actor) session.getAttributes().get("actor");
+              if (session.isOpen() && authorized(actor, storeId))
+                session.sendMessage(new TextMessage(payload));
             } catch (Exception ex) {
               sessions.remove(entry.getKey());
               try {
@@ -79,6 +82,22 @@ public class OrderSocket extends TextWebSocketHandler {
             }
           }
         });
+  }
+
+  private Long eventStore(String payload) {
+    var matcher =
+        java.util.regex.Pattern.compile("\\\"orderId\\\"\\s*:\\s*\\\"?(\\d+)").matcher(payload);
+    if (!matcher.find()) return null;
+    var order = db.one("SELECT store_id FROM orders WHERE id=?", Long.parseLong(matcher.group(1)));
+    return order == null ? null : Db.id(order, "store_id");
+  }
+
+  static boolean authorized(Actor actor, Long storeId) {
+    return actor.role().equals("PLATFORM_ADMIN")
+        || actor.role().equals("ADMIN")
+        || Set.of("SHOP_MANAGER", "OPERATOR").contains(actor.role())
+            && storeId != null
+            && Objects.equals(actor.storeId(), storeId);
   }
 
   @Scheduled(fixedDelay = 20000)

@@ -18,6 +18,9 @@ public class AuthFilter extends OncePerRequestFilter {
   private final RateLimits limits;
   private final io.micrometer.core.instrument.MeterRegistry metrics;
 
+  @org.springframework.beans.factory.annotation.Value("${campus.legacy-api:false}")
+  private boolean legacyApi;
+
   public AuthFilter(
       AuthService auth,
       ErrorWriter errors,
@@ -38,6 +41,22 @@ public class AuthFilter extends OncePerRequestFilter {
     res.setHeader("X-Request-Id", requestId);
     try {
       String path = req.getRequestURI();
+      if (!legacyApi
+          && ((path.startsWith("/api/v1/admin/")
+                  && !path.startsWith("/api/v1/admin/auth/")
+                  && !path.equals("/api/v1/admin/ws-ticket"))
+              || path.startsWith("/api/v1/user/menu/")
+              || Set.of(
+                      "/api/v1/user/shop",
+                      "/api/v1/user/buildings",
+                      "/api/v1/user/cart",
+                      "/api/v1/user/checkout/preview")
+                  .contains(path)
+              || path.startsWith("/api/v1/user/cart/")
+              || path.startsWith("/api/v1/user/orders/by-request/")
+              || (path.equals("/api/v1/user/orders") && req.getMethod().equals("POST"))
+              || path.matches("/api/v1/user/orders/[^/]+/(pay|cancel)")))
+        throw new BusinessException(410, "API_UPGRADED", "单店入口已升级，请刷新页面并选择店铺");
       String token = req.getHeader("Authorization");
       if (token != null && token.startsWith("Bearer ")) {
         Actor actor = auth.authenticate(token.substring(7));
@@ -50,7 +69,8 @@ public class AuthFilter extends OncePerRequestFilter {
             && !path.equals("/api/v1/admin/auth/me")
             && !path.equals("/api/v1/admin/auth/logout"))
           throw new BusinessException(403, "PASSWORD_CHANGE_REQUIRED", "请先修改初始密码");
-        if (!req.getMethod().equals("GET") && path.contains("/orders"))
+        if (!req.getMethod().equals("GET")
+            && (path.contains("/orders") || path.contains("/checkouts") || path.contains("/claim")))
           limits.check("order:" + actor.type() + ":" + actor.id(), 30, 60);
       }
       if (path.endsWith("/auth/login")

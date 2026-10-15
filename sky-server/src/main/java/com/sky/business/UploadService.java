@@ -23,6 +23,16 @@ public class UploadService {
 
   public synchronized String upload(MultipartFile file) {
     Actor.admin();
+    return uploadProduct(file);
+  }
+
+  public synchronized String uploadProduct(MultipartFile file) {
+    var actor = Actor.employee();
+    require(
+        java.util.Set.of("ADMIN", "PLATFORM_ADMIN", "SHOP_MANAGER").contains(actor.role()),
+        403,
+        "FORBIDDEN",
+        "需要店长或平台权限");
     require(!file.isEmpty() && file.getSize() <= 5 * 1024 * 1024, 400, "INVALID_IMAGE", "图片最大5MB");
     try (var input = ImageIO.createImageInputStream(file.getInputStream())) {
       var readers = ImageIO.getImageReaders(input);

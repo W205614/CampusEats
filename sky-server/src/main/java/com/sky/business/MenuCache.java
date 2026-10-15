@@ -83,12 +83,16 @@ public class MenuCache {
   public void afterCommit(String key) {
     if (TransactionSynchronizationManager.isSynchronizationActive()) {
       LocalDateTime now = LocalDateTime.now(clock);
+      Long storeId = key.matches("store:[0-9]+:catalog") ? Long.parseLong(key.split(":")[1]) : null;
       db.update(
-          "INSERT INTO outbox_event(event_type,aggregate_id,payload,next_attempt_at,created_at)"
-              + " VALUES('CACHE_INVALIDATE',0,?,?,?)",
+          "INSERT INTO"
+              + " outbox_event(event_type,aggregate_id,payload,next_attempt_at,created_at,store_id,campus_id)"
+              + " VALUES('CACHE_INVALIDATE',0,?,?,?,?,(SELECT campus_id FROM store WHERE id=?))",
           json.write(Map.of("key", key)),
           now,
-          now);
+          now,
+          storeId,
+          storeId);
       TransactionSynchronizationManager.registerSynchronization(
           new TransactionSynchronization() {
             @Override

@@ -1,15 +1,15 @@
 {
   "openapi": "3.1.0",
   "info": {
-    "title": "CampusEats v1",
-    "description": "单校区点餐演示；所有支付退款均为模拟",
-    "version": "1.0"
+    "title": "CampusEats Platform",
+    "description": "多校区独立店铺平台，单体单实例；支付与退款均为模拟",
+    "version": "2.0"
   },
   "paths": {
     "/api/v1/user/addresses/{id}": {
       "put": {
         "tags": [
-          "commerce-controller"
+          "platform-controller"
         ],
         "operationId": "addressUpdate",
         "parameters": [
@@ -49,8 +49,7 @@
                       "type": "string"
                     },
                     "data": {
-                      "type": "object",
-                      "additionalProperties": {}
+                      "type": "object"
                     },
                     "requestId": {
                       "type": "string",
@@ -76,7 +75,7 @@
       },
       "delete": {
         "tags": [
-          "commerce-controller"
+          "platform-controller"
         ],
         "operationId": "addressDelete",
         "parameters": [
@@ -102,62 +101,28 @@
         ]
       }
     },
-    "/api/v1/admin/shop": {
-      "get": {
-        "tags": [
-          "shop-controller"
-        ],
-        "operationId": "shop",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "example": "OK"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/ShopView"
-                    },
-                    "requestId": {
-                      "type": "string",
-                      "format": "uuid"
-                    }
-                  },
-                  "required": [
-                    "code",
-                    "data",
-                    "message",
-                    "requestId"
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ]
-      },
+    "/api/v1/platform/coupons/{id}": {
       "put": {
         "tags": [
-          "shop-controller"
+          "platform-controller"
         ],
-        "operationId": "configure",
+        "operationId": "platformCouponUpdate",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Shop"
+                "$ref": "#/components/schemas/Coupon"
               }
             }
           },
@@ -175,13 +140,148 @@
         ]
       }
     },
-    "/api/v1/admin/quotas": {
+    "/api/v1/platform/campuses/{id}": {
+      "put": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "campusUpdate",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Campus"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/platform/campuses/{campusId}/buildings/{id}": {
+      "put": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "buildingUpdate",
+        "parameters": [
+          {
+            "name": "campusId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Building"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/merchant/stores/{storeId}": {
+      "put": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "storeUpdate",
+        "parameters": [
+          {
+            "name": "storeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Store"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/merchant/stores/{storeId}/quotas": {
       "get": {
         "tags": [
-          "shop-controller"
+          "platform-controller"
         ],
         "operationId": "quotas",
         "parameters": [
+          {
+            "name": "storeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
           {
             "name": "date",
             "in": "query",
@@ -208,11 +308,7 @@
                       "type": "string"
                     },
                     "data": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "additionalProperties": {}
-                      }
+                      "type": "object"
                     },
                     "requestId": {
                       "type": "string",
@@ -238,10 +334,19 @@
       },
       "put": {
         "tags": [
-          "shop-controller"
+          "platform-controller"
         ],
         "operationId": "quota",
         "parameters": [
+          {
+            "name": "storeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
           {
             "name": "date",
             "in": "query",
@@ -274,13 +379,70 @@
         ]
       }
     },
-    "/api/v1/admin/products/{type}/{id}": {
+    "/api/v1/merchant/stores/{storeId}/promotions/{id}": {
       "put": {
         "tags": [
-          "catalog-controller"
+          "platform-controller"
         ],
-        "operationId": "updateProduct",
+        "operationId": "promotionUpdate",
         "parameters": [
+          {
+            "name": "storeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Promotion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/merchant/stores/{storeId}/products/{type}/{id}": {
+      "put": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "productUpdate",
+        "parameters": [
+          {
+            "name": "storeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
           {
             "name": "type",
             "in": "path",
@@ -319,50 +481,24 @@
             "bearer": []
           }
         ]
-      },
-      "delete": {
+      }
+    },
+    "/api/v1/merchant/stores/{storeId}/coupons/{id}": {
+      "put": {
         "tags": [
-          "catalog-controller"
+          "platform-controller"
         ],
-        "operationId": "deleteProduct",
+        "operationId": "storeCouponUpdate",
         "parameters": [
           {
-            "name": "type",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "id",
+            "name": "storeId",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
               "format": "int64"
             }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ]
-      }
-    },
-    "/api/v1/admin/employees/{id}": {
-      "put": {
-        "tags": [
-          "catalog-controller"
-        ],
-        "operationId": "updateEmployee",
-        "parameters": [
+          },
           {
             "name": "id",
             "in": "path",
@@ -377,7 +513,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Employee"
+                "$ref": "#/components/schemas/Coupon"
               }
             }
           },
@@ -395,13 +531,22 @@
         ]
       }
     },
-    "/api/v1/admin/categories/{id}": {
+    "/api/v1/merchant/stores/{storeId}/categories/{id}": {
       "put": {
         "tags": [
-          "catalog-controller"
+          "platform-controller"
         ],
-        "operationId": "updateCategory",
+        "operationId": "categoryUpdate",
         "parameters": [
+          {
+            "name": "storeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
           {
             "name": "id",
             "in": "path",
@@ -432,41 +577,14 @@
             "bearer": []
           }
         ]
-      },
-      "delete": {
-        "tags": [
-          "catalog-controller"
-        ],
-        "operationId": "deleteCategory",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ]
       }
     },
-    "/api/v1/admin/buildings/{id}": {
+    "/api/v1/platform/staff/{id}": {
       "put": {
         "tags": [
-          "shop-controller"
+          "platform-controller"
         ],
-        "operationId": "buildingUpdate",
+        "operationId": "staffUpdate",
         "parameters": [
           {
             "name": "id",
@@ -482,7 +600,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Building"
+                "$ref": "#/components/schemas/Staff"
               }
             }
           },
@@ -500,51 +618,162 @@
         ]
       }
     },
-    "/api/v1/user/orders": {
-      "get": {
+    "/api/v1/merchant/staff/{id}": {
+      "put": {
         "tags": [
-          "commerce-controller"
+          "platform-controller"
         ],
-        "operationId": "orders",
+        "operationId": "staffUpdate_1",
         "parameters": [
           {
-            "name": "page",
-            "in": "query",
-            "required": false,
+            "name": "id",
+            "in": "path",
+            "required": true,
             "schema": {
               "type": "integer",
-              "format": "int32",
-              "default": 1
-            }
-          },
-          {
-            "name": "size",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "default": 20
-            }
-          },
-          {
-            "name": "status",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
-            }
-          },
-          {
-            "name": "query",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "string"
+              "format": "int64"
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Staff"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/user/stores/{storeId}/favorites/{type}/{id}": {
+      "post": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "favorite",
+        "parameters": [
+          {
+            "name": "storeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "delete": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "unfavorite",
+        "parameters": [
+          {
+            "name": "storeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "type",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/user/stores/{storeId}/cart/items": {
+      "post": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "cartChange",
+        "parameters": [
+          {
+            "name": "storeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CartChange"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "OK",
@@ -561,7 +790,7 @@
                       "type": "string"
                     },
                     "data": {
-                      "$ref": "#/components/schemas/PageOrderView"
+                      "type": "object"
                     },
                     "requestId": {
                       "type": "string",
@@ -584,19 +813,22 @@
             "bearer": []
           }
         ]
-      },
+      }
+    },
+    "/api/v1/user/stores/{storeId}/cart/clear": {
       "post": {
         "tags": [
-          "commerce-controller"
+          "platform-controller"
         ],
-        "operationId": "submit",
+        "operationId": "clearCart",
         "parameters": [
           {
-            "name": "Idempotency-Key",
-            "in": "header",
+            "name": "storeId",
+            "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "integer",
+              "format": "int64"
             }
           }
         ],
@@ -604,7 +836,46 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Submit"
+                "$ref": "#/components/schemas/Version"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/user/orders/{id}/review": {
+      "post": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "review",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Review"
               }
             }
           },
@@ -626,7 +897,7 @@
                       "type": "string"
                     },
                     "data": {
-                      "$ref": "#/components/schemas/OrderView"
+                      "type": "object"
                     },
                     "requestId": {
                       "type": "string",
@@ -654,7 +925,7 @@
     "/api/v1/user/orders/{id}/reorder": {
       "post": {
         "tags": [
-          "commerce-controller"
+          "platform-controller"
         ],
         "operationId": "reorder",
         "parameters": [
@@ -694,8 +965,7 @@
                       "type": "string"
                     },
                     "data": {
-                      "type": "object",
-                      "additionalProperties": {}
+                      "type": "object"
                     },
                     "requestId": {
                       "type": "string",
@@ -723,7 +993,7 @@
     "/api/v1/user/orders/{id}/reminder": {
       "post": {
         "tags": [
-          "commerce-controller"
+          "platform-controller"
         ],
         "operationId": "reminder",
         "parameters": [
@@ -749,10 +1019,335 @@
         ]
       }
     },
-    "/api/v1/user/orders/{id}/pay": {
+    "/api/v1/user/orders/{id}/evidence": {
       "post": {
         "tags": [
-          "commerce-controller"
+          "platform-controller"
+        ],
+        "operationId": "uploadEvidence",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                },
+                "required": [
+                  "file"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/user/orders/{id}/aftersales": {
+      "post": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "apply",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Aftersale"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/user/coupons/{id}/claim": {
+      "post": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "claimCoupon",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/user/checkouts": {
+      "get": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "checkouts",
+        "parameters": [
+          {
+            "name": "beforeId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "submit",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Checkout"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/user/checkouts/{id}/pay": {
+      "post": {
+        "tags": [
+          "platform-controller"
         ],
         "operationId": "pay",
         "parameters": [
@@ -792,7 +1387,7 @@
                       "type": "string"
                     },
                     "data": {
-                      "$ref": "#/components/schemas/OrderView"
+                      "type": "object"
                     },
                     "requestId": {
                       "type": "string",
@@ -817,12 +1412,12 @@
         ]
       }
     },
-    "/api/v1/user/orders/{id}/cancel": {
+    "/api/v1/user/checkouts/{id}/cancel": {
       "post": {
         "tags": [
-          "commerce-controller"
+          "platform-controller"
         ],
-        "operationId": "cancel",
+        "operationId": "checkoutCancel",
         "parameters": [
           {
             "name": "id",
@@ -838,7 +1433,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/OrderAction"
+                "$ref": "#/components/schemas/Version"
               }
             }
           },
@@ -846,36 +1441,7 @@
         },
         "responses": {
           "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "example": "OK"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/OrderView"
-                    },
-                    "requestId": {
-                      "type": "string",
-                      "format": "uuid"
-                    }
-                  },
-                  "required": [
-                    "code",
-                    "data",
-                    "message",
-                    "requestId"
-                  ]
-                }
-              }
-            }
+            "description": "OK"
           }
         },
         "security": [
@@ -885,17 +1451,17 @@
         ]
       }
     },
-    "/api/v1/user/checkout/preview": {
+    "/api/v1/user/checkouts/preview": {
       "post": {
         "tags": [
-          "commerce-controller"
+          "platform-controller"
         ],
         "operationId": "preview",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Preview"
+                "$ref": "#/components/schemas/Checkout"
               }
             }
           },
@@ -918,120 +1484,6 @@
                     },
                     "data": {
                       "$ref": "#/components/schemas/Quote"
-                    },
-                    "requestId": {
-                      "type": "string",
-                      "format": "uuid"
-                    }
-                  },
-                  "required": [
-                    "code",
-                    "data",
-                    "message",
-                    "requestId"
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ]
-      }
-    },
-    "/api/v1/user/cart/items": {
-      "post": {
-        "tags": [
-          "commerce-controller"
-        ],
-        "operationId": "cartChange",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/CartChange"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "example": "OK"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/Cart"
-                    },
-                    "requestId": {
-                      "type": "string",
-                      "format": "uuid"
-                    }
-                  },
-                  "required": [
-                    "code",
-                    "data",
-                    "message",
-                    "requestId"
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ]
-      }
-    },
-    "/api/v1/user/cart/clear": {
-      "post": {
-        "tags": [
-          "commerce-controller"
-        ],
-        "operationId": "clear",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/Version"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "example": "OK"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/Cart"
                     },
                     "requestId": {
                       "type": "string",
@@ -1160,10 +1612,88 @@
         }
       }
     },
+    "/api/v1/user/aftersales/{id}/withdraw": {
+      "post": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "withdraw",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Version"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/user/aftersales/{id}/appeal": {
+      "post": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "appeal",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Version"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
     "/api/v1/user/addresses": {
       "get": {
         "tags": [
-          "commerce-controller"
+          "platform-controller"
         ],
         "operationId": "addresses",
         "responses": {
@@ -1182,10 +1712,7 @@
                       "type": "string"
                     },
                     "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/AddressView"
-                      }
+                      "type": "object"
                     },
                     "requestId": {
                       "type": "string",
@@ -1211,7 +1738,7 @@
       },
       "post": {
         "tags": [
-          "commerce-controller"
+          "platform-controller"
         ],
         "operationId": "address",
         "requestBody": {
@@ -1240,8 +1767,7 @@
                       "type": "string"
                     },
                     "data": {
-                      "type": "object",
-                      "additionalProperties": {}
+                      "type": "object"
                     },
                     "requestId": {
                       "type": "string",
@@ -1269,7 +1795,7 @@
     "/api/v1/user/addresses/{id}/default": {
       "post": {
         "tags": [
-          "commerce-controller"
+          "platform-controller"
         ],
         "operationId": "addressDefault",
         "parameters": [
@@ -1295,12 +1821,22 @@
         ]
       }
     },
-    "/api/v1/admin/ws-ticket": {
+    "/api/v1/platform/stores": {
       "post": {
         "tags": [
-          "socket-controller"
+          "platform-controller"
         ],
-        "operationId": "ticket",
+        "operationId": "store",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Store"
+              }
+            }
+          },
+          "required": true
+        },
         "responses": {
           "200": {
             "description": "OK",
@@ -1317,8 +1853,7 @@
                       "type": "string"
                     },
                     "data": {
-                      "type": "object",
-                      "additionalProperties": {}
+                      "type": "object"
                     },
                     "requestId": {
                       "type": "string",
@@ -1343,12 +1878,555 @@
         ]
       }
     },
-    "/api/v1/admin/uploads": {
+    "/api/v1/platform/reviews/{id}/hide": {
       "post": {
         "tags": [
-          "upload-controller"
+          "platform-controller"
         ],
-        "operationId": "upload",
+        "operationId": "hide",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Text"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/platform/orders/{id}/unassign": {
+      "post": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "unassign",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Action"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/platform/orders/{id}/reset-pickup": {
+      "post": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "resetPickup",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/platform/coupons": {
+      "get": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "adminPlatformCoupons",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "platformCoupon",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Coupon"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/platform/coupons/{id}/stop": {
+      "post": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "stopPlatformCoupon",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/platform/campuses": {
+      "get": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "adminCampuses",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "campus",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Campus"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/platform/campuses/{campusId}/buildings": {
+      "get": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "adminBuildings",
+        "parameters": [
+          {
+            "name": "campusId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "building",
+        "parameters": [
+          {
+            "name": "campusId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Building"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/platform/aftersales/{id}/decision": {
+      "post": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "rule",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Decision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/merchant/stores/{storeId}/uploads": {
+      "post": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "productUpload",
+        "parameters": [
+          {
+            "name": "storeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -1383,8 +2461,7 @@
                       "type": "string"
                     },
                     "data": {
-                      "type": "object",
-                      "additionalProperties": {}
+                      "type": "object"
                     },
                     "requestId": {
                       "type": "string",
@@ -1409,56 +2486,20 @@
         ]
       }
     },
-    "/api/v1/admin/tasks/{type}/{id}/retry": {
-      "post": {
+    "/api/v1/merchant/stores/{storeId}/promotions": {
+      "get": {
         "tags": [
-          "task-controller"
+          "platform-controller"
         ],
-        "operationId": "retry",
+        "operationId": "promotions",
         "parameters": [
           {
-            "name": "type",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "name": "id",
+            "name": "storeId",
             "in": "path",
             "required": true,
             "schema": {
               "type": "integer",
               "format": "int64"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK"
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ]
-      }
-    },
-    "/api/v1/admin/products/{type}": {
-      "get": {
-        "tags": [
-          "catalog-controller"
-        ],
-        "operationId": "products",
-        "parameters": [
-          {
-            "name": "type",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
             }
           }
         ],
@@ -1478,10 +2519,7 @@
                       "type": "string"
                     },
                     "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/ProductView"
-                      }
+                      "type": "object"
                     },
                     "requestId": {
                       "type": "string",
@@ -1507,10 +2545,87 @@
       },
       "post": {
         "tags": [
-          "catalog-controller"
+          "platform-controller"
+        ],
+        "operationId": "promotion",
+        "parameters": [
+          {
+            "name": "storeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Promotion"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/merchant/stores/{storeId}/products/{type}": {
+      "post": {
+        "tags": [
+          "platform-controller"
         ],
         "operationId": "product",
         "parameters": [
+          {
+            "name": "storeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
           {
             "name": "type",
             "in": "path",
@@ -1546,8 +2661,7 @@
                       "type": "string"
                     },
                     "data": {
-                      "type": "object",
-                      "additionalProperties": {}
+                      "type": "object"
                     },
                     "requestId": {
                       "type": "string",
@@ -1572,15 +2686,139 @@
         ]
       }
     },
-    "/api/v1/admin/orders/{id}/{action}": {
-      "post": {
+    "/api/v1/merchant/stores/{storeId}/coupons": {
+      "get": {
         "tags": [
-          "commerce-controller"
+          "platform-controller"
         ],
-        "operationId": "action",
+        "operationId": "adminStoreCoupons",
         "parameters": [
           {
-            "name": "id",
+            "name": "storeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      },
+      "post": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "storeCoupon",
+        "parameters": [
+          {
+            "name": "storeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Coupon"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/merchant/stores/{storeId}/coupons/{id}/stop": {
+      "post": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "stopStoreCoupon",
+        "parameters": [
+          {
+            "name": "storeId",
             "in": "path",
             "required": true,
             "schema": {
@@ -1589,56 +2827,18 @@
             }
           },
           {
-            "name": "action",
+            "name": "id",
             "in": "path",
             "required": true,
             "schema": {
-              "type": "string"
+              "type": "integer",
+              "format": "int64"
             }
           }
         ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/OrderAction"
-              }
-            }
-          },
-          "required": true
-        },
         "responses": {
           "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "example": "OK"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/OrderView"
-                    },
-                    "requestId": {
-                      "type": "string",
-                      "format": "uuid"
-                    }
-                  },
-                  "required": [
-                    "code",
-                    "data",
-                    "message",
-                    "requestId"
-                  ]
-                }
-              }
-            }
+            "description": "OK"
           }
         },
         "security": [
@@ -1648,118 +2848,23 @@
         ]
       }
     },
-    "/api/v1/admin/employees": {
+    "/api/v1/merchant/stores/{storeId}/categories": {
       "get": {
         "tags": [
-          "catalog-controller"
-        ],
-        "operationId": "employees",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "example": "OK"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/EmployeeView"
-                      }
-                    },
-                    "requestId": {
-                      "type": "string",
-                      "format": "uuid"
-                    }
-                  },
-                  "required": [
-                    "code",
-                    "data",
-                    "message",
-                    "requestId"
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ]
-      },
-      "post": {
-        "tags": [
-          "catalog-controller"
-        ],
-        "operationId": "employee",
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/Employee"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "example": "OK"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "data": {
-                      "type": "object",
-                      "additionalProperties": {}
-                    },
-                    "requestId": {
-                      "type": "string",
-                      "format": "uuid"
-                    }
-                  },
-                  "required": [
-                    "code",
-                    "data",
-                    "message",
-                    "requestId"
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ]
-      }
-    },
-    "/api/v1/admin/categories": {
-      "get": {
-        "tags": [
-          "catalog-controller"
+          "platform-controller"
         ],
         "operationId": "adminCategories",
+        "parameters": [
+          {
+            "name": "storeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
@@ -1776,10 +2881,7 @@
                       "type": "string"
                     },
                     "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/CategoryView"
-                      }
+                      "type": "object"
                     },
                     "requestId": {
                       "type": "string",
@@ -1805,9 +2907,20 @@
       },
       "post": {
         "tags": [
-          "catalog-controller"
+          "platform-controller"
         ],
         "operationId": "category",
+        "parameters": [
+          {
+            "name": "storeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
         "requestBody": {
           "content": {
             "application/json": {
@@ -1834,8 +2947,7 @@
                       "type": "string"
                     },
                     "data": {
-                      "type": "object",
-                      "additionalProperties": {}
+                      "type": "object"
                     },
                     "requestId": {
                       "type": "string",
@@ -1860,12 +2972,12 @@
         ]
       }
     },
-    "/api/v1/admin/buildings": {
+    "/api/v1/platform/staff": {
       "get": {
         "tags": [
-          "shop-controller"
+          "platform-controller"
         ],
-        "operationId": "adminBuildings",
+        "operationId": "staff",
         "responses": {
           "200": {
             "description": "OK",
@@ -1882,10 +2994,7 @@
                       "type": "string"
                     },
                     "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/BuildingView"
-                      }
+                      "type": "object"
                     },
                     "requestId": {
                       "type": "string",
@@ -1911,19 +3020,526 @@
       },
       "post": {
         "tags": [
-          "shop-controller"
+          "platform-controller"
         ],
-        "operationId": "building",
+        "operationId": "staffSave",
         "requestBody": {
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/Building"
+                "$ref": "#/components/schemas/Staff"
               }
             }
           },
           "required": true
         },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/merchant/staff": {
+      "post": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "staffSave_1",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Staff"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/merchant/reviews/{id}/reply": {
+      "post": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "reply",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Text"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/merchant/refunds/{id}/retry": {
+      "post": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "refundRetry",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/user/orders/{id}/actions/{action}": {
+      "post": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "orderAction",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "action",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Action"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/courier/orders/{id}/actions/{action}": {
+      "post": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "orderAction_1",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "action",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Action"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/merchant/orders/{id}/actions/{action}": {
+      "post": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "orderAction_2",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "action",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Action"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/merchant/events/{id}/retry": {
+      "post": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "eventRetry",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/merchant/aftersales/{id}/decision": {
+      "post": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "decide",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Decision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/courier/tasks/{id}/claim": {
+      "post": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "claimTask",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Version"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "OK"
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/admin/ws-ticket": {
+      "post": {
+        "tags": [
+          "socket-controller"
+        ],
+        "operationId": "ticket",
         "responses": {
           "200": {
             "description": "OK",
@@ -2082,22 +3698,12 @@
         }
       }
     },
-    "/api/v1/user/orders/by-request/{key}": {
+    "/api/v1/user/wallet": {
       "get": {
         "tags": [
-          "commerce-controller"
+          "platform-controller"
         ],
-        "operationId": "byKey",
-        "parameters": [
-          {
-            "name": "key",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
+        "operationId": "wallet",
         "responses": {
           "200": {
             "description": "OK",
@@ -2114,7 +3720,7 @@
                       "type": "string"
                     },
                     "data": {
-                      "$ref": "#/components/schemas/OrderView"
+                      "type": "object"
                     },
                     "requestId": {
                       "type": "string",
@@ -2139,596 +3745,20 @@
         ]
       }
     },
-    "/api/v1/user/menu/items": {
+    "/api/v1/user/stores": {
       "get": {
         "tags": [
-          "catalog-controller"
+          "platform-controller"
         ],
-        "operationId": "menu",
+        "operationId": "stores",
         "parameters": [
           {
-            "name": "categoryId",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          },
-          {
-            "name": "type",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "example": "OK"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/ProductView"
-                      }
-                    },
-                    "requestId": {
-                      "type": "string",
-                      "format": "uuid"
-                    }
-                  },
-                  "required": [
-                    "code",
-                    "data",
-                    "message",
-                    "requestId"
-                  ]
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/user/menu/categories": {
-      "get": {
-        "tags": [
-          "catalog-controller"
-        ],
-        "operationId": "categories",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "example": "OK"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/CategoryView"
-                      }
-                    },
-                    "requestId": {
-                      "type": "string",
-                      "format": "uuid"
-                    }
-                  },
-                  "required": [
-                    "code",
-                    "data",
-                    "message",
-                    "requestId"
-                  ]
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/user/cart": {
-      "get": {
-        "tags": [
-          "commerce-controller"
-        ],
-        "operationId": "cart",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "example": "OK"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/Cart"
-                    },
-                    "requestId": {
-                      "type": "string",
-                      "format": "uuid"
-                    }
-                  },
-                  "required": [
-                    "code",
-                    "data",
-                    "message",
-                    "requestId"
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ]
-      }
-    },
-    "/api/v1/user/buildings": {
-      "get": {
-        "tags": [
-          "shop-controller"
-        ],
-        "operationId": "buildings",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "example": "OK"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "$ref": "#/components/schemas/BuildingView"
-                      }
-                    },
-                    "requestId": {
-                      "type": "string",
-                      "format": "uuid"
-                    }
-                  },
-                  "required": [
-                    "code",
-                    "data",
-                    "message",
-                    "requestId"
-                  ]
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/admin/tasks/{type}": {
-      "get": {
-        "tags": [
-          "task-controller"
-        ],
-        "operationId": "list",
-        "parameters": [
-          {
-            "name": "type",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "example": "OK"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "additionalProperties": {}
-                      }
-                    },
-                    "requestId": {
-                      "type": "string",
-                      "format": "uuid"
-                    }
-                  },
-                  "required": [
-                    "code",
-                    "data",
-                    "message",
-                    "requestId"
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ]
-      }
-    },
-    "/api/v1/user/shop": {
-      "get": {
-        "tags": [
-          "shop-controller"
-        ],
-        "operationId": "shop_1",
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "example": "OK"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/ShopView"
-                    },
-                    "requestId": {
-                      "type": "string",
-                      "format": "uuid"
-                    }
-                  },
-                  "required": [
-                    "code",
-                    "data",
-                    "message",
-                    "requestId"
-                  ]
-                }
-              }
-            }
-          }
-        }
-      }
-    },
-    "/api/v1/admin/reports": {
-      "get": {
-        "tags": [
-          "catalog-controller"
-        ],
-        "operationId": "reports",
-        "parameters": [
-          {
-            "name": "begin",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "date"
-            }
-          },
-          {
-            "name": "end",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "date"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "example": "OK"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "data": {
-                      "type": "object",
-                      "additionalProperties": {}
-                    },
-                    "requestId": {
-                      "type": "string",
-                      "format": "uuid"
-                    }
-                  },
-                  "required": [
-                    "code",
-                    "data",
-                    "message",
-                    "requestId"
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ]
-      }
-    },
-    "/api/v1/admin/reports/export": {
-      "get": {
-        "tags": [
-          "catalog-controller"
-        ],
-        "operationId": "export",
-        "parameters": [
-          {
-            "name": "begin",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "date"
-            }
-          },
-          {
-            "name": "end",
-            "in": "query",
-            "required": true,
-            "schema": {
-              "type": "string",
-              "format": "date"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "example": "OK"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "data": {
-                      "type": "string",
-                      "format": "byte"
-                    },
-                    "requestId": {
-                      "type": "string",
-                      "format": "uuid"
-                    }
-                  },
-                  "required": [
-                    "code",
-                    "data",
-                    "message",
-                    "requestId"
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ]
-      }
-    },
-    "/api/v1/user/orders/{id}": {
-      "get": {
-        "tags": [
-          "commerce-controller"
-        ],
-        "operationId": "detail",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "example": "OK"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/OrderView"
-                    },
-                    "requestId": {
-                      "type": "string",
-                      "format": "uuid"
-                    }
-                  },
-                  "required": [
-                    "code",
-                    "data",
-                    "message",
-                    "requestId"
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ]
-      }
-    },
-    "/api/v1/admin/orders/{id}": {
-      "get": {
-        "tags": [
-          "commerce-controller"
-        ],
-        "operationId": "detail_1",
-        "parameters": [
-          {
-            "name": "id",
-            "in": "path",
-            "required": true,
-            "schema": {
-              "type": "integer",
-              "format": "int64"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "example": "OK"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "data": {
-                      "$ref": "#/components/schemas/OrderView"
-                    },
-                    "requestId": {
-                      "type": "string",
-                      "format": "uuid"
-                    }
-                  },
-                  "required": [
-                    "code",
-                    "data",
-                    "message",
-                    "requestId"
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ]
-      }
-    },
-    "/api/v1/admin/orders": {
-      "get": {
-        "tags": [
-          "commerce-controller"
-        ],
-        "operationId": "orders_1",
-        "parameters": [
-          {
-            "name": "page",
+            "name": "campusId",
             "in": "query",
             "required": false,
             "schema": {
               "type": "integer",
-              "format": "int32",
-              "default": 1
-            }
-          },
-          {
-            "name": "size",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "default": 20
-            }
-          },
-          {
-            "name": "status",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int32"
+              "format": "int64"
             }
           },
           {
@@ -2756,7 +3786,7 @@
                       "type": "string"
                     },
                     "data": {
-                      "$ref": "#/components/schemas/PageOrderView"
+                      "type": "object"
                     },
                     "requestId": {
                       "type": "string",
@@ -2773,20 +3803,26 @@
               }
             }
           }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ]
+        }
       }
     },
-    "/api/v1/admin/dashboard": {
+    "/api/v1/user/stores/{storeId}/reviews": {
       "get": {
         "tags": [
-          "catalog-controller"
+          "platform-controller"
         ],
-        "operationId": "dashboard",
+        "operationId": "reviews",
+        "parameters": [
+          {
+            "name": "storeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
@@ -2803,8 +3839,130 @@
                       "type": "string"
                     },
                     "data": {
-                      "type": "object",
-                      "additionalProperties": {}
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/user/stores/{storeId}/products": {
+      "get": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "products",
+        "parameters": [
+          {
+            "name": "storeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "query",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "categoryId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/user/stores/{storeId}/coupons": {
+      "get": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "storeCoupons",
+        "parameters": [
+          {
+            "name": "storeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
                     },
                     "requestId": {
                       "type": "string",
@@ -2829,12 +3987,1260 @@
         ]
       }
     },
-    "/api/v1/admin/couriers": {
+    "/api/v1/user/stores/{storeId}/categories": {
       "get": {
         "tags": [
-          "catalog-controller"
+          "platform-controller"
+        ],
+        "operationId": "categories",
+        "parameters": [
+          {
+            "name": "storeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/user/stores/{storeId}/cart": {
+      "get": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "cart",
+        "parameters": [
+          {
+            "name": "storeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/user/search": {
+      "get": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "search",
+        "parameters": [
+          {
+            "name": "campusId",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "query",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "categoryId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "open",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/user/orders": {
+      "get": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "userOrders",
+        "parameters": [
+          {
+            "name": "beforeId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/user/favorites": {
+      "get": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "favorites",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/user/coupons": {
+      "get": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "platformCoupons",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/user/checkouts/{id}": {
+      "get": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "checkout",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/user/checkouts/by-request/{key}": {
+      "get": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "checkoutKey",
+        "parameters": [
+          {
+            "name": "key",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/user/carts": {
+      "get": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "carts",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/user/campuses": {
+      "get": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "campuses",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/user/campuses/{campusId}/buildings": {
+      "get": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "buildings",
+        "parameters": [
+          {
+            "name": "campusId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/user/aftersales": {
+      "get": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "userAftersales",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/platform/refunds": {
+      "get": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "refunds",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/platform/events": {
+      "get": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "events",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/platform/audit": {
+      "get": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "audit",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/platform/aftersales": {
+      "get": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "platformAftersales",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/merchant/stores": {
+      "get": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "adminStores",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/merchant/stores/{storeId}/staff": {
+      "get": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "storeStaff",
+        "parameters": [
+          {
+            "name": "storeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/merchant/stores/{storeId}/reviews": {
+      "get": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "adminReviews",
+        "parameters": [
+          {
+            "name": "storeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/merchant/stores/{storeId}/refunds": {
+      "get": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "storeRefunds",
+        "parameters": [
+          {
+            "name": "storeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/merchant/stores/{storeId}/products": {
+      "get": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "adminProducts",
+        "parameters": [
+          {
+            "name": "storeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/merchant/stores/{storeId}/orders": {
+      "get": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "storeOrders",
+        "parameters": [
+          {
+            "name": "storeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "beforeId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/merchant/stores/{storeId}/events": {
+      "get": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "storeEvents",
+        "parameters": [
+          {
+            "name": "storeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/merchant/stores/{storeId}/couriers": {
+      "get": {
+        "tags": [
+          "platform-controller"
         ],
         "operationId": "couriers",
+        "parameters": [
+          {
+            "name": "storeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
@@ -2851,11 +5257,736 @@
                       "type": "string"
                     },
                     "data": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "additionalProperties": {}
-                      }
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/merchant/stores/{storeId}/audit": {
+      "get": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "storeAudit",
+        "parameters": [
+          {
+            "name": "storeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/merchant/stores/{storeId}/aftersales": {
+      "get": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "merchantAftersales",
+        "parameters": [
+          {
+            "name": "storeId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/platform/reports/export": {
+      "get": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "export",
+        "parameters": [
+          {
+            "name": "campusId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "storeId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "begin",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "byte"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/merchant/reports/export": {
+      "get": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "export_1",
+        "parameters": [
+          {
+            "name": "campusId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "storeId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "begin",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": {
+                "schema": {
+                  "type": "string",
+                  "format": "byte"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/platform/reports": {
+      "get": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "report",
+        "parameters": [
+          {
+            "name": "campusId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "storeId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "begin",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/merchant/reports": {
+      "get": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "report_1",
+        "parameters": [
+          {
+            "name": "campusId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "storeId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          },
+          {
+            "name": "begin",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          },
+          {
+            "name": "end",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "date"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/merchant/orders/{id}": {
+      "get": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "order",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/courier/orders/{id}": {
+      "get": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "order_1",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/user/orders/{id}": {
+      "get": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "order_2",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/evidence/{id}": {
+      "get": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "evidence",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "image/png": {
+                "schema": {
+                  "type": "string",
+                  "format": "byte"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/courier/pool": {
+      "get": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "pool",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
+                    },
+                    "requestId": {
+                      "type": "string",
+                      "format": "uuid"
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "data",
+                    "message",
+                    "requestId"
+                  ]
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/courier/orders": {
+      "get": {
+        "tags": [
+          "platform-controller"
+        ],
+        "operationId": "courierOrders",
+        "parameters": [
+          {
+            "name": "beforeId",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "*/*": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "example": "OK"
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "data": {
+                      "type": "object"
                     },
                     "requestId": {
                       "type": "string",
@@ -2973,79 +6104,6 @@
           }
         ]
       }
-    },
-    "/api/v1/admin/audit": {
-      "get": {
-        "tags": [
-          "commerce-controller"
-        ],
-        "operationId": "audit",
-        "parameters": [
-          {
-            "name": "page",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "default": 1
-            }
-          },
-          {
-            "name": "size",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "type": "integer",
-              "format": "int32",
-              "default": 20
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "content": {
-              "*/*": {
-                "schema": {
-                  "type": "object",
-                  "properties": {
-                    "code": {
-                      "type": "string",
-                      "example": "OK"
-                    },
-                    "message": {
-                      "type": "string"
-                    },
-                    "data": {
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "additionalProperties": {}
-                      }
-                    },
-                    "requestId": {
-                      "type": "string",
-                      "format": "uuid"
-                    }
-                  },
-                  "required": [
-                    "code",
-                    "data",
-                    "message",
-                    "requestId"
-                  ]
-                }
-              }
-            }
-          }
-        },
-        "security": [
-          {
-            "bearer": []
-          }
-        ]
-      }
     }
   },
   "components": {
@@ -3080,19 +6138,118 @@
           "room"
         ]
       },
-      "Shop": {
+      "Coupon": {
         "type": "object",
         "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 0
+          },
+          "kind": {
+            "type": "string",
+            "pattern": "REDUCTION|DISCOUNT"
+          },
+          "thresholdCents": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "value": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "capCents": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "total": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 1000000,
+            "minimum": 1
+          },
+          "perUser": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 100,
+            "minimum": 1
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "endsAt",
+          "kind",
+          "name",
+          "startsAt"
+        ]
+      },
+      "Campus": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 0
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "Building": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 0
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      },
+      "Store": {
+        "type": "object",
+        "properties": {
+          "campusId": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 80,
+            "minLength": 0
+          },
+          "enabled": {
+            "type": "boolean"
+          },
           "open": {
             "type": "boolean"
           },
-          "deliveryFee": {
+          "deliveryFeeCents": {
             "type": "string",
-            "example": "12.00"
+            "pattern": "^[0-9]+$"
           },
-          "packagingFee": {
+          "packagingFeeCents": {
             "type": "string",
-            "example": "12.00"
+            "pattern": "^[0-9]+$"
           },
           "hours": {
             "type": "array",
@@ -3110,9 +6267,8 @@
           }
         },
         "required": [
-          "deliveryFee",
           "hours",
-          "packagingFee"
+          "name"
         ]
       },
       "Quota": {
@@ -3134,6 +6290,39 @@
         },
         "required": [
           "dishId"
+        ]
+      },
+      "Promotion": {
+        "type": "object",
+        "properties": {
+          "itemType": {
+            "type": "string",
+            "pattern": "DISH|SETMEAL"
+          },
+          "itemId": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "priceCents": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "startsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "endsAt": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "enabled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "endsAt",
+          "itemType",
+          "startsAt"
         ]
       },
       "Component": {
@@ -3225,39 +6414,6 @@
           "price"
         ]
       },
-      "Employee": {
-        "type": "object",
-        "properties": {
-          "username": {
-            "type": "string",
-            "maxLength": 32,
-            "minLength": 0
-          },
-          "name": {
-            "type": "string",
-            "maxLength": 32,
-            "minLength": 0
-          },
-          "role": {
-            "type": "string",
-            "minLength": 1,
-            "pattern": "ADMIN|OPERATOR|DELIVERER"
-          },
-          "enabled": {
-            "type": "boolean"
-          },
-          "password": {
-            "type": "string",
-            "maxLength": 128,
-            "minLength": 12
-          }
-        },
-        "required": [
-          "name",
-          "role",
-          "username"
-        ]
-      },
       "Category": {
         "type": "object",
         "properties": {
@@ -3285,299 +6441,46 @@
           "name"
         ]
       },
-      "Building": {
+      "Staff": {
         "type": "object",
         "properties": {
+          "username": {
+            "type": "string",
+            "maxLength": 32,
+            "minLength": 0
+          },
           "name": {
             "type": "string",
-            "maxLength": 80,
+            "maxLength": 32,
             "minLength": 0
+          },
+          "role": {
+            "type": "string",
+            "minLength": 1,
+            "pattern": "PLATFORM_ADMIN|SHOP_MANAGER|OPERATOR|DELIVERER"
+          },
+          "storeId": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "campusId": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
           },
           "enabled": {
             "type": "boolean"
+          },
+          "password": {
+            "type": "string",
+            "maxLength": 128,
+            "minLength": 12
           }
         },
         "required": [
-          "name"
+          "name",
+          "role",
+          "username"
         ]
-      },
-      "Submit": {
-        "type": "object",
-        "properties": {
-          "addressId": {
-            "type": "string",
-            "pattern": "^[0-9]+$"
-          },
-          "cartVersion": {
-            "type": "string",
-            "pattern": "^[0-9]+$"
-          },
-          "quoteHash": {
-            "type": "string",
-            "minLength": 1,
-            "pattern": "[0-9a-f]{64}"
-          },
-          "remark": {
-            "type": "string",
-            "maxLength": 100,
-            "minLength": 0
-          }
-        },
-        "required": [
-          "addressId",
-          "cartVersion",
-          "quoteHash"
-        ]
-      },
-      "DetailView": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "pattern": "^[0-9]+$"
-          },
-          "name": {
-            "type": "string"
-          },
-          "number": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "amount": {
-            "type": "string",
-            "example": "12.00"
-          },
-          "dishFlavor": {
-            "type": "string"
-          },
-          "image": {
-            "type": "string"
-          }
-        }
-      },
-      "OrderView": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "pattern": "^[0-9]+$"
-          },
-          "number": {
-            "type": "string"
-          },
-          "version": {
-            "type": "string",
-            "pattern": "^[0-9]+$"
-          },
-          "status": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "payStatus": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "amount": {
-            "type": "string",
-            "example": "12.00"
-          },
-          "orderTime": {
-            "type": "string",
-            "format": "date-time"
-          },
-          "consignee": {
-            "type": "string"
-          },
-          "phone": {
-            "type": "string"
-          },
-          "address": {
-            "type": "string"
-          },
-          "buildingName": {
-            "type": "string"
-          },
-          "room": {
-            "type": "string"
-          },
-          "remark": {
-            "type": "string"
-          },
-          "courierId": {
-            "type": "string",
-            "pattern": "^[0-9]+$"
-          },
-          "deliveryOverdue": {
-            "type": "boolean"
-          },
-          "details": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/DetailView"
-            }
-          },
-          "refund": {
-            "$ref": "#/components/schemas/RefundView"
-          },
-          "snapshotSource": {
-            "type": "string"
-          },
-          "requestId": {
-            "type": "string"
-          },
-          "deliveryFee": {
-            "type": "string",
-            "example": "12.00"
-          },
-          "packagingFee": {
-            "type": "string",
-            "example": "12.00"
-          }
-        }
-      },
-      "RefundView": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "pattern": "^[0-9]+$"
-          },
-          "state": {
-            "type": "string"
-          },
-          "attempts": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "lastError": {
-            "type": "string"
-          }
-        }
-      },
-      "Version": {
-        "type": "object",
-        "properties": {
-          "version": {
-            "type": "string",
-            "pattern": "^[0-9]+$"
-          }
-        },
-        "required": [
-          "version"
-        ]
-      },
-      "OrderAction": {
-        "type": "object",
-        "properties": {
-          "version": {
-            "type": "string",
-            "pattern": "^[0-9]+$"
-          },
-          "reason": {
-            "type": "string",
-            "maxLength": 200,
-            "minLength": 0
-          },
-          "courierId": {
-            "type": "string",
-            "pattern": "^[0-9]+$"
-          }
-        },
-        "required": [
-          "version"
-        ]
-      },
-      "Preview": {
-        "type": "object",
-        "properties": {
-          "addressId": {
-            "type": "string",
-            "pattern": "^[0-9]+$"
-          },
-          "cartVersion": {
-            "type": "string",
-            "pattern": "^[0-9]+$"
-          }
-        },
-        "required": [
-          "addressId",
-          "cartVersion"
-        ]
-      },
-      "CartItemView": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "pattern": "^[0-9]+$"
-          },
-          "itemType": {
-            "type": "string"
-          },
-          "itemId": {
-            "type": "string",
-            "pattern": "^[0-9]+$"
-          },
-          "quantity": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "flavors": {
-            "type": "object",
-            "additionalProperties": {
-              "type": "string"
-            }
-          },
-          "name": {
-            "type": "string"
-          },
-          "price": {
-            "type": "string",
-            "example": "12.00"
-          },
-          "image": {
-            "type": "string"
-          },
-          "status": {
-            "type": "integer",
-            "format": "int32"
-          }
-        }
-      },
-      "Quote": {
-        "type": "object",
-        "properties": {
-          "cartVersion": {
-            "type": "string",
-            "pattern": "^[0-9]+$"
-          },
-          "items": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/CartItemView"
-            }
-          },
-          "subtotal": {
-            "type": "string"
-          },
-          "deliveryFee": {
-            "type": "string",
-            "example": "12.00"
-          },
-          "packagingFee": {
-            "type": "string",
-            "example": "12.00"
-          },
-          "total": {
-            "type": "string"
-          },
-          "quoteHash": {
-            "type": "string"
-          },
-          "businessDate": {
-            "type": "string"
-          }
-        }
       },
       "CartChange": {
         "type": "object",
@@ -3588,7 +6491,6 @@
           },
           "itemType": {
             "type": "string",
-            "minLength": 1,
             "pattern": "DISH|SETMEAL"
           },
           "itemId": {
@@ -3607,24 +6509,287 @@
             "maximum": 50,
             "minimum": -50
           }
-        },
-        "required": [
-          "cartVersion",
-          "itemId",
-          "itemType"
-        ]
+        }
       },
-      "Cart": {
+      "Version": {
         "type": "object",
         "properties": {
-          "cartVersion": {
+          "version": {
             "type": "string",
             "pattern": "^[0-9]+$"
+          }
+        },
+        "required": [
+          "version"
+        ]
+      },
+      "Review": {
+        "type": "object",
+        "properties": {
+          "rating": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 5,
+            "minimum": 1
+          },
+          "content": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "content"
+        ]
+      },
+      "Aftersale": {
+        "type": "object",
+        "properties": {
+          "kind": {
+            "type": "string",
+            "pattern": "FULL|PARTIAL|CANCEL"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 0
           },
           "items": {
             "type": "array",
             "items": {
-              "$ref": "#/components/schemas/CartItemView"
+              "$ref": "#/components/schemas/RefundLine"
+            },
+            "maxItems": 50,
+            "minItems": 0
+          },
+          "evidenceIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 3,
+            "minItems": 0
+          }
+        },
+        "required": [
+          "kind",
+          "reason"
+        ]
+      },
+      "RefundLine": {
+        "type": "object",
+        "properties": {
+          "detailId": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32",
+            "maximum": 50,
+            "minimum": 1
+          }
+        }
+      },
+      "Checkout": {
+        "type": "object",
+        "properties": {
+          "stores": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Selection"
+            },
+            "maxItems": 20,
+            "minItems": 0
+          },
+          "platformCouponId": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "quoteHash": {
+            "type": "string",
+            "maxLength": 64,
+            "minLength": 0
+          },
+          "remark": {
+            "type": "string",
+            "maxLength": 100,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "stores"
+        ]
+      },
+      "Selection": {
+        "type": "object",
+        "properties": {
+          "storeId": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "cartVersion": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "fulfillment": {
+            "type": "string",
+            "pattern": "DELIVERY|PICKUP"
+          },
+          "addressId": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "couponId": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          }
+        },
+        "required": [
+          "fulfillment"
+        ]
+      },
+      "Line": {
+        "type": "object",
+        "properties": {
+          "cartId": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "itemType": {
+            "type": "string"
+          },
+          "itemId": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "name": {
+            "type": "string"
+          },
+          "image": {
+            "type": "string"
+          },
+          "flavors": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32"
+          },
+          "normalCents": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "activityCents": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "paidCents": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          }
+        }
+      },
+      "Part": {
+        "type": "object",
+        "properties": {
+          "storeId": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "campusId": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "storeName": {
+            "type": "string"
+          },
+          "campusName": {
+            "type": "string"
+          },
+          "cartVersion": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "fulfillment": {
+            "type": "string"
+          },
+          "addressId": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "address": {
+            "type": "object",
+            "additionalProperties": {}
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Line"
+            }
+          },
+          "subtotalCents": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "shopDiscountCents": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "platformDiscountCents": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "deliveryCents": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "packagingCents": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "totalCents": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "couponId": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "settingsVersion": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          }
+        }
+      },
+      "Quote": {
+        "type": "object",
+        "properties": {
+          "stores": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Part"
+            }
+          },
+          "platformCouponId": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "totalCents": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "businessDate": {
+            "type": "string"
+          },
+          "quoteHash": {
+            "type": "string"
+          },
+          "rules": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": {}
             }
           }
         }
@@ -3658,6 +6823,8 @@
           "role": {
             "type": "string",
             "enum": [
+              "PLATFORM_ADMIN",
+              "SHOP_MANAGER",
               "ADMIN",
               "OPERATOR",
               "DELIVERER",
@@ -3669,6 +6836,14 @@
           },
           "expiresAt": {
             "type": "string"
+          },
+          "storeId": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "campusId": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
           }
         }
       },
@@ -3682,6 +6857,62 @@
             "minimum": 1
           }
         }
+      },
+      "Text": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "maxLength": 1000,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "text"
+        ]
+      },
+      "Action": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 0
+          },
+          "courierId": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "code": {
+            "type": "string",
+            "maxLength": 12,
+            "minLength": 0
+          }
+        }
+      },
+      "Decision": {
+        "type": "object",
+        "properties": {
+          "version": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "approve": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string",
+            "maxLength": 200,
+            "minLength": 0
+          }
+        },
+        "required": [
+          "reason"
+        ]
       },
       "Password": {
         "type": "object",
@@ -3721,238 +6952,6 @@
           "username"
         ]
       },
-      "ComponentView": {
-        "type": "object",
-        "properties": {
-          "dishId": {
-            "type": "string",
-            "pattern": "^[0-9]+$"
-          },
-          "copies": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "name": {
-            "type": "string"
-          },
-          "currentName": {
-            "type": "string"
-          },
-          "status": {
-            "type": "integer",
-            "format": "int32"
-          }
-        }
-      },
-      "FlavorView": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "pattern": "^[0-9]+$"
-          },
-          "name": {
-            "type": "string"
-          },
-          "values": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          }
-        }
-      },
-      "ProductView": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "pattern": "^[0-9]+$"
-          },
-          "name": {
-            "type": "string"
-          },
-          "categoryId": {
-            "type": "string",
-            "pattern": "^[0-9]+$"
-          },
-          "price": {
-            "type": "string",
-            "example": "12.00"
-          },
-          "image": {
-            "type": "string"
-          },
-          "description": {
-            "type": "string"
-          },
-          "status": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "remaining": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "itemType": {
-            "type": "string"
-          },
-          "flavors": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/FlavorView"
-            }
-          },
-          "components": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/ComponentView"
-            }
-          },
-          "defaultQuota": {
-            "type": "integer",
-            "format": "int32"
-          }
-        }
-      },
-      "CategoryView": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "pattern": "^[0-9]+$"
-          },
-          "name": {
-            "type": "string"
-          },
-          "type": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "sort": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "status": {
-            "type": "integer",
-            "format": "int32"
-          }
-        }
-      },
-      "BuildingView": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "pattern": "^[0-9]+$"
-          },
-          "name": {
-            "type": "string"
-          },
-          "enabled": {
-            "type": "boolean"
-          }
-        }
-      },
-      "AddressView": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "pattern": "^[0-9]+$"
-          },
-          "buildingId": {
-            "type": "string",
-            "pattern": "^[0-9]+$"
-          },
-          "buildingName": {
-            "type": "string"
-          },
-          "room": {
-            "type": "string"
-          },
-          "consignee": {
-            "type": "string"
-          },
-          "phone": {
-            "type": "string"
-          },
-          "isDefault": {
-            "type": "boolean"
-          },
-          "enabled": {
-            "type": "boolean"
-          }
-        }
-      },
-      "ShopView": {
-        "type": "object",
-        "properties": {
-          "open": {
-            "type": "boolean"
-          },
-          "accepting": {
-            "type": "boolean"
-          },
-          "deliveryFee": {
-            "type": "string",
-            "example": "12.00"
-          },
-          "packagingFee": {
-            "type": "string",
-            "example": "12.00"
-          },
-          "hours": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "phone": {
-            "type": "string"
-          }
-        }
-      },
-      "PageOrderView": {
-        "type": "object",
-        "properties": {
-          "total": {
-            "type": "string",
-            "pattern": "^[0-9]+$"
-          },
-          "records": {
-            "type": "array",
-            "items": {
-              "$ref": "#/components/schemas/OrderView"
-            }
-          }
-        }
-      },
-      "EmployeeView": {
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "pattern": "^[0-9]+$"
-          },
-          "name": {
-            "type": "string"
-          },
-          "username": {
-            "type": "string"
-          },
-          "role": {
-            "type": "string"
-          },
-          "status": {
-            "type": "integer",
-            "format": "int32"
-          },
-          "mustChangePassword": {
-            "type": "boolean"
-          }
-        }
-      },
       "Actor": {
         "type": "object",
         "properties": {
@@ -3971,6 +6970,14 @@
           },
           "mustChangePassword": {
             "type": "boolean"
+          },
+          "storeId": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
+          },
+          "campusId": {
+            "type": "string",
+            "pattern": "^[0-9]+$"
           }
         }
       }

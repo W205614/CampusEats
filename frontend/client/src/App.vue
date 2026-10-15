@@ -255,4 +255,4 @@ button {
   text-decoration: underline;
   color: #99532b;
 }
-</style>
+textarea{width:100%;box-sizing:border-box;background:#f7f5f1;padding:20rpx;border-radius:12rpx;margin:24rpx 0;min-height:150rpx}input{min-height:72rpx}picker{min-height:48rpx}.modal>.card{width:calc(100% - 48rpx);max-width:820rpx;max-height:88vh;overflow:auto}</style>

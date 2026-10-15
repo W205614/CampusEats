@@ -1,3 +1,5 @@
+> 历史单店版本文档。当前多校区版本请使用 [平台架构](platform-architecture.md) 与 [升级说明](platform-deployment.md)。
+
 # v1 部署、迁移与恢复
 
 ## 新部署

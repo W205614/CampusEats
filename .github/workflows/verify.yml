@@ -20,7 +20,7 @@ jobs:
           cache-dependency-path: |
             frontend/admin/package-lock.json
             frontend/client/package-lock.json
-      - run: mvn -B -ntp verify
+      - run: mvn -B -ntp clean verify
       - run: npm ci --prefix frontend/admin && npm run build --prefix frontend/admin
       - run: npm ci --prefix frontend/client --include=optional && npm run typecheck --prefix frontend/client && npm run build:h5 --prefix frontend/client && npm run build:mp-weixin --prefix frontend/client
       - name: Check generated API types
@@ -42,6 +42,19 @@ jobs:
       - run: npx --prefix frontend/admin playwright install --with-deps chromium
       - run: npm run test --prefix frontend/admin
       - run: node scripts/check-websocket.mjs
+      - name: Verify independent backup restore
+        shell: pwsh
+        run: |
+          docker compose stop web server
+          if ($LASTEXITCODE -ne 0) { throw 'Failed to pause application writers.' }
+          try {
+            ./scripts/backup.ps1 -Destination (Join-Path $PWD '.local/backups/ci-restore')
+            ./scripts/restore-check.ps1 -BackupDirectory (Join-Path $PWD '.local/backups/ci-restore')
+          } finally {
+            docker compose up -d --wait --wait-timeout 300
+            if ($LASTEXITCODE -ne 0) { throw 'Failed to restore healthy application services.' }
+          }
+          ./scripts/smoke.ps1
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -51,4 +64,5 @@ jobs:
             .local/playwright-results
             .local/playwright-report
             .local/audit-client.json
+            .local/backups/ci-restore/restore-check.txt
           retention-days: 7

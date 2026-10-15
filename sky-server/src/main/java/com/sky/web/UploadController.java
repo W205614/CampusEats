@@ -6,6 +6,9 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 @RestController
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
+    name = "campus.legacy-api",
+    havingValue = "true")
 public class UploadController {
   private final UploadService uploads;
 

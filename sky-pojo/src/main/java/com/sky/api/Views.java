@@ -9,6 +9,8 @@ public final class Views {
   private Views() {}
 
   public enum Role {
+    PLATFORM_ADMIN,
+    SHOP_MANAGER,
     ADMIN,
     OPERATOR,
     DELIVERER,
@@ -21,7 +23,9 @@ public final class Views {
       String name,
       Role role,
       boolean mustChangePassword,
-      String expiresAt) {}
+      String expiresAt,
+      Long storeId,
+      Long campusId) {}
 
   public record ShopView(
       boolean open,

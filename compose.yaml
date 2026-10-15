@@ -31,7 +31,7 @@ services:
       retries: 20
     mem_limit: 160m
   server:
-    image: campuseats-server:v1
+    image: ${SERVER_IMAGE:-campuseats-server:v1}
     build: .
     restart: unless-stopped
     environment:
@@ -59,7 +59,7 @@ services:
       start_period: 60s
     mem_limit: 768m
   web:
-    image: campuseats-web:v1
+    image: ${WEB_IMAGE:-campuseats-web:v1}
     build:
       context: .
       dockerfile: deploy/web.Dockerfile
@@ -69,7 +69,7 @@ services:
       server:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL","wget -q -O /dev/null http://127.0.0.1/admin/ && wget -q -O /dev/null http://127.0.0.1/api/v1/user/shop"]
+      test: ["CMD-SHELL","wget -q -O /dev/null http://127.0.0.1/admin/ && wget -q -O /dev/null http://127.0.0.1/api/v1/user/campuses"]
       interval: 10s
       timeout: 5s
       retries: 10

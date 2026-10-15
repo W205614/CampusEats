@@ -35,6 +35,12 @@
       "style": {
         "navigationBarTitleText": "登录"
       }
+    },
+    {
+      "path": "pages/account/index",
+      "style": {
+        "navigationBarTitleText": "我的收藏与优惠券"
+      }
     }
   ],
   "globalStyle": {

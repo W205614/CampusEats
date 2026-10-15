@@ -28,6 +28,20 @@ public class MockPaymentGateway {
       throw new BusinessException(503, "MOCK_REFUND_FAILED", "模拟退款失败");
   }
 
+  private final java.util.concurrent.ConcurrentHashMap<Long, Long> refundReceipts =
+      new java.util.concurrent.ConcurrentHashMap<>();
+
+  public void refund(long request, long cents) {
+    Long existing = refundReceipts.get(request);
+    BusinessException.require(
+        existing == null || existing == cents, 409, "REFUND_CONFLICT", "退款编号不能更换金额");
+    if (existing != null) return;
+    refund(request);
+    Long previous = refundReceipts.putIfAbsent(request, cents);
+    BusinessException.require(
+        previous == null || previous == cents, 409, "REFUND_CONFLICT", "退款编号不能更换金额");
+  }
+
   public void failNextPayments(int count) {
     paymentFailures.set(count);
   }

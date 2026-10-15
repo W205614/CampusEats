@@ -1,144 +1,232 @@
-import { type Page } from '@playwright/test';
-import { test, expect, adminLogin, userLogin } from './helpers';
-import { randomBytes } from 'node:crypto';
-async function addFood(page: Page) {
-  await page.getByText('校园热餐', { exact: true }).click();
-  const dish = page.locator('.card').filter({ hasText: '番茄鸡蛋饭' });
-  await dish.getByText('选餐', { exact: true }).click();
-  await page.getByText(/加入购物车/).click();
-  await expect(page.getByText('查看购物车', { exact: true })).toBeVisible();
-}
-async function address(page: Page, name: string) {
-  await page.goto('/app/pages/addresses/index');
-  await page.getByText('新增地址', { exact: true }).click();
-  await page.getByRole('textbox').nth(0).fill('305');
-  await page.getByRole('textbox').nth(1).fill(name);
-  await page.getByRole('spinbutton').fill('13800000000');
-  await page.getByText('保存地址', { exact: true }).click();
-  const card = page.locator('.card').filter({ hasText: name });
-  await expect(card).toBeVisible();
-  if (await card.getByText('设为默认', { exact: true }).count())
-    await card.getByText('设为默认', { exact: true }).click();
-  await expect(card.getByText('默认', { exact: true })).toBeVisible();
-}
-async function confirm(page: Page) {
-  await page.getByText('确定', { exact: true }).click();
-}
-test('H5下单支付，管理端接单派送，用户收到送达状态', async ({ page, admin, browser, demoData }) => {
-  const courierName = '验收配送员-' + randomBytes(4).toString('hex');
-  const courierInput = { username: 'e2e-' + randomBytes(6).toString('hex'), name: courierName, role: 'DELIVERER', enabled: true, password: randomBytes(24).toString('hex') };
-  const courier = await admin('/employees', 'POST', courierInput);
-  const userPage = await browser.newPage({
-    viewport: { width: 390, height: 844 },
-  });
-  try {
-    await demoData.trackAccount(1);
-    await userLogin(userPage, 1);
-    await address(userPage, demoData.name);
-    await userPage.goto('/app/');
-    await addFood(userPage);
-    await userPage.goto('/app/pages/checkout/index');
-    await expect(userPage.getByText('合计', { exact: true })).toBeVisible();
-    const submitted = userPage.waitForResponse(
-      (r) => r.url().endsWith('/api/v1/user/orders') && r.request().method() === 'POST',
-    );
-    await userPage.getByText('提交订单 · 稍后模拟支付', { exact: true }).click();
-    await confirm(userPage);
-    const order = (await (await submitted).json()).data;
-    await expect(
-      userPage.locator('uni-page-body').getByText('我的订单', { exact: true }),
-    ).toBeVisible();
-    const card = userPage.locator('.card').filter({ hasText: '番茄鸡蛋饭' }).first();
-    await card.getByText('模拟支付', { exact: true }).click();
-    await confirm(userPage);
-    await expect(card.getByText('待接单', { exact: true })).toBeVisible();
-    await adminLogin(page);
-    await page.getByRole('link', { name: '订单与配送', exact: true }).click();
-    await page.locator('.el-table__row').filter({ hasText: order.number }).click();
-    await page.getByRole('button', { name: '接单备餐' }).click();
-    await page.getByText('选择配送员', { exact: true }).click();
-    await page.getByText(courierName, { exact: true }).click();
-    await page.getByRole('button', { name: '派单', exact: true }).click();
-    await page.getByRole('button', { name: '开始配送' }).click();
-    await page.getByRole('button', { name: '确认送达' }).click();
-    await expect(
-      page.locator('.el-drawer__body').getByText('已送达', { exact: false }),
-    ).toBeVisible();
-    await userPage.getByText('刷新', { exact: true }).click();
-    await expect(card.getByText('已送达', { exact: true })).toBeVisible();
-    await page.screenshot({
-      path: '../../.local/admin-orders.png',
-      fullPage: true,
+import { randomUUID } from 'node:crypto';
+import { test, expect, call, asSession } from './helpers';
+import type { Store, Product, Cart, Checkout, Quote, Order } from '../../contracts/platform';
+test('cross-campus mixed fulfillment, combined payment, pickup, refund and review', async ({
+  request,
+  page,
+  adminSession,
+  userSession,
+}) => {
+  const a = adminSession.token,
+    u = userSession.token;
+  const stores = await call<Store[]>(request, '/merchant/stores', a);
+  for (const store of stores.filter((s) => ['1', '3'].includes(s.id)))
+    await call(request, '/merchant/stores/' + store.id, a, 'PUT', {
+      campusId: store.campusId,
+      name: store.name,
+      enabled: true,
+      open: true,
+      deliveryFeeCents: 600,
+      packagingFeeCents: 100,
+      hours: ['00:00-24:00'],
+      phone: store.phone,
     });
-    await userPage.screenshot({
-      path: '../../.local/client-orders.png',
-      fullPage: true,
+  const selections = [];
+  for (const storeId of ['1', '3']) {
+    const products = await call<Product[]>(request, '/user/stores/' + storeId + '/products', u);
+    const product = products.find(
+      (p) => p.itemType === 'DISH' && !p.flavors?.length && p.remaining > 2,
+    )!;
+    expect(product).toBeTruthy();
+    let cart = await call<Cart>(request, '/user/stores/' + storeId + '/cart', u);
+    cart = await call<Cart>(request, '/user/stores/' + storeId + '/cart/items', u, 'POST', {
+      cartVersion: cart.cartVersion,
+      itemType: 'DISH',
+      itemId: product.id,
+      flavors: {},
+      delta: 2,
     });
-  } finally {
-    await userPage.close();
-    await admin('/employees/' + courier.id, 'PUT', { ...courierInput, password: null, enabled: false });
+    let addressId: string | null = null;
+    if (storeId === '3') {
+      const buildings = await call<{ id: string }[]>(request, '/user/campuses/2/buildings', u);
+      addressId = (
+        await call<{ id: string }>(request, '/user/addresses', u, 'POST', {
+          buildingId: buildings[0]!.id,
+          room: 'E2E-301',
+          consignee: '验收用户',
+          phone: '13800000000',
+        })
+      ).id;
+    }
+    selections.push({
+      storeId,
+      cartVersion: cart.cartVersion,
+      fulfillment: storeId === '1' ? 'PICKUP' : 'DELIVERY',
+      addressId,
+      couponId: null,
+    });
   }
-});
-test('丢失提交响应后用原请求键恢复，不重复创建订单', async ({ page, admin, demoData }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await demoData.trackAccount(2);
-  await userLogin(page, 2);
-  await address(page, demoData.name);
-  await page.goto('/app/');
-  await addFood(page);
-  await page.goto('/app/pages/checkout/index');
-  await expect(page.getByText('合计', { exact: true })).toBeVisible();
-  let created: any;
-  let first = true;
-  await page.route('**/api/v1/user/orders', async (route) => {
-    if (route.request().method() === 'POST' && first) {
-      first = false;
-      const response = await route.fetch();
-      created = (await response.json()).data;
-      await route.abort('failed');
-    } else await route.continue();
+  const input = { stores: selections };
+  const quote = await call<Quote>(request, '/user/checkouts/preview', u, 'POST', input);
+  const body = { ...input, quoteHash: quote.quoteHash };
+  const key = randomUUID();
+  const c = await call<Checkout>(request, '/user/checkouts', u, 'POST', body, {
+    'Idempotency-Key': key,
   });
-  await page.getByText('提交订单 · 稍后模拟支付', { exact: true }).dblclick();
-  await confirm(page);
-  await expect(page.getByText('上次提交结果待确认', { exact: true })).toBeVisible();
-  // uni-button is a custom element: Playwright does not infer its disabled state.
-  const recovery = page.getByText('查询并恢复订单', { exact: true });
-  await expect(recovery).not.toHaveAttribute('disabled', /.*/);
-  await recovery.click();
-  await expect(page.locator('uni-page-body').getByText('我的订单', { exact: true })).toBeVisible();
-  const current = await admin('/orders/' + created.id);
-  expect(current.id).toBe(created.id);
-  const all = await admin('/orders?size=100');
-  expect(all.records.filter((o: any) => o.requestId === created.requestId)).toHaveLength(1);
-});
-test('H5取消已支付订单，等待模拟退款完成', async ({ page, admin, demoData }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await demoData.trackAccount(3);
-  await userLogin(page, 3);
-  await address(page, demoData.name);
-  await page.goto('/app/');
-  await addFood(page);
-  await page.goto('/app/pages/checkout/index');
-  await expect(page.getByText('合计', { exact: true })).toBeVisible();
-  const submitted = page.waitForResponse(
-    (r) => r.url().endsWith('/api/v1/user/orders') && r.request().method() === 'POST',
+  const repeated = await call<Checkout>(request, '/user/checkouts', u, 'POST', body, {
+    'Idempotency-Key': key,
+  });
+  expect(repeated.id).toBe(c.id);
+  await asSession(page, userSession, true);
+  await page.goto('/app/pages/orders/index');
+  const payment = page.waitForResponse((r) => r.url().endsWith('/checkouts/' + c.id + '/pay'));
+  await page.getByText('整批模拟支付', { exact: true }).last().click();
+  expect((await payment).ok()).toBeTruthy();
+  const paid = await call<Checkout>(request, '/user/checkouts/' + c.id, u);
+  expect(paid.state).toBe('PAID');
+  expect(paid.orders).toHaveLength(2);
+  const order = paid.orders.find((o) => o.storeId === '1')!;
+  await call(request, '/merchant/orders/' + order.id + '/actions/accept', a, 'POST', {
+    version: order.version,
+  });
+  let current = await call<Order>(request, '/user/orders/' + order.id, u);
+  await call(request, '/merchant/orders/' + order.id + '/actions/ready', a, 'POST', {
+    version: current.version,
+  });
+  current = await call<Order>(request, '/user/orders/' + order.id, u);
+  expect(current.pickupCode).toMatch(/^\d{8}$/);
+  await call(request, '/merchant/orders/' + order.id + '/actions/verify', a, 'POST', {
+    version: current.version,
+    code: current.pickupCode,
+  });
+  current = await call<Order>(request, '/user/orders/' + order.id, u);
+  expect(current.status).toBe(5);
+  const req = await call<{ id: string }>(
+    request,
+    '/user/orders/' + order.id + '/aftersales',
+    u,
+    'POST',
+    {
+      kind: 'PARTIAL',
+      reason: '验收部分退款',
+      items: [{ detailId: current.details[0]!.id, quantity: 1 }],
+    },
   );
-  await page.getByText('提交订单 · 稍后模拟支付', { exact: true }).click();
-  await confirm(page);
-  const order = (await (await submitted).json()).data;
-  await expect(page.locator('uni-page-body').getByText('我的订单', { exact: true })).toBeVisible();
-  const card = page.locator('.card').filter({ hasText: '番茄鸡蛋饭' }).first();
-  await card.getByText('模拟支付', { exact: true }).click();
-  await confirm(page);
-  await expect(card.getByText('待接单', { exact: true })).toBeVisible();
-  await card.getByText('取消', { exact: true }).click();
-  await confirm(page);
-  await expect(card.getByText('已取消', { exact: true })).toBeVisible();
+  await call(request, '/merchant/aftersales/' + req.id + '/decision', a, 'POST', {
+    version: '0',
+    approve: true,
+    reason: '验收同意',
+  });
   await expect
-    .poll(async () => (await admin('/orders/' + order.id)).payStatus, {
-      timeout: 15000,
-    })
-    .toBe(2);
-  await page.getByText('刷新', { exact: true }).click();
-  await expect(card.getByText('已退款', { exact: true })).toBeVisible();
+    .poll(
+      async () => Number((await call<Order>(request, '/user/orders/' + order.id, u)).refundedCents),
+      { timeout: 15000 },
+    )
+    .toBeGreaterThan(0);
+  await call(request, '/user/orders/' + order.id + '/review', u, 'POST', {
+    rating: 5,
+    content: '跨校区合单验收评价',
+  });
+  const other = paid.orders.find((o) => o.storeId === '3')!;
+  expect((await call<Order>(request, '/user/orders/' + other.id, u)).refundedCents).toBe('0');
+});
+
+test('user selects two campuses and mixed fulfillment entirely through H5 checkout', async ({
+  page,
+  request,
+  adminSession,
+  userSession,
+}) => {
+  const a = adminSession.token,
+    u = userSession.token;
+  for (const store of (await call<Store[]>(request, '/merchant/stores', a)).filter((s) =>
+    ['1', '3'].includes(s.id),
+  ))
+    await call(request, '/merchant/stores/' + store.id, a, 'PUT', {
+      campusId: store.campusId,
+      name: store.name,
+      enabled: true,
+      open: true,
+      deliveryFeeCents: 600,
+      packagingFeeCents: 100,
+      hours: ['00:00-24:00'],
+      phone: store.phone,
+    });
+  const room='UI-'+randomUUID().slice(0,8);
+  const buildings = await call<{ id: string }[]>(request, '/user/campuses/2/buildings', u);
+  await call(request, '/user/addresses', u, 'POST', {
+    buildingId: buildings[0]!.id,
+    room,
+    consignee: '页面验收用户',
+    phone: '13800000000',
+  });
+  await asSession(page, userSession, true);
+  await page.goto('/app/');
+  async function addFood() {
+    const card = page
+      .locator('uni-view.card')
+      .filter({ has: page.getByText('番茄鸡蛋饭', { exact: true }) });
+    await card.getByText('选餐', { exact: true }).click();
+    const response = page.waitForResponse(
+      (r) => r.url().endsWith('/cart/items') && r.request().method() === 'POST',
+    );
+    await page.getByText('加入本店购物车', { exact: true }).click();
+    expect((await response).ok()).toBeTruthy();
+  }
+  await addFood();
+  await page.getByText('默认校区 ▾', { exact: true }).click();
+  await page.locator('.uni-picker-item:visible').filter({ hasText: '东校区' }).click();
+  await page.getByText('东区食堂 ▾', { exact: true }).waitFor();
+  await expect(
+    page.locator('uni-view.card').filter({ has: page.getByText('番茄鸡蛋饭', { exact: true }) }),
+  ).toHaveCount(1);
+  await addFood();
+  await page.goto('/app/pages/cart/index');
+  await expect(page.getByText('选择此店', { exact: true })).toHaveCount(2);
+  await page.getByText('选择此店', { exact: true }).first().click();
+  await page.getByText('选择此店', { exact: true }).first().click();
+  await page.getByText('合并结算 2 家店', { exact: true }).click();
+  await page.getByText('确认合并订单', { exact: true }).waitFor();
+  const east = page
+    .locator('uni-view.card')
+    .filter({ has: page.getByText('东校区 · 东区食堂', { exact: true }) });
+  await east.getByText('到店自取 ▾', { exact: true }).click();
+  await page.locator('.uni-picker-item:visible').filter({ hasText: '校区配送' }).click();
+  await page.getByText('选择本校区收货地址 ▾', { exact: true }).click();
+  await page.locator('.uni-picker-item:visible').filter({ hasText: room }).click();
+  const preview = page.waitForResponse((r) => r.url().endsWith('/checkouts/preview'));
+  await page.getByText('计算报价', { exact: true }).click();
+  const previewResponse = await preview;
+  expect(previewResponse.ok()).toBeTruthy();
+  const previewBody = previewResponse.request().postDataJSON();
+  expect(previewBody.stores.map((x: { fulfillment: string }) => x.fulfillment)).toEqual([
+    'PICKUP',
+    'DELIVERY',
+  ]);
+  const submitted = page.waitForResponse(
+    (r) => r.url().endsWith('/user/checkouts') && r.request().method() === 'POST',
+  );
+  await page.getByText('提交订单，随后模拟支付', { exact: true }).click();
+  const created = await (await submitted).json();
+  expect(created.code).toBe('OK');
+  const c = created.data as Checkout;
+  expect(c.orders).toHaveLength(2);
+  await page.getByText('整批模拟支付', { exact: true }).last().click();
+  await expect
+    .poll(async () => (await call<Checkout>(request, '/user/checkouts/' + c.id, u)).state)
+    .toBe('PAID');
+});
+test('merchant creates a coupon using the visible marketing form', async ({
+  page,
+  adminSession,
+}) => {
+  await asSession(page, adminSession);
+  await page.goto('/admin/marketing');
+  await page.getByRole('button', { name: '新增优惠券' }).click();
+  const dialog = page.getByRole('dialog');
+  const name = '页面券-' + Date.now();
+  await dialog.getByLabel('名称', { exact: true }).fill(name);
+  const response = page.waitForResponse(
+    (r) => r.url().endsWith('/stores/1/coupons') && r.request().method() === 'POST',
+  );
+  await dialog.getByRole('button', { name: '保存', exact: true }).click();
+  const sent = await response;
+  expect(sent.ok()).toBeTruthy();
+  expect(sent.request().postDataJSON().value).toBe(300);
+  await expect(page.getByText(name, { exact: true })).toBeVisible();
+});
+
+test('favorite navigation changes the retained menu page to the favorite campus',async({page,request,userSession})=>{
+  await call(request,'/user/stores/3/favorites/STORE/3',userSession.token,'POST');
+  await asSession(page,userSession,true);await page.goto('/app/');await page.getByText('默认校区 ▾',{exact:true}).waitFor();await page.getByText('领券与我的收藏',{exact:true}).click();const favorite=page.locator('uni-view.card').filter({has:page.getByText('东区食堂 · 东区食堂',{exact:true})});await favorite.getByText('进入店铺',{exact:true}).click();await expect(page.getByText('东校区 ▾',{exact:true})).toBeVisible();await expect(page.getByText('东区食堂 ▾',{exact:true})).toBeVisible();
 });

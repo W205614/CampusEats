@@ -39,13 +39,31 @@ public class SecurityConfiguration {
                         "/api/v1/user/menu/**",
                         "/api/v1/user/shop",
                         "/api/v1/user/buildings",
-                        "/uploads/**",
+                        "/uploads/{file:[a-f0-9-]+\\.png}",
                         "/ws/orders")
                     .permitAll()
+                    .requestMatchers(
+                        org.springframework.http.HttpMethod.GET,
+                        "/api/v1/user/campuses",
+                        "/api/v1/user/campuses/*/buildings",
+                        "/api/v1/user/stores",
+                        "/api/v1/user/stores/*/products",
+                        "/api/v1/user/stores/*/categories",
+                        "/api/v1/user/stores/*/reviews",
+                        "/api/v1/user/search")
+                    .permitAll()
                     .requestMatchers("/docs", "/swagger-ui/**", "/v3/api-docs/**", "/actuator/**")
-                    .hasRole("ADMIN")
+                    .hasAnyRole("ADMIN", "PLATFORM_ADMIN")
+                    .requestMatchers("/api/v1/platform/**")
+                    .hasRole("PLATFORM_ADMIN")
+                    .requestMatchers("/api/v1/merchant/**")
+                    .hasAnyRole("PLATFORM_ADMIN", "SHOP_MANAGER", "OPERATOR")
+                    .requestMatchers("/api/v1/courier/**")
+                    .hasRole("DELIVERER")
+                    .requestMatchers("/api/v1/evidence/**")
+                    .authenticated()
                     .requestMatchers("/api/v1/admin/**")
-                    .hasAnyRole("ADMIN", "OPERATOR", "DELIVERER")
+                    .hasAnyRole("ADMIN", "PLATFORM_ADMIN", "SHOP_MANAGER", "OPERATOR", "DELIVERER")
                     .requestMatchers("/api/v1/user/**")
                     .hasRole("USER")
                     .anyRequest()

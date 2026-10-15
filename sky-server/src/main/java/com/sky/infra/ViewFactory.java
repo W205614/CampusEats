@@ -37,7 +37,9 @@ public final class ViewFactory {
         text(r, "name"),
         Views.Role.valueOf(text(r, "role")),
         Db.bool(r, "mustChangePassword"),
-        text(r, "expiresAt"));
+        text(r, "expiresAt"),
+        id(r, "storeId"),
+        id(r, "campusId"));
   }
 
   @SuppressWarnings("unchecked")

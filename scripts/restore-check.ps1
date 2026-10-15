@@ -22,10 +22,24 @@ try {
  $expected=@(Get-Content -LiteralPath (Join-Path $backupRoot 'source-counts.txt'))
  if(($result[0..5] -join ',') -ne ($expected -join ',')){throw 'Restored row counts do not match source.'}
  if($result[6] -ne '0' -or $result[7] -ne '0' -or $result[8] -ne '0'){throw 'Restored ownership, quota or detail integrity check failed.'}
- $restoredChecksums=docker exec $name sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -u root sky_take_out -Nse "CHECKSUM TABLE orders,order_detail,user,employee,address_book,dish,dish_flavor,setmeal,setmeal_dish,campus_building,shop_settings,refund_task,outbox_event,daily_quota,order_reservation,audit_log EXTENDED;"'
+ $tables=@('orders','order_detail','user','employee','address_book','dish','dish_flavor','setmeal','setmeal_dish','campus_building','shop_settings','refund_task','outbox_event','daily_quota','order_reservation','audit_log')
+ if(Test-Path -LiteralPath (Join-Path $backupRoot 'tables.txt')){$tables=@(Get-Content -LiteralPath (Join-Path $backupRoot 'tables.txt'))}
+ if(@($tables | Where-Object {$_ -notmatch '^[a-zA-Z0-9_]+$'}).Count){throw 'Invalid table inventory.'}
+ $checksumSql='CHECKSUM TABLE '+($tables -join ',')+' EXTENDED;'
+ $restoredChecksums=$checksumSql | docker exec -i $name sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -u root sky_take_out -N'
  if($LASTEXITCODE -ne 0 -or ($restoredChecksums -join ',') -ne ((Get-Content -LiteralPath (Join-Path $backupRoot 'table-checksums.txt')) -join ',')){throw 'Restored business table checksums differ.'}
+ if(Test-Path -LiteralPath (Join-Path $backupRoot 'all-table-counts.txt')){
+  $allCountSql=($tables | ForEach-Object {"SELECT '$_',COUNT(*) FROM $_;"}) -join ' '
+  $restoredCounts=$allCountSql | docker exec -i $name sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -u root sky_take_out -N'
+  if($LASTEXITCODE -ne 0 -or ($restoredCounts -join ',') -ne ((Get-Content -LiteralPath (Join-Path $backupRoot 'all-table-counts.txt')) -join ',')){throw 'Full table counts differ.'}
+ }
+ if($tables -contains 'checkout'){
+  $integritySql='SELECT COUNT(*) FROM orders o LEFT JOIN store s ON s.id=o.store_id LEFT JOIN checkout c ON c.id=o.checkout_id WHERE s.id IS NULL OR c.id IS NULL OR o.campus_id<>s.campus_id OR o.refunded_cents<0 OR o.reserved_refund_cents<0 OR o.refunded_cents+o.reserved_refund_cents>o.paid_cents; SELECT COUNT(*) FROM checkout c WHERE c.total_cents<>(SELECT COALESCE(SUM(ROUND(o.amount*100)),0) FROM orders o WHERE o.checkout_id=c.id); SELECT COUNT(*) FROM order_detail WHERE refunded_quantity<0 OR reserved_quantity<0 OR refunded_quantity+reserved_quantity>number;'
+  $integrity=$integritySql | docker exec -i $name sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -u root sky_take_out -N'
+  if($LASTEXITCODE -ne 0 -or @($integrity | Where-Object {$_ -ne '0'}).Count){throw 'Platform ownership or money invariants failed.'}
+ }
  $restoreUploads=Join-Path $backupRoot ('restore-files-'+(Get-Date -Format 'yyyyMMddHHmmss'))
- Copy-Item -LiteralPath (Join-Path $backupRoot 'uploads') -Destination $restoreUploads -Recurse
+ Copy-Item -LiteralPath (Join-Path $backupRoot 'uploads') -Destination $restoreUploads -Recurse -Force
  foreach($file in $manifest | Where-Object {$_.path -like 'uploads*'}){$target=Join-Path $restoreUploads ($file.path -replace '^uploads[/\\]?','');if((Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash -ne $file.sha256){throw 'Restored upload hash mismatch'}}
  $result | Set-Content -LiteralPath (Join-Path $backupRoot 'restore-check.txt') -Encoding utf8
  Write-Host "Restored into independent container $name. Counts and integrity results: restore-check.txt"
