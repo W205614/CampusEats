@@ -187,15 +187,20 @@ const nav = (url: string) => uni.navigateTo({ url });
 onShow(load);
 </script>
 <template>
-  <view class="screen"
-    ><view class="row"
-      ><view class="eyebrow">CAMPUS EATS</view
-      ><text
-        class="tap"
-        @click="nav(session.session ? '/pages/account/index' : '/pages/login/index')"
-        >{{ session.session?.name || '登录' }}</text
-      ></view
-    ><view class="hero"
+  <view class="screen menu-screen">
+    <view class="row menu-nav">
+      <view class="menu-brand">CampusEats</view>
+      <!-- #ifdef H5 -->
+      <a href="/admin/" class="tap" style="text-decoration: none">商家/配送工作台</a>
+      <!-- #endif -->
+      <!-- #ifdef H5 -->
+      <a class="menu-login" :href="session.session ? '/app/pages/account/index' : '/app/pages/login/index'">{{ session.session?.name || '登录点餐' }}</a>
+      <!-- #endif -->
+      <!-- #ifndef H5 -->
+      <button class="menu-login" @click="nav(session.session ? '/pages/account/index' : '/pages/login/index')">{{ session.session?.name || '登录点餐' }}</button>
+      <!-- #endif -->
+    </view>
+    <view class="hero"
       ><view class="title">校园好店，<br />一起下单。</view
       ><view class="subtitle">分店备餐，按校区配送，也可到店自取。</view></view
     ><view class="card"
@@ -219,7 +224,7 @@ onShow(load);
         ></picker
       ></view
     ><view class="card"
-      ><input v-model="query" placeholder="搜索餐品或店铺名称" @confirm="menu" />
+      ><input v-model="query" aria-label="搜索餐品或店铺名称" placeholder="搜索餐品或店铺名称" @confirm="menu" />
       <picker :range="['本店全部分类', ...categories.map((c) => c.name)]" :value="Math.max(0, categories.findIndex((c) => c.id === category) + 1)" @change="category = categories[Number($event.detail.value) - 1]?.id || ''; menu()"><view class="field-label tap">分类：{{ categories.find((c) => c.id === category)?.name || '本店全部分类' }} ▾</view></picker>
       <picker :range="['本校区全部店铺', '仅营业中', '仅休息中']" :value="openFilter" @change="openFilter = Number($event.detail.value); searchCampus()"><view class="field-label tap">校区筛选：{{ ['本校区全部店铺', '仅营业中', '仅休息中'][openFilter] }} ▾</view></picker><view
         class="row"
@@ -236,7 +241,7 @@ onShow(load);
       ><text class="tap" @click="nav('/pages/account/index')">领券与我的收藏</text
       ><text class="tap" @click="openReviews">店铺评价</text></view
     ><template v-if="campusSearch"><view class="section-title">店铺搜索结果</view><view class="card row" v-for="s in matchedStores" :key="s.id"><view>{{ s.name }}<view class="muted">{{ s.accepting ? '营业中' : '休息中' }} · {{ s.hours.join(' / ') }}</view></view><text class="tap" @click="visitStore(s)">进入店铺</text></view><view v-if="!matchedStores.length" class="muted">没有匹配的店铺。</view><view class="section-title">餐品搜索结果</view></template
-    ><view class="card" v-for="p in products" :key="p.storeId + p.itemType + p.id"
+    ><view class="card menu-product" v-for="p in products" :key="p.storeId + p.itemType + p.id"
       ><view class="row"
         ><image
           v-if="p.image"
@@ -295,3 +300,31 @@ onShow(load);
     ></view
   >
 </template>
+
+<style scoped>
+.menu-nav { flex-wrap: wrap; margin-bottom: 24rpx; gap: 16rpx; }
+.menu-brand { font-size: 36rpx; color: #173f35; font-weight: 750; letter-spacing: -1rpx; margin-right: auto; }
+.menu-nav a { font-size: 24rpx; padding: 16rpx 0; }
+.menu-login { text-decoration: none; margin: 0; padding: 8rpx 18rpx; font-size: 24rpx; line-height: 48rpx; color: #173f35; background: #e3ebe3; border-radius: 6rpx; }
+.menu-login::after { border: 0; }
+.menu-product .card-name { margin-bottom: 8rpx; }
+.menu-product > .row > view { min-width: 0; }
+.menu-product .row .row { flex-wrap: wrap; }
+.menu-screen .hero { margin-bottom: 24rpx; }
+/* #ifdef H5 */
+.menu-screen { padding-bottom: 80px; }
+.menu-nav a { min-height: 44px; display: inline-flex; align-items: center; font-size: 13px; }
+.menu-login { min-height: 44px; font-size: 14px; line-height: 28px; }
+.menu-screen .title { font-size: 30px; }
+.menu-screen .muted, .menu-screen .subtitle { font-size: 14px; }
+.menu-screen .tap { font-size: 14px; }
+.menu-screen .small-button { min-height: 44px; font-size: 14px; line-height: 44px; }
+.menu-screen .card-name { font-size: 18px; }
+@media (min-width: 600px) {
+  .menu-screen { max-width: 760px; padding: 24px 24px 88px; }
+  .menu-screen .hero { padding: 28px; }
+  .menu-screen .card { padding: 24px; margin-bottom: 18px; }
+  .menu-screen .title { font-size: 36px; }
+}
+/* #endif */
+</style>

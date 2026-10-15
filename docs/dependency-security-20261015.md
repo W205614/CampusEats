@@ -1,47 +1,46 @@
-# 用户端构建依赖复核 · 2026-10-15
+# 构建依赖替换与兼容性复核 · 2026-10-15
 
-## 结论
+## 当前结论
 
-原有7个高风险包都追溯到同一公告：`braces` 的 [GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm)。复核时npm最新版本仍为3.0.3，官方公告明确没有修复版本。新版uni-app稳定版及测试版仍使用相同依赖链，因此本轮未通过升级消除该根因，也未将其标记为已修复。
+管理端与用户端使用 npm 官方审计接口，均为 **0 项已知漏洞**。用户端原来的 `braces` 路径已移除，旧 Jimp 引入的 `phin 2.9.3` 也已移除；仍由其它图像依赖使用的 `phin 3.7.1` 不属于此次受影响范围。已删除 `audit-exceptions.json`，CI 对任何级别的漏洞、失败报告和计数不一致均失败，不再依赖临时例外。
 
-完成四项兼容覆盖升级，移除另外6条安全公告。审计中的受影响包从26个变为21个；高危包条目从7个变为17个，均仍由同一braces公告传播而来，没有新增高危公告。不能将这些包条目视为17个独立漏洞，也不能将本轮描述为高危清零。
+这代表指定 lockfile 在复核时的公告结果，不代表全面安全认证，也不代表工具链对任意上游版本兼容。
 
-## 已交付的升级
+## 为什么不能只升级版本
 
-| 依赖 | 原安装版本 | 新版本 | 已移除公告 |
-|---|---|---|---|
-| `@babel/core` | 7.25.2 | 7.29.7 | [sourceMappingURL任意文件读取](https://github.com/advisories/GHSA-4x5r-pxfx-6jf8) |
-| `@intlify/shared` | 9.1.9、9.14.1、9.14.5 | 统一9.14.5 | [原型污染](https://github.com/advisories/GHSA-hjwq-mjwj-4x6c) |
-| `esbuild` | 0.20.2、0.27.7 | 统一0.28.2 | [开发服务器跨站读取](https://github.com/advisories/GHSA-67mh-4wv8-2f99)、[Windows文件读取](https://github.com/advisories/GHSA-g7r4-m6w7-qqqr) |
-| `postcss-selector-parser` | 6.1.2及已有7.1.6 | 统一7.1.6 | [递归拒绝服务](https://github.com/advisories/GHSA-w9m9-85wc-3x92)、[平方复杂度拒绝服务](https://github.com/advisories/GHSA-rj75-hqrm-r3gf) |
+- `braces 3.0.3` 的 [GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm) 未提供官方修复版。已核对的新 uni-app 稳定版与测试版仍使用 `fast-glob → micromatch → braces` 和 chokidar 3 的路径，仅升级框架不能消除根因。
+- chokidar 4 删除 glob 支持，不能只改 overrides 后假定静态资源复制正常。
+- 旧 Jimp 使用 phin 2 的回调 API，phin 3 改为 Promise，直接覆盖会破坏调用。Jimp 0.22.12 又引入受影响的 file-type 16.x，因此没有采用该中间版本。最终选择 Jimp 1.6.1，并适配其 [v1 命名导出](https://jimp-dev.github.io/jimp/guides/migrate-to-v1/)。
 
-版本通过客户端package.json的精确overrides及lockfile固定。uni-app各组件保持原有同一版本组，没有混用Vue 2／Vue 3工具链。
+## 最终替换
 
-## 未采用的升级路径
+| 范围 | 实现与兼容边界 |
+|---|---|
+| 文件扫描 | 本仓库 `tooling/fast-glob-compat` 本地包替代 fast-glob，底层使用 tinyglobby 0.2.17、picomatch 4.0.7。支持锁定编译器实际使用的同步／异步匹配与选项；保留原目录扫描语义，限制模式长度与嵌套，未知选项明确失败。不是 fast-glob 全 API 替身。 |
+| 资源监听 | chokidar 4.0.3 监听源目录，兼容桥过滤 uni-app 的相对复制模式与排除条件，支持新增目录后的新增文件、修改、删除及 add／unwatch。保持 cwd 为普通路径，避免项目路径含方括号时被当作 glob。 |
+| 二维码读取 | Jimp 1.6.1，实际自动化入口由 `require("jimp").read` 改为 `require("jimp").Jimp.read`，继续传递 bitmap 到二维码解码器。 |
+| 安装补丁 | `tooling/compat-patches.json` 固定两个上游文件的版本、修改前后 SHA-256 和精确替换。postinstall 先验证整个补丁集合再写入；未知内容或版本中止安装，重复安装幂等。没有修改上游声明版本来冒充官方修复。 |
 
-1. `braces`最新3.0.3仍受影响。`micromatch`最新4.0.8依赖braces，`fast-glob`最新3.3.3依赖micromatch；仅升级这些包不能移除漏洞。
-2. 已核对`@dcloudio/uni-cli-shared`稳定版`3.0.0-5020620260917001`和测试版`3.0.0-alpha-5030120260930001`的npm元数据，两者仍固定chokidar 3.6.0、fast-glob 3.3.3。相关插件和uni-cloud也保留fast-glob。来源：[稳定版元数据](https://registry.npmjs.org/@dcloudio%2funi-cli-shared/3.0.0-5020620260917001)、[测试版元数据](https://registry.npmjs.org/@dcloudio%2funi-cli-shared/3.0.0-alpha-5030120260930001)。
-3. 新版chokidar移除了glob支持，与当前uni-app所用版本并非可直接替换关系。没有强制覆盖、引入非官方braces替代包或修改node_modules来隐藏审计结果。
-4. 另一个剩余根因为[phin重定向泄露敏感请求头](https://github.com/advisories/GHSA-x565-32qp-m3vf)。旧Jimp使用phin 2的回调接口，不能直接换为phin 3的Promise接口。试升Jimp 0.22.12会引入受[另一条公告](https://github.com/advisories/GHSA-5v7r-6r5c-r473)影响的file-type 16.x，其修复版21.3.1不符合该Jimp的依赖范围。因此已撤回该试验，保持Jimp 0.10.3。此路径服务小程序自动化工具，不属于真实资金业务。
+uni-app 组件继续统一固定为 `3.0.0-5020420260813003`。升级框架、改动依赖版本或新增编译器用法时，必须重新审查适配范围、上游字节及测试；不能只更新哈希绕过检查。`npm ci --ignore-scripts` 不会应用补丁，后续兼容测试将拒绝未应用的状态。
 
-## 审计口径与约束
+Docker 安装前复制本地 tooling 包，CI、本机构建脚本和 Linux 镜像构建均运行兼容回归及依赖树校验。
 
-| npm报告 | 低 | 中 | 高 | 严重 | 包条目合计 | 独立公告 |
+## 审计变化
+
+| 阶段 | 低 | 中 | 高 | 严重 | 包条目合计 | 独立公告 |
 |---|---:|---:|---:|---:|---:|---:|
-| 原lockfile，复核前及隔离重查 | 10 | 9 | 7 | 0 | 26 | 8 |
-| 升级后lockfile | 0 | 4 | 17 | 0 | 21 | 2 |
+| 原 lockfile | 10 | 9 | 7 | 0 | 26 | 8 |
+| 首轮安全覆盖升级 | 0 | 4 | 17 | 0 | 21 | 2 |
+| 本轮替换后 | 0 | 0 | 0 | 0 | 0 | 0 |
 
-高危条目分级重新传播至原来已存在的DCloud包；这些DCloud包版本保持不变。升级后17条高危的所有依赖路径均指向braces的同一公告，4条中危均指向phin。保留原始及升级后报告、依赖树和公告差集供核对。
+首轮升级的 Babel 7.29.7、intlify/shared 9.14.5、esbuild 0.28.2、postcss-selector-parser 7.1.6 保留，移除了另外6条公告。当时的17高、4中属于依赖链传播的包条目，不是21个独立漏洞；后续本轮才消除剩余两个公告路径。
 
-高危例外仅补充本次明确核对的传递包名，允许的高危公告仍只有GHSA-vfj7-8cjw-p6xm；原到期日2026-11-07不延长。CI仍拒绝未知高危包、允许包上的新高危公告、严重漏洞、过期例外及缺失的审计结果。新增6项回归验证这些约束。
+## 验证与维护证据
 
-构建在受信本机和CI执行，日常四容器中的Nginx仅提供静态前端，不部署Node开发服务器。该边界降低暴露面，不等于漏洞已修复；不应把不可信glob模式送入构建工具或公开开发服务器。
+- 6项工具链回归：三个编译器消费者的真实模块解析、文件扫描与排除／目录语义、真实 uni-app FileWatcher 的增改删、动态 add／unwatch、补丁幂等与上游漂移拒绝、实际微信自动化适配器解码本仓库生成的二维码。
+- 8项严格审计规则回归：零发现允许、各级发现均拒绝、报告失败与缺失、隐藏条目与计数不一致。
+- 后端84项验证通过；最终镜像在隔离28083环境28项浏览器回归、冒烟及 WebSocket 验证通过，单工作进程、无重试；包含真实商品图片解码和过期会话恢复。交付提交的远程验证以对应 CI 为准。
+- 两端类型检查、管理端／H5／微信小程序生产构建以及 Linux Web 镜像构建通过。小程序构建及二维码单元验证不等同于微信真机或开发者工具连接验收。
+- 日常18083仅执行只读冒烟；写入式浏览器测试在独立验收库运行。旧日常镜像已经归档，保留数据库和上传文件备份，不删除日常数据卷。
 
-## 验证与证据
-
-- 客户端npm ci干净安装、两端类型检查、管理端、H5及微信小程序生产构建通过；Linux Web镜像从新lockfile构建通过。
-- 隔离28083环境17条浏览器用例全部通过，无重试；接口冒烟与WebSocket验证通过。日常18083只执行只读冒烟，写入式验收数据不进入日常库。
-- 审计规则6项测试通过，并加入CI。最终GitHub CI仍执行后端84项、两端构建、契约、审计、浏览器、WebSocket和独立备份恢复；结果以交付提交对应的工作流为准。
-- 小程序构建不等同于微信真机验证。
-
-本机证据在`.local/security-upgrade/`：原始package与lockfile、audit-before.json、audit-baseline-recheck.json、audit-comparison.json、各构建和浏览器日志、审计规则测试日志，以及升级前镜像归档和SHA-256。当前原始npm审计报告为`.local/audit-client.json`，配置与口令不提交Git。
+原首轮证据位于本机 `.local/security-upgrade/`；本轮日志、二维码与兼容测试、镜像归档和哈希位于 `.local/toolchain-replacement/`。原始 npm 报告为 `.local/audit-client.json`。配置、口令与大份本机归档不提交 Git。

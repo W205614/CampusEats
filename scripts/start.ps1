@@ -58,8 +58,9 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Deployment failed; inspect docker compose logs.' }
     $portMatch = [regex]::Match($config,'(?m)^WEB_PORT=(\d+)'); $port=18083
     if ($portMatch.Success) { $port=[int]$portMatch.Groups[1].Value }
-    Write-Host "Admin: http://localhost:$port/admin/"
-    Write-Host "H5: http://localhost:$port/app/"
+    Write-Host "Ordering: http://localhost:$port/"
+    Write-Host "Staff workbench: http://localhost:$port/admin/"
+    Write-Host "H5 direct link: http://localhost:$port/app/"
     Write-Host 'Initial demo credentials: .local/demo-credentials.txt (local only).'
     Write-Host 'Uses project-scoped persistent volumes. Before schema upgrades, writers are paused and a backup is independently restored.'
 } finally { Pop-Location }

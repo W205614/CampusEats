@@ -5,6 +5,8 @@ import { api, toast, loggedIn } from '../../api';
 import { cents, states, type Store, type Coupon } from '../../../../contracts/platform';
 const stores = ref<Store[]>([]),
   selected = ref(''),
+  accountLoaded = ref(false),
+  couponsLoaded = ref(false),
   coupons = ref<Coupon[]>([]),
   wallet = ref<Coupon[]>([]),
   favorites = ref<
@@ -12,26 +14,32 @@ const stores = ref<Store[]>([]),
   >([]);
 async function load() {
   if (!loggedIn()) return;
+  accountLoaded.value = false;
   try {
     stores.value = await api<Store[]>('/stores');
-    if (!selected.value || !stores.value.some((s) => s.id === selected.value))
-      selected.value = String(uni.getStorageSync('store-choice') || stores.value[0]?.id || '');
+    if (!stores.value.some((s) => s.id === selected.value)) {
+      const previous = String(uni.getStorageSync('store-choice') || '');
+      selected.value = stores.value.find((s) => s.id === previous)?.id || stores.value[0]?.id || '';
+    }
     [wallet.value, favorites.value] = await Promise.all([
       api<Coupon[]>('/wallet'),
       api<typeof favorites.value>('/favorites'),
     ]);
+    accountLoaded.value = true;
     await available();
   } catch (e) {
     toast(e);
   }
 }
 async function available() {
+  couponsLoaded.value = false;
   try {
     const platform = await api<Coupon[]>('/coupons');
     const local = selected.value
       ? await api<Coupon[]>('/stores/' + selected.value + '/coupons')
       : [];
     coupons.value = [...platform, ...local];
+    couponsLoaded.value = true;
   } catch (e) {
     toast(e);
   }
@@ -92,6 +100,7 @@ onShow(load);
           }}</view
         ></view
       ><button class="primary small-button" @click="claim(c)">领取</button></view
+    ><view v-if="couponsLoaded && !coupons.length" class="empty">当前暂无可领取的优惠券，可以切换店铺看看。</view
     ><view class="section-title">我的优惠券</view
     ><view class="card" v-for="c in wallet" :key="c.id"
       ><view class="row"
@@ -100,6 +109,7 @@ onShow(load);
       ><view class="muted"
         >{{ c.storeId ? '店铺专用' : '平台通用' }} · 到期 {{ c.endsAt.slice(0, 10) }}</view
       ></view
+    ><view v-if="accountLoaded && !wallet.length" class="empty">还没有优惠券，领取后会保存在这里。</view
     ><view class="section-title">我的收藏</view
     ><view class="card" v-for="f in favorites" :key="f.storeId + f.targetType + f.targetId"
       ><view>{{ f.name || '已停用商品' }} · {{ f.storeName }}</view
@@ -107,6 +117,7 @@ onShow(load);
         ><text class="tap" @click="visit(f)">进入店铺</text
         ><text class="tap" @click="remove(f)">取消收藏</text></view
       ></view
+    ><view v-if="accountLoaded && !favorites.length" class="empty">还没有收藏，去点餐页收藏喜欢的店铺和餐品吧。</view
     ></view
   >
 </template>

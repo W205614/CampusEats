@@ -3,6 +3,43 @@ import { test, expect, call, asSession, password } from './helpers';
 import type { Session } from '../../contracts/models';
 import type { Cart, Checkout, Order, Product, Quote, Store } from '../../contracts/platform';
 
+test('root opens ordering and users can switch login entrances without editing the URL', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+  await expect(page).toHaveURL(/\/app\//);
+  await expect(page.getByText('登录点餐', { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+  await page.getByRole('link', { name: '商家/配送工作台' }).click();
+  await expect(page.getByLabel('账户', { exact: true })).toHaveValue('');
+  await page.getByRole('link', { name: '用户点餐', exact: true }).click();
+  await page.getByText('登录点餐', { exact: true }).click();
+  await expect(page.getByText('进入演示用户 1', { exact: true })).toBeVisible();
+  await expect(page.getByRole('link', { name: '进入工作台登录' })).toBeVisible();
+  const loggedIn = page.waitForResponse(r => r.url().endsWith('/user/auth/demo') && r.ok());
+  await page.getByText('进入演示用户 1', { exact: true }).click();
+  const login = await (await loggedIn).json();
+  await expect(page.getByText(login.data.name, { exact: true })).toBeVisible();
+  expect(await page.evaluate(() => sessionStorage.getItem('campus-admin'))).toBeNull();
+  expect(await page.evaluate(() => JSON.parse(sessionStorage.getItem('campus-user') || 'null')?.role)).toBe('USER');
+});
+
+test('switching between ordering and workbench preserves their independent sessions', async ({ page, adminSession, userSession }) => {
+  await page.goto('/');
+  await page.evaluate(({ admin, user }) => {
+    sessionStorage.setItem('campus-admin', JSON.stringify(admin));
+    sessionStorage.setItem('campus-user', JSON.stringify(user));
+  }, { admin: adminSession, user: userSession });
+  await page.reload();
+  await expect(page).toHaveURL(/\/app\//);
+  await expect(page.getByText(userSession.name, { exact: true })).toBeVisible();
+  await page.getByRole('link', { name: '商家/配送工作台' }).click();
+  await expect(page.getByRole('button', { name: '退出', exact: true })).toBeVisible();
+  await page.getByRole('link', { name: '去点餐' }).click();
+  await expect(page.getByText(userSession.name, { exact: true })).toBeVisible();
+  expect(await page.evaluate(token => JSON.parse(sessionStorage.getItem('campus-admin')!).token === token, adminSession.token)).toBeTruthy();
+  expect(await page.evaluate(token => JSON.parse(sessionStorage.getItem('campus-user')!).token === token, userSession.token)).toBeTruthy();
+});
+
 test('courier login opens the delivery desk and protected routes return to it', async ({ page, request, adminSession }) => {
   const username = 'uxcourier' + randomUUID().slice(0, 8);
   const initial = password(), changed = 'Ux-' + randomUUID();

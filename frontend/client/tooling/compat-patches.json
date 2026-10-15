@@ -1,0 +1,32 @@
+[
+  {
+    "package": "@dcloudio/uni-cli-shared",
+    "version": "3.0.0-5020420260813003",
+    "file": "dist/watcher.js",
+    "edits": [
+      [
+        "const chokidar_1 = require(\"chokidar\");",
+        "const chokidar_1 = require(\"fast-glob/watch\");"
+      ],
+      [
+        "const src = this.src.map((src) => (0, utils_1.pathToGlob)(path_1.default.resolve(watchOptions.cwd), src));",
+        "const src = this.src;"
+      ]
+    ],
+    "before": "4e20d6a4df4d6119e47df4b76e89850b80c1c8261b5bd6f7c7f9edd118a1e28f",
+    "after": "2db5e5ac8cd11c7e084c66166c4ef21648400e5fd964d016fdf970699984bb13"
+  },
+  {
+    "package": "@dcloudio/uni-mp-weixin",
+    "version": "3.0.0-5020420260813003",
+    "file": "lib/uni.automator.js",
+    "edits": [
+      [
+        "require(\"jimp\").read(t)",
+        "require(\"jimp\").Jimp.read(t)"
+      ]
+    ],
+    "before": "d4bf9f0efc8aa72d927f375d65f52dd8869174a8b95efc8627f49b29ffd9b748",
+    "after": "708ed4a4950ca964593d2190c2e939ecb37178a2c30bfb5aee9d24f31217262c"
+  }
+]

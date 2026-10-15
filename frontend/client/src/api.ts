@@ -9,8 +9,18 @@ export function base() {
   // #endif
   return origin.replace(/\/$/, "");
 }
-export const image = (path: string) =>
-  path?.startsWith("/") ? base() + path : path;
+export function image(path: string) {
+  if (!path?.startsWith("/")) return path;
+  const url = base() + path;
+  // uni-h5 prefixes root-relative image sources with its /app/ router base.
+  // Server uploads and demo images belong to the API origin instead.
+  // #ifdef H5
+  return new URL(url, window.location.origin).href;
+  // #endif
+  // #ifndef H5
+  return url;
+  // #endif
+}
 export function api<T>(
   path: string,
   method: "GET" | "POST" | "PUT" | "DELETE" = "GET",
@@ -18,43 +28,65 @@ export function api<T>(
   headers: Record<string, string> = {},
 ): Promise<T> {
   const store = useSession();
+  const pathname = path.split("?", 1)[0] || "";
+  // Keep this list aligned with the server's anonymous GET routes. Private reads
+  // and every mutation must surface their original result without replaying it.
+  const publicRead =
+    method === "GET" &&
+    (/^\/(campuses|stores|search)$/.test(pathname) ||
+      /^\/campuses\/[^/]+\/buildings$/.test(pathname) ||
+      /^\/stores\/[^/]+\/(products|categories|reviews)$/.test(pathname));
+  const login = /^\/auth\/(demo|wechat)$/.test(pathname);
+  const token = login ? undefined : store.session?.token;
   return new Promise((resolve, reject) => {
-    uni.request({
-      url: base() + "/api/v1/user" + path,
-      method,
-      data: data as any,
-      timeout: 15000,
-      header: {
+    function request(anonymous = false) {
+      const requestHeaders: Record<string, string> = {
         "Content-Type": "application/json",
-        ...(store.session
-          ? { Authorization: "Bearer " + store.session.token }
-          : {}),
+        ...(token ? { Authorization: "Bearer " + token } : {}),
         ...headers,
-      },
-      success(response) {
-        const result = response.data as Envelope<T>;
-        if (
-          response.statusCode >= 200 &&
-          response.statusCode < 300 &&
-          result.code === "OK"
-        )
-          resolve(result.data);
-        else {
-          if (response.statusCode === 401) store.set(null);
-          reject(
-            new ApiError(
-              result.code || "UNAVAILABLE",
-              result.message || "服务暂不可用",
-              result.requestId || "",
-              response.statusCode,
-            ),
-          );
-        }
-      },
-      fail() {
-        reject(new ApiError("NETWORK", "网络连接失败，请重试", "", 0));
-      },
-    });
+      };
+      if (anonymous || login)
+        for (const name of Object.keys(requestHeaders))
+          if (name.toLowerCase() === "authorization") delete requestHeaders[name];
+      uni.request({
+        url: base() + "/api/v1/user" + path,
+        method,
+        data: data as any,
+        timeout: 15000,
+        header: requestHeaders,
+        success(response) {
+          const result = response.data as Envelope<T>;
+          if (
+            response.statusCode >= 200 &&
+            response.statusCode < 300 &&
+            result.code === "OK"
+          )
+            resolve(result.data);
+          else {
+            if (response.statusCode === 401) {
+              // A delayed failure for an old session must not erase a newer login.
+              if (token && store.session?.token === token) store.set(null);
+              if (publicRead && token && !anonymous) {
+                request(true);
+                return;
+              }
+            }
+            reject(
+              new ApiError(
+                result.code || "UNAVAILABLE",
+                result.message || "服务暂不可用",
+                result.requestId || "",
+                response.statusCode,
+              ),
+            );
+          }
+        },
+        fail() {
+          reject(new ApiError("NETWORK", "网络连接失败，请重试", "", 0));
+        },
+      });
+    }
+    request();
   });
 }
 export function toast(error: unknown) {

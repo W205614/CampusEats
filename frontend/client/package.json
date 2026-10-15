@@ -6,7 +6,9 @@
     "dev:h5": "uni --host 127.0.0.1 --port 5174",
     "build:h5": "uni build",
     "build:mp-weixin": "uni build -p mp-weixin",
-    "typecheck": "vue-tsc --noEmit"
+    "typecheck": "vue-tsc --noEmit",
+    "postinstall": "node tooling/apply-compat-patches.cjs",
+    "test:toolchain": "npm ls fast-glob chokidar jimp --all && node --test tooling/compat.test.cjs"
   },
   "dependencies": {
     "@dcloudio/uni-app": "3.0.0-5020420260813003",
@@ -25,7 +27,8 @@
     "typescript": "5.9.3",
     "vite": "7.3.7",
     "vue-tsc": "3.3.12",
-    "@vue/runtime-core": "3.5.43"
+    "@vue/runtime-core": "3.5.43",
+    "fast-glob": "file:tooling/fast-glob-compat"
   },
   "overrides": {
     "vite": "$vite",
@@ -51,7 +54,10 @@
     "@babel/core": "7.29.7",
     "@intlify/shared": "9.14.5",
     "esbuild": "0.28.2",
-    "postcss-selector-parser": "7.1.6"
+    "postcss-selector-parser": "7.1.6",
+    "chokidar": "4.0.3",
+    "jimp": "1.6.1",
+    "fast-glob": "$fast-glob"
   },
   "optionalDependencies": {
     "@rollup/rollup-win32-x64-msvc": "4.64.0",

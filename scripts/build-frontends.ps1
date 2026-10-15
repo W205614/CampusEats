@@ -6,6 +6,8 @@ try {
   npm ci --prefix "frontend/$client" --include=optional
   if($LASTEXITCODE -ne 0){throw "npm ci failed: $client"}
  }
+ npm run test:toolchain --prefix frontend/client
+ if($LASTEXITCODE -ne 0){throw 'Client toolchain compatibility failed'}
  npm run typecheck --prefix frontend/client
  if($LASTEXITCODE -ne 0){throw 'Client type check failed'}
  npm run build --prefix frontend/admin

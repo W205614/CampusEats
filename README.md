@@ -20,6 +20,8 @@
 
 以下截图于2026-10-15从本机新版截取，展示演示环境。
 
+![员工登录与用户入口切换](docs/images/platform-login.png)
+
 ![多校区与独立店铺工作台](docs/images/platform-dashboard.png)
 
 <img src="docs/images/platform-h5-menu.png" alt="H5 校区选店与点餐" width="390">
@@ -37,8 +39,11 @@ docker compose ps
 
 | 入口 | 地址 |
 |---|---|
+| 默认入口（用户点餐） | http://localhost:18083/ |
 | 平台／店铺／配送工作台 | http://localhost:18083/admin/ |
 | H5 点餐端 | http://localhost:18083/app/ |
+
+直接访问网站即进入点餐页，点击「登录点餐」选择用户账户。商家、配送员和平台管理员点击「商家/配送工作台」进入员工登录；工作台也提供「用户点餐／去点餐」返回入口，无需手动修改网址。员工账户不再预填 `admin`，两端会话各自保存。
 
 初始平台账号为 `admin`，密码保存在本机 `.local/demo-credentials.txt`。演示店长为 `manager1` 至 `manager4`，运营员为 `operator1` 至 `operator4`，配送员为 `courier1`、`courier1b`、`courier2`、`courier2b`。新建演示员工首次登录必须改密；已有账号保留原密码，修改 `.env` 不会重置已有账号。
 
@@ -96,8 +101,8 @@ node scripts/check-websocket.mjs
 
 统计将支付和成功退款按各自发生日期记录，净收款为所选期间支付额减成功退款额；完成单成交额单独展示。合单支付笔数按结算单去重。历史缺失事件时间保留为未知，不伪造发生日期。
 
-[架构与接口](docs/platform-architecture.md) · [升级与回滚](docs/platform-deployment.md) · [本轮验收记录](docs/platform-verification-20261015.md)
+[架构与接口](docs/platform-architecture.md) · [升级与回滚](docs/platform-deployment.md) · [本轮验收记录](docs/platform-verification-20261015.md) · [入口与体验完善](docs/frontend-experience-20261015.md)
 
-CI 会从源码执行后端回归、两端构建与类型检查、接口契约比对、依赖审计、浏览器和 WebSocket 验证，再暂停写入并完成独立备份恢复及恢复后的冒烟检查。[查看 GitHub Actions](https://github.com/W205614/CampusEats/actions/workflows/verify.yml)。这些检查不等同于生产容量或微信真机验证。
+本轮本地验证通过84项后端、28项浏览器、6项构建兼容及8项审计规则回归；另完成7个页面在390／768／1440三种宽度下的21组体验检查、WebSocket与独立备份恢复。CI 会从源码重复后端回归、两端构建与类型检查、接口契约比对、依赖审计、浏览器和 WebSocket 验证，再暂停写入并完成独立备份恢复及恢复后的冒烟检查。[查看 GitHub Actions](https://github.com/W205614/CampusEats/actions/workflows/verify.yml)。这些检查不等同于生产容量或微信真机验证。
 
-用户端已升级 Babel、esbuild、国际化共享库和 CSS 解析器，移除6条安全公告。仍有braces与phin两个未消除的根因；当前npm报告为17高、4中，均含传递包计数，不能描述为“零漏洞”。高危例外于2026-11-07到期。[依赖安全复核与升级证据](docs/dependency-security-20261015.md)。历史 v1 文档与旧压测／故障脚本保留作追溯，旧脚本入口已阻断执行，避免调用已下线的单店接口或重建日常服务。
+用户端通过受版本与文件哈希约束的构建适配，将文件匹配替换为 tinyglobby、监听升级为 chokidar 4、二维码图像处理升级为 Jimp 1，移除 braces 和旧 phin 依赖路径。两端当前 npm 审计均为0项已知漏洞；已撤销旧例外，CI 拒绝任何级别的新发现。适配仅覆盖锁定的 uni-app 工具链，更新框架时必须复核补丁和兼容回归；审计结果不等同于全面安全认证。[依赖安全复核与升级证据](docs/dependency-security-20261015.md)。历史 v1 文档与旧压测／故障脚本保留作追溯，旧脚本入口已阻断执行，避免调用已下线的单店接口或重建日常服务。

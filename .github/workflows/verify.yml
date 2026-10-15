@@ -22,13 +22,13 @@ jobs:
             frontend/client/package-lock.json
       - run: mvn -B -ntp clean verify
       - run: npm ci --prefix frontend/admin && npm run build --prefix frontend/admin
-      - run: npm ci --prefix frontend/client --include=optional && npm run typecheck --prefix frontend/client && npm run build:h5 --prefix frontend/client && npm run build:mp-weixin --prefix frontend/client
+      - run: npm ci --prefix frontend/client --include=optional && npm run test:toolchain --prefix frontend/client && npm run typecheck --prefix frontend/client && npm run build:h5 --prefix frontend/client && npm run build:mp-weixin --prefix frontend/client
       - name: Check generated API types
         run: node scripts/generate-contracts.mjs && git diff --exit-code -- frontend/contracts/openapi.ts
       - name: Dependency audit
         run: |
           mkdir -p .local
-          npm audit --prefix frontend/admin --registry=https://registry.npmjs.org --audit-level=high
+          npm audit --prefix frontend/admin --registry=https://registry.npmjs.org --audit-level=info
           npm audit --prefix frontend/client --registry=https://registry.npmjs.org --json > .local/audit-client.json || true
           node scripts/check-client-audit.mjs
           node --test scripts/check-client-audit.test.mjs

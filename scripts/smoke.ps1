@@ -3,7 +3,7 @@ $ErrorActionPreference='Stop'
 $redirect=Invoke-WebRequest "$BaseUrl/" -MaximumRedirection 0 -SkipHttpErrorCheck -ErrorAction SilentlyContinue
 $origin=[uri]($BaseUrl.TrimEnd('/')+'/')
 $target=[uri]::new($origin,[string]$redirect.Headers.Location)
-if($redirect.StatusCode -ne 302 -or $target.AbsoluteUri -ne ($BaseUrl.TrimEnd('/')+'/admin/')){
+if($redirect.StatusCode -ne 302 -or $target.AbsoluteUri -ne ($BaseUrl.TrimEnd('/')+'/app/')){
  throw 'Root redirect lost its origin or port'
 }
 $ready=Invoke-RestMethod "$BaseUrl/actuator/health/readiness"

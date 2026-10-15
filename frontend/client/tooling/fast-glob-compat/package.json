@@ -1,0 +1,14 @@
+{
+  "name": "@campuseats/fast-glob-compat",
+  "version": "1.0.0",
+  "private": true,
+  "description": "The glob API used by the pinned uni-app compiler, backed by tinyglobby",
+  "type": "commonjs",
+  "main": "index.cjs",
+  "exports": { ".": "./index.cjs", "./watch": "./watch.cjs" },
+  "dependencies": {
+    "chokidar": "4.0.3",
+    "picomatch": "4.0.7",
+    "tinyglobby": "0.2.17"
+  }
+}

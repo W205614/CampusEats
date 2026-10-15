@@ -5,6 +5,29 @@ test('anonymous admin login and H5 campus selector', async ({ page }) => {
   await page.goto('/app/');
   await expect(page.getByText('校园好店，')).toBeVisible();
   await expect(page.getByText('默认校区 ▾', { exact: true })).toBeVisible();
+  const picture = page.locator('.menu-product uni-image').first();
+  await expect(picture).toBeVisible();
+  // uni-app renders H5 pictures as a background on an inner div. A 200 response
+  // alone can be the SPA fallback HTML, so verify the rendered image and pixels.
+  await expect.poll(() => picture.evaluate(element =>
+    [...element.querySelectorAll('div')].some(child => getComputedStyle(child).backgroundImage !== 'none'),
+  )).toBeTruthy();
+  const pixels = await picture.evaluate(async element => {
+    const background = [...element.querySelectorAll('div')]
+      .map(child => getComputedStyle(child).backgroundImage).find(value => value !== 'none') || '';
+    const source = /^url\(["']?(.*?)["']?\)$/.exec(background)?.[1];
+    if (!source) return { width: 0, height: 0, validPath: false };
+    const url = new URL(source, location.href);
+    const validPath = url.origin === location.origin && /^\/(demo-images|uploads)\//.test(url.pathname);
+    const image = new Image();
+    const loaded = new Promise<void>(resolve => { image.onload = image.onerror = () => resolve(); });
+    image.src = source;
+    await Promise.race([loaded, new Promise(resolve => setTimeout(resolve, 5000))]);
+    return { width: image.naturalWidth, height: image.naturalHeight, validPath };
+  });
+  expect(pixels.validPath).toBeTruthy();
+  expect(pixels.width).toBeGreaterThan(0);
+  expect(pixels.height).toBeGreaterThan(0);
 });
 test('platform manages campuses, stores, catalog and marketing pages', async ({
   page,

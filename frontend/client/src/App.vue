@@ -4,9 +4,9 @@ onLaunch(() => {});
 </script>
 <style>
 page {
-  background: #f7f5f1;
-  font-family: -apple-system, "Microsoft YaHei", sans-serif;
-  color: #30332b;
+  background: #f2f4f0;
+  font-family: "Microsoft YaHei", "DengXian", "PingFang SC", "Segoe UI", sans-serif;
+  color: #20382d;
   font-size: 28rpx;
 }
 view,
@@ -22,14 +22,14 @@ button {
 }
 .hero {
   padding: 38rpx 34rpx;
-  background: #ece6d9;
-  border-radius: 28rpx;
+  background: #e3ebe3;
+  border-radius: 8rpx;
   margin-bottom: 30rpx;
 }
 .eyebrow {
   font-size: 20rpx;
   letter-spacing: 3rpx;
-  color: #9e673e;
+  color: #22634e;
 }
 .title {
   font-size: 44rpx;
@@ -39,7 +39,7 @@ button {
 }
 .subtitle,
 .muted {
-  color: #838776;
+  color: #59675e;
   font-size: 24rpx;
   line-height: 1.7;
 }
@@ -56,15 +56,15 @@ button {
 }
 .card {
   background: #fff;
-  border: 1rpx solid #e7e8df;
-  border-radius: 22rpx;
+  border: 0;
+  border-radius: 8rpx;
   padding: 28rpx;
   margin-bottom: 22rpx;
 }
 .primary {
-  background: #c25f32 !important;
+  background: #22634e !important;
   color: #fff !important;
-  border-radius: 15rpx;
+  border-radius: 6rpx;
   font-size: 28rpx;
   border: none;
   margin: 0;
@@ -74,9 +74,9 @@ button {
   border: 0;
 }
 .secondary {
-  background: #f0ede4;
-  color: #765d43;
-  border-radius: 14rpx;
+  background: #e7eee7;
+  color: #234f3c;
+  border-radius: 6rpx;
   font-size: 24rpx;
   margin: 0;
 }
@@ -86,8 +86,8 @@ button {
   font-size: 24rpx;
 }
 .tag {
-  background: #f3e8d8;
-  color: #9c622f;
+  background: #e7eee7;
+  color: #234f3c;
   border-radius: 8rpx;
   padding: 7rpx 12rpx;
   font-size: 20rpx;
@@ -98,13 +98,13 @@ button {
   color: #7a8170;
 }
 .price {
-  color: #ad5129;
+  color: #22634e;
   font-size: 33rpx;
   font-weight: 700;
 }
 .field-label {
   font-size: 25rpx;
-  color: #666e5c;
+  color: #59675e;
   margin: 24rpx 0 12rpx;
 }
 .field {
@@ -115,23 +115,23 @@ button {
   height: 80rpx;
 }
 .notice {
-  background: #fbefdd;
-  color: #966337;
+  background: #edf3ed;
+  color: #4c6151;
   font-size: 24rpx;
   line-height: 1.7;
   padding: 20rpx;
-  border-radius: 14rpx;
+  border-radius: 6rpx;
   margin-bottom: 22rpx;
 }
 .empty {
   text-align: center;
   padding: 70rpx 20rpx;
-  color: #858976;
+  color: #59675e;
 }
 .empty-title {
   font-size: 34rpx;
   margin-bottom: 14rpx;
-  color: #454d3b;
+  color: #20382d;
 }
 .line {
   padding: 19rpx 0;
@@ -151,8 +151,8 @@ button {
   line-height: 52rpx;
   margin: 0;
   padding: 0;
-  background: #f2eee3;
-  color: #a15932;
+  background: #e3ebe3;
+  color: #22634e;
   border: 0;
   border-radius: 50%;
   font-size: 32rpx;
@@ -191,20 +191,15 @@ button {
   font-size: 24rpx;
 }
 .option.selected {
-  border-color: #c25f32;
-  background: #fff1e5;
-  color: #ae562f;
+  border-color: #22634e;
+  background: #e7eee7;
+  color: #22634e;
 }
 .food-art {
   width: 140rpx;
   height: 140rpx;
-  border-radius: 22rpx;
-  background: radial-gradient(
-    circle at 50% 45%,
-    #fff5da 0 43%,
-    #d4b884 44% 50%,
-    #eee3cc 51%
-  );
+  border-radius: 8rpx;
+  background: #e3ebe3;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -214,14 +209,14 @@ button {
 .food-art image {
   width: 100%;
   height: 100%;
-  border-radius: 22rpx;
+  border-radius: 8rpx;
 }
 .card-name {
   font-weight: 650;
   font-size: 31rpx;
 }
 .card-description {
-  color: #878b7e;
+  color: #59675e;
   font-size: 22rpx;
   line-height: 1.5;
   margin-top: 8rpx;
@@ -230,14 +225,13 @@ button {
   position: sticky;
   bottom: 15rpx;
   padding: 24rpx;
-  background: #353b2d;
+  background: #173f35;
   color: #fff;
   border-radius: 20rpx;
-  box-shadow: 0 8rpx 30rpx #0002;
   margin-top: 30rpx;
 }
 .sticky-summary .price {
-  color: #f6c494;
+  color: #e4eadc;
 }
 .form-actions {
   display: flex;
@@ -248,11 +242,17 @@ button {
   flex: 1;
 }
 .tap {
-  color: #9e5c35;
+  color: #22634e;
   font-size: 25rpx;
 }
 .link {
   text-decoration: underline;
-  color: #99532b;
+  color: #22634e;
 }
-textarea{width:100%;box-sizing:border-box;background:#f7f5f1;padding:20rpx;border-radius:12rpx;margin:24rpx 0;min-height:150rpx}input{min-height:72rpx}picker{min-height:48rpx}.modal>.card{width:calc(100% - 48rpx);max-width:820rpx;max-height:88vh;overflow:auto}</style>
+textarea{width:100%;box-sizing:border-box;background:#f2f4f0;padding:20rpx;border-radius:12rpx;margin:24rpx 0;min-height:150rpx}input{min-height:72rpx}picker{min-height:48rpx}.modal>.card{width:calc(100% - 48rpx);max-width:820rpx;max-height:88vh;overflow:auto}
+/* #ifdef H5 */
+body, uni-page-body { font-family: "Microsoft YaHei", "DengXian", "PingFang SC", "Segoe UI", sans-serif; color: #20382d; }
+a:focus-visible, button:focus-visible { outline: 3px solid #6b927c; outline-offset: 3px; }
+/* #endif */
+.primary[disabled], .secondary[disabled] { opacity: .6; }
+</style>

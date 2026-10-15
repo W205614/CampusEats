@@ -10,7 +10,7 @@ import { roles, type Session } from '../../contracts/models';
 import type { Store } from '../../contracts/platform';
 const session = useSession(),
   router = useRouter(),
-  username = ref('admin'),
+  username = ref(''),
   password = ref(''),
   busy = ref(false),
   stores = ref<Store[]>([]),
@@ -77,32 +77,34 @@ const links = computed(() => {
 </script>
 <template>
   <div v-if="!session.session" class="login-shell">
-    <section class="login-story">
-      <div class="brand">C<span>CampusEats</span></div>
-      <p class="eyebrow">校园里的每一餐</p>
-      <h1>多家好店，<br />一份安心。</h1>
-      <p>连接校区、店铺与配送，<br />让每一餐都有清楚的去向。</p>
-      <div class="story-note">多校区 · 独立店铺 · 模拟支付</div>
-    </section>
-    <section class="login-form">
-      <p class="eyebrow">校园供餐平台</p>
-      <h2>欢迎回来</h2>
-      <p class="muted">平台管理员、店长、运营员及配送员统一登录。</p>
-      <el-form @submit.prevent="login"
-        ><el-form-item label="账户"
-          ><el-input v-model="username" autocomplete="username" /></el-form-item
-        ><el-form-item label="密码"
-          ><el-input
-            v-model="password"
-            type="password"
-            show-password
-            autocomplete="current-password" /></el-form-item
-        ><el-button type="primary" native-type="submit" :loading="busy"
-          >登录工作台</el-button
-        ></el-form
-      >
-      <p class="muted small">演示账号使用本机生成的初始密码，首次员工登录须改密。</p>
-    </section>
+    <div class="login-sheet">
+      <section class="login-story">
+        <a class="brand" href="/app/" aria-label="CampusEats 用户点餐">CampusEats</a>
+        <div class="login-story-copy">
+          <h1>把每一餐，<br />安排妥当。</h1>
+          <p>从接单、备餐到送达，<br />在各自的岗位，让校园好好吃饭。</p>
+        </div>
+        <div class="story-note">多校区协作 · 店铺独立履约</div>
+      </section>
+      <section class="login-form">
+        <h2>登录工作台</h2>
+        <p class="muted">平台管理员、店长、运营员及配送员统一登录。</p>
+        <el-form label-position="top" @submit.prevent="login">
+          <el-form-item label="账户" for="staff-username">
+            <el-input id="staff-username" v-model="username" autocomplete="username" placeholder="请输入工作账户" required />
+          </el-form-item>
+          <el-form-item label="密码" for="staff-password">
+            <el-input id="staff-password" v-model="password" type="password" show-password autocomplete="current-password" placeholder="请输入密码" required />
+          </el-form-item>
+          <el-button class="wide" type="primary" native-type="submit" :loading="busy">登录工作台</el-button>
+        </el-form>
+        <p class="login-help">演示账号使用本机生成的初始密码，首次员工登录须改密。</p>
+        <div class="login-customer">
+          <span>想给自己点一餐？</span>
+          <a href="/app/">用户点餐 <span aria-hidden="true">→</span></a>
+        </div>
+      </section>
+    </div>
   </div>
   <div v-else class="workspace">
     <aside class="sidebar">
@@ -129,6 +131,7 @@ const links = computed(() => {
         ><span v-else>校区配送工作台</span>
         <div>
           {{ session.session.name }} · {{ roles[role] }}
+          <a href="/app/" style="margin-left: 12px">去点餐</a>
           <el-button text @click="router.push('/password')">改密</el-button
           ><el-button text @click="logout">退出</el-button>
         </div>

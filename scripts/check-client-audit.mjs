@@ -1,38 +1,17 @@
-import fs from "node:fs/promises";
-const audit = JSON.parse(await fs.readFile(".local/audit-client.json", "utf8"));
-if (!audit.metadata) throw new Error("Audit did not return a report.");
-const review = JSON.parse(
-  await fs.readFile("frontend/client/audit-exceptions.json", "utf8"),
-);
-if (Date.now() > Date.parse(review.expiresOn + "T23:59:59Z"))
-  throw new Error("Build dependency exceptions require review.");
-const findings = audit.vulnerabilities;
-function reviewed(name, visiting = new Set()) {
-  const v = findings[name];
-  if (!v) return false;
-  if (visiting.has(name)) return true;
-  if (v.severity === "critical") return false;
-  if (v.severity === "high" && !review.packages.includes(name)) return false;
-  visiting.add(name);
-  return v.via.every((x) =>
-    typeof x === "string"
-      ? reviewed(x, visiting)
-      : ["low", "moderate"].includes(x.severity) ||
-        review.advisories.includes(x.url),
-  );
+import fs from 'node:fs/promises';
+import { pathToFileURL } from 'node:url';
+export function checkAudit(audit) {
+  const counts = audit?.metadata?.vulnerabilities;
+  const findings = audit?.vulnerabilities;
+  if (audit?.error || !counts || !findings || typeof findings !== 'object' || Array.isArray(findings))
+    throw new Error('Audit did not return a valid report.');
+  const severities = ['info', 'low', 'moderate', 'high', 'critical'];
+  if ([...severities, 'total'].some(key => !Number.isSafeInteger(counts[key]) || counts[key] < 0))
+    throw new Error('Audit severity counts are missing or invalid.');
+  if (severities.reduce((sum, key) => sum + counts[key], 0) !== counts.total || Object.keys(findings).length !== counts.total)
+    throw new Error('Audit counts disagree with findings.');
+  if (counts.total !== 0) throw new Error('Vulnerable dependencies: ' + Object.keys(findings).join(', '));
+  return 'Audit checked: zero known vulnerabilities; no exceptions.';
 }
-const blocked = Object.values(findings).filter(
-  (v) =>
-    v.severity === "critical" || (v.severity === "high" && !reviewed(v.name)),
-);
-if (blocked.length)
-  throw new Error(
-    "Unreviewed high/critical dependencies: " +
-      blocked.map((v) => v.name).join(", "),
-  );
-console.log(
-  "Audit checked: " +
-    audit.metadata.vulnerabilities.high +
-    " high build dependency findings reviewed; expires " +
-    review.expiresOn,
-);
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href)
+  console.log(checkAudit(JSON.parse(await fs.readFile('.local/audit-client.json', 'utf8'))));
