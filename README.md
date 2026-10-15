@@ -105,4 +105,6 @@ node scripts/check-websocket.mjs
 
 本轮本地验证通过84项后端、29项浏览器、6项构建兼容及8项审计规则回归；另完成不同屏宽的体验检查、WebSocket与独立备份恢复。最后复验修复了H5登录无法纯键盘操作的问题，新增用例实际按Tab、Space、Enter完成登录。[复验范围与证据](docs/final-verification-20261015.md)。CI 会从源码重复后端回归、两端构建与类型检查、接口契约比对、依赖审计、浏览器和 WebSocket 验证，再暂停写入并完成独立备份恢复及恢复后的冒烟检查。[查看 GitHub Actions](https://github.com/W205614/CampusEats/actions/workflows/verify.yml)。这些检查不等同于生产容量或微信真机验证。
 
-用户端通过受版本与文件哈希约束的构建适配，将文件匹配替换为 tinyglobby、监听升级为 chokidar 4、二维码图像处理升级为 Jimp 1，移除 braces 和旧 phin 依赖路径。两端当前 npm 审计均为0项已知漏洞；已撤销旧例外，CI 拒绝任何级别的新发现。适配仅覆盖锁定的 uni-app 工具链，更新框架时必须复核补丁和兼容回归；审计结果不等同于全面安全认证。[依赖安全复核与升级证据](docs/dependency-security-20261015.md)。历史 v1 文档与旧压测／故障脚本保留作追溯，旧脚本入口已阻断执行，避免调用已下线的单店接口或重建日常服务。
+用户端通过受版本与文件哈希约束的构建适配，将文件匹配替换为 tinyglobby、监听升级为 chokidar 4、二维码图像处理升级为 Jimp 1，移除 braces 和旧 phin 依赖路径。两端当前 npm 审计均为0项已知漏洞；已撤销旧例外，CI 拒绝任何级别的新发现。适配仅覆盖锁定的 uni-app 工具链，更新框架时必须复核补丁和兼容回归；审计结果不等同于全面安全认证。[依赖安全复核与升级证据](docs/dependency-security-20261015.md)。
+
+历史 v1 文档保留作追溯；已退役的单店压测、故障演练及其辅助脚本已移除，旧实现可从 Git 历史查阅。当前可执行检查以上述命令和 CI 为准。前端只从 `frontend/admin/`、`frontend/client/` 源码构建，小程序输出到 `frontend/client/dist/build/mp-weixin/`，不依赖根目录旧小程序或 `deploy/admin/` 产物。[文件清理范围](docs/structure-cleanup-20261015.md)。
