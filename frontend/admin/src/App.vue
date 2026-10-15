@@ -18,7 +18,7 @@ const session = useSession(),
 const role = computed(() => session.session?.role || '');
 async function load() {
   storesLoaded.value = false;
-  if (!session.session || role.value === 'DELIVERER') return;
+  if (!session.session || session.session.mustChangePassword || role.value === 'DELIVERER') return;
   try {
     stores.value = await request<Store[]>('/merchant/stores');
     if (!stores.value.some((s) => s.id === selectedStore.value))

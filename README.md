@@ -131,7 +131,7 @@ try {
 
 [架构与接口](docs/platform-architecture.md) · [升级与回滚](docs/platform-deployment.md) · [多校区验收记录](docs/platform-verification-20261015.md) · [入口与体验完善](docs/frontend-experience-20261015.md)
 
-2026-10-15的[本地复验记录](docs/final-verification-20261015.md)包含84项后端、29项浏览器，以及不同屏宽体验、WebSocket和独立备份恢复检查；其中H5键盘登录缺陷已修复并增加回归。文件清理提交`2d39a4a`的[CI记录](https://github.com/W205614/CampusEats/actions/runs/38731526482)再次通过84项后端、29项浏览器、6项构建兼容和8项审计规则回归。
+2026-10-15的[完整浏览器旅程复验](docs/browser-journey-20261015.md)通过84项后端、30项浏览器、6项构建兼容和8项审计规则回归。新增用例通过页面完成选餐加购、地址与领券、支付、店长接备发、配送员抢取送、图片举证、部分退款和剩余整单退款／平台介入，并修复员工首次改密时多余店铺请求造成的403提示。更早的29项浏览器及屏宽检查保留在[前次复验记录](docs/final-verification-20261015.md)，不混作同一次测试。
 
 CI从源码重复后端回归、两端类型检查与构建、接口契约比对、依赖审计、浏览器和WebSocket验证，再暂停写入并完成独立备份恢复及恢复后的冒烟。后续结果以[对应提交的GitHub Actions](https://github.com/W205614/CampusEats/actions/workflows/verify.yml)为准；上述证据不等同于全站无缺陷、生产容量或微信真机验证。
 
