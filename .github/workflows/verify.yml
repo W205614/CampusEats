@@ -31,6 +31,7 @@ jobs:
           npm audit --prefix frontend/admin --registry=https://registry.npmjs.org --audit-level=high
           npm audit --prefix frontend/client --registry=https://registry.npmjs.org --json > .local/audit-client.json || true
           node scripts/check-client-audit.mjs
+          node --test scripts/check-client-audit.test.mjs
       - name: Start source-built demo
         shell: pwsh
         run: ./scripts/start.ps1 -SkipVerify
