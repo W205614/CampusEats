@@ -1909,7 +1909,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: number;
+                id: string;
             };
             cookie?: never;
         };
@@ -1942,7 +1942,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: number;
+                id: string;
             };
             cookie?: never;
         };
@@ -1962,7 +1962,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: number;
+                id: string;
             };
             cookie?: never;
         };
@@ -1986,7 +1986,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: number;
+                id: string;
             };
             cookie?: never;
         };
@@ -2010,8 +2010,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                campusId: number;
-                id: number;
+                campusId: string;
+                id: string;
             };
             cookie?: never;
         };
@@ -2035,7 +2035,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                storeId: number;
+                storeId: string;
             };
             cookie?: never;
         };
@@ -2061,7 +2061,7 @@ export interface operations {
             };
             header?: never;
             path: {
-                storeId: number;
+                storeId: string;
             };
             cookie?: never;
         };
@@ -2092,7 +2092,7 @@ export interface operations {
             };
             header?: never;
             path: {
-                storeId: number;
+                storeId: string;
             };
             cookie?: never;
         };
@@ -2116,8 +2116,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                storeId: number;
-                id: number;
+                storeId: string;
+                id: string;
             };
             cookie?: never;
         };
@@ -2141,9 +2141,9 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                storeId: number;
+                storeId: string;
                 type: string;
-                id: number;
+                id: string;
             };
             cookie?: never;
         };
@@ -2167,8 +2167,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                storeId: number;
-                id: number;
+                storeId: string;
+                id: string;
             };
             cookie?: never;
         };
@@ -2192,8 +2192,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                storeId: number;
-                id: number;
+                storeId: string;
+                id: string;
             };
             cookie?: never;
         };
@@ -2217,7 +2217,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: number;
+                id: string;
             };
             cookie?: never;
         };
@@ -2241,7 +2241,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: number;
+                id: string;
             };
             cookie?: never;
         };
@@ -2265,9 +2265,9 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                storeId: number;
+                storeId: string;
                 type: string;
-                id: number;
+                id: string;
             };
             cookie?: never;
         };
@@ -2287,9 +2287,9 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                storeId: number;
+                storeId: string;
                 type: string;
-                id: number;
+                id: string;
             };
             cookie?: never;
         };
@@ -2309,7 +2309,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                storeId: number;
+                storeId: string;
             };
             cookie?: never;
         };
@@ -2342,7 +2342,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                storeId: number;
+                storeId: string;
             };
             cookie?: never;
         };
@@ -2366,7 +2366,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: number;
+                id: string;
             };
             cookie?: never;
         };
@@ -2399,7 +2399,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: number;
+                id: string;
             };
             cookie?: never;
         };
@@ -2432,7 +2432,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: number;
+                id: string;
             };
             cookie?: never;
         };
@@ -2452,7 +2452,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: number;
+                id: string;
             };
             cookie?: never;
         };
@@ -2488,7 +2488,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: number;
+                id: string;
             };
             cookie?: never;
         };
@@ -2521,7 +2521,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: number;
+                id: string;
             };
             cookie?: never;
         };
@@ -2548,7 +2548,7 @@ export interface operations {
     checkouts: {
         parameters: {
             query?: {
-                beforeId?: number;
+                beforeId?: string;
             };
             header?: never;
             path?: never;
@@ -2612,7 +2612,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: number;
+                id: string;
             };
             cookie?: never;
         };
@@ -2645,7 +2645,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: number;
+                id: string;
             };
             cookie?: never;
         };
@@ -2762,7 +2762,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: number;
+                id: string;
             };
             cookie?: never;
         };
@@ -2786,7 +2786,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: number;
+                id: string;
             };
             cookie?: never;
         };
@@ -2868,7 +2868,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: number;
+                id: string;
             };
             cookie?: never;
         };
@@ -2919,7 +2919,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: number;
+                id: string;
             };
             cookie?: never;
         };
@@ -2943,7 +2943,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: number;
+                id: string;
             };
             cookie?: never;
         };
@@ -2976,7 +2976,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: number;
+                id: string;
             };
             cookie?: never;
         };
@@ -3054,7 +3054,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: number;
+                id: string;
             };
             cookie?: never;
         };
@@ -3132,7 +3132,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                campusId: number;
+                campusId: string;
             };
             cookie?: never;
         };
@@ -3161,7 +3161,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                campusId: number;
+                campusId: string;
             };
             cookie?: never;
         };
@@ -3194,7 +3194,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: number;
+                id: string;
             };
             cookie?: never;
         };
@@ -3218,7 +3218,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                storeId: number;
+                storeId: string;
             };
             cookie?: never;
         };
@@ -3254,7 +3254,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                storeId: number;
+                storeId: string;
             };
             cookie?: never;
         };
@@ -3283,7 +3283,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                storeId: number;
+                storeId: string;
             };
             cookie?: never;
         };
@@ -3316,7 +3316,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                storeId: number;
+                storeId: string;
                 type: string;
             };
             cookie?: never;
@@ -3350,7 +3350,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                storeId: number;
+                storeId: string;
             };
             cookie?: never;
         };
@@ -3379,7 +3379,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                storeId: number;
+                storeId: string;
             };
             cookie?: never;
         };
@@ -3412,8 +3412,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                storeId: number;
-                id: number;
+                storeId: string;
+                id: string;
             };
             cookie?: never;
         };
@@ -3433,7 +3433,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                storeId: number;
+                storeId: string;
             };
             cookie?: never;
         };
@@ -3462,7 +3462,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                storeId: number;
+                storeId: string;
             };
             cookie?: never;
         };
@@ -3584,7 +3584,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: number;
+                id: string;
             };
             cookie?: never;
         };
@@ -3608,7 +3608,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: number;
+                id: string;
             };
             cookie?: never;
         };
@@ -3628,7 +3628,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: number;
+                id: string;
                 action: string;
             };
             cookie?: never;
@@ -3662,7 +3662,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: number;
+                id: string;
                 action: string;
             };
             cookie?: never;
@@ -3696,7 +3696,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: number;
+                id: string;
                 action: string;
             };
             cookie?: never;
@@ -3730,7 +3730,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: number;
+                id: string;
             };
             cookie?: never;
         };
@@ -3750,7 +3750,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: number;
+                id: string;
             };
             cookie?: never;
         };
@@ -3774,7 +3774,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: number;
+                id: string;
             };
             cookie?: never;
         };
@@ -3941,7 +3941,7 @@ export interface operations {
     stores: {
         parameters: {
             query?: {
-                campusId?: number;
+                campusId?: string;
                 query?: string;
             };
             header?: never;
@@ -3973,7 +3973,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                storeId: number;
+                storeId: string;
             };
             cookie?: never;
         };
@@ -4001,11 +4001,11 @@ export interface operations {
         parameters: {
             query?: {
                 query?: string;
-                categoryId?: number;
+                categoryId?: string;
             };
             header?: never;
             path: {
-                storeId: number;
+                storeId: string;
             };
             cookie?: never;
         };
@@ -4034,7 +4034,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                storeId: number;
+                storeId: string;
             };
             cookie?: never;
         };
@@ -4063,7 +4063,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                storeId: number;
+                storeId: string;
             };
             cookie?: never;
         };
@@ -4092,7 +4092,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                storeId: number;
+                storeId: string;
             };
             cookie?: never;
         };
@@ -4119,9 +4119,9 @@ export interface operations {
     search: {
         parameters: {
             query: {
-                campusId: number;
+                campusId: string;
                 query?: string;
-                categoryId?: number;
+                categoryId?: string;
                 open?: boolean;
             };
             header?: never;
@@ -4151,7 +4151,7 @@ export interface operations {
     userOrders: {
         parameters: {
             query?: {
-                beforeId?: number;
+                beforeId?: string;
             };
             header?: never;
             path?: never;
@@ -4236,7 +4236,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: number;
+                id: string;
             };
             cookie?: never;
         };
@@ -4348,7 +4348,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                campusId: number;
+                campusId: string;
             };
             cookie?: never;
         };
@@ -4539,7 +4539,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                storeId: number;
+                storeId: string;
             };
             cookie?: never;
         };
@@ -4568,7 +4568,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                storeId: number;
+                storeId: string;
             };
             cookie?: never;
         };
@@ -4597,7 +4597,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                storeId: number;
+                storeId: string;
             };
             cookie?: never;
         };
@@ -4626,7 +4626,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                storeId: number;
+                storeId: string;
             };
             cookie?: never;
         };
@@ -4653,11 +4653,11 @@ export interface operations {
     storeOrders: {
         parameters: {
             query?: {
-                beforeId?: number;
+                beforeId?: string;
             };
             header?: never;
             path: {
-                storeId: number;
+                storeId: string;
             };
             cookie?: never;
         };
@@ -4686,7 +4686,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                storeId: number;
+                storeId: string;
             };
             cookie?: never;
         };
@@ -4715,7 +4715,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                storeId: number;
+                storeId: string;
             };
             cookie?: never;
         };
@@ -4744,7 +4744,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                storeId: number;
+                storeId: string;
             };
             cookie?: never;
         };
@@ -4773,7 +4773,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                storeId: number;
+                storeId: string;
             };
             cookie?: never;
         };
@@ -4800,8 +4800,8 @@ export interface operations {
     export: {
         parameters: {
             query: {
-                campusId?: number;
-                storeId?: number;
+                campusId?: string;
+                storeId?: string;
                 begin: string;
                 end: string;
             };
@@ -4825,8 +4825,8 @@ export interface operations {
     export_1: {
         parameters: {
             query: {
-                campusId?: number;
-                storeId?: number;
+                campusId?: string;
+                storeId?: string;
                 begin: string;
                 end: string;
             };
@@ -4850,8 +4850,8 @@ export interface operations {
     report: {
         parameters: {
             query: {
-                campusId?: number;
-                storeId?: number;
+                campusId?: string;
+                storeId?: string;
                 begin: string;
                 end: string;
             };
@@ -4882,8 +4882,8 @@ export interface operations {
     report_1: {
         parameters: {
             query: {
-                campusId?: number;
-                storeId?: number;
+                campusId?: string;
+                storeId?: string;
                 begin: string;
                 end: string;
             };
@@ -4916,7 +4916,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: number;
+                id: string;
             };
             cookie?: never;
         };
@@ -4945,7 +4945,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: number;
+                id: string;
             };
             cookie?: never;
         };
@@ -4974,7 +4974,7 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                id: number;
+                id: string;
             };
             cookie?: never;
         };
@@ -5050,7 +5050,7 @@ export interface operations {
     courierOrders: {
         parameters: {
             query?: {
-                beforeId?: number;
+                beforeId?: string;
             };
             header?: never;
             path?: never;

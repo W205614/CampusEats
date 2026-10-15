@@ -54,6 +54,12 @@ public class OpenApiConfiguration {
                   item.readOperations()
                       .forEach(
                           op -> {
+                            if (op.getParameters() != null)
+                              for (var parameter : op.getParameters()) {
+                                var schema = parameter.getSchema();
+                                if (schema != null && "int64".equals(schema.getFormat()))
+                                  parameter.setSchema(new StringSchema().pattern("^[0-9]+$"));
+                              }
                             if (!(path.endsWith("/auth/login")
                                 || path.endsWith("/auth/demo")
                                 || path.endsWith("/auth/wechat")

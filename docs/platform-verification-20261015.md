@@ -24,6 +24,8 @@
 | WebSocket | 正确Origin、一次性票据成功；错误Origin、重放及伪造票据拒绝；注销关闭连接 |
 | 部署冒烟 | 根路径跳转保留端口、readiness、店铺菜单、字符串ID和金额、鉴权及旧入口410通过 |
 
+84项为本机干净全量构建结果；后续长ID契约补丁单独复跑29项平台集成测试并通过。CI对每个提交仍执行完整clean verify及本表所述前端、部署与恢复检查。
+
 浏览器流程包括跨校区选店、分店购物车、逐店混合配送／自取、合并报价与支付、核销、部分退款和评价；也覆盖营销表单创建、跨校区收藏返回、平台切换活动店铺，以及员工、审计、售后和统计页面。
 
 部分履约和售后步骤通过真实HTTP接口准备和核对，不能把这些步骤描述为全部使用人工点击完成。用户下单与混合履约选择另有完整H5页面流程测试。
@@ -39,6 +41,7 @@
 - 补齐催单、再来一单、店铺搜索和订单／结算单历史分页；轮询保留已加载历史。
 - 结算恢复仅在原提交明确被4xx拒绝后解除锁定，未知结果继续保留请求键；配额与统计日期使用浏览器本地日期，修复中国凌晨默认前一天的问题。
 - 通知任务独立显示订单和事件字段，避免复用退款金额表头。
+- OpenAPI的长整型路径和查询参数统一生成数字字符串，补充游标与订单ID契约断言，避免生成number类型导致大ID丢失精度；重新生成契约并检查两端类型。
 
 ## 迁移、恢复与运行核对
 
@@ -49,7 +52,7 @@
 - 带私有举证图片的验收快照也完成恢复；私有目录中实际存在1张测试图片，恢复时逐文件核对哈希。
 - 私有举证HTTP验证：上传和本人读取成功、PNG类型及no-store正确，匿名、其他用户及公开图片路径均无法读取。
 - 恢复检查涵盖订单与用户归属、明细孤立记录、配额约束、店铺／校区／结算归属、结算金额和退款数量金额上限。
-- 最终发布使用通过验收的同一Java和Web镜像；验收Java JAR的SHA-256为 `668517d809e13687702ea8e987162456ff3368d1d8b77865e3269322b2c28329`。Windows本机clean构建与Linux镜像的class及资源内容逐项相同，嵌套JAR封装元数据不同，未把整体文件哈希说成相同。
+- Web保持使用通过17条浏览器回归的镜像。Java在长ID契约补丁后重新构建并完成29项平台集成回归、两端类型检查和部署冒烟；最终JAR的SHA-256为 `2211244e0af7a58a21d5683441a53380d283aabeb7b2557200e930721a2bea8e`。Windows本机构建与Linux镜像的class及资源内容逐项相同，嵌套JAR封装元数据不同，未把整体文件哈希说成相同。
 
 备份保留在本机受保护目录：
 
@@ -61,6 +64,7 @@
 .local/backups/20261015-review-baseline/
 .local/backups/20261015-review-acceptance/
 .local/backups/20261015-review-release/
+.local/backups/20261015-contract-release/
 ```
 
 原始版本与本次审查前版本的镜像已分别导出到 `.local/review/rollback-before-platform.tar`、`rollback-review-baseline.tar` 并记录SHA-256，清理Docker冗余标签后仍可加载恢复。回滚必须配套恢复数据库、文件与镜像，不能仅切换旧镜像。
@@ -75,6 +79,6 @@
 
 历史事件时间缺失时保留为未知，不伪造发生日期；按日统计不把这些历史金额归入某个猜测日期。
 
-本次主要日志为 `.local/review/final-clean-backend.log`、`.local/playwright-final-20261015.txt` 和 `.local/review/*image*build.log`；原迁移指纹为 `.local/platform-data-before.json`、`.local/platform-data-after.json`，本次发布前后指纹为 `.local/review/daily-before.json`、`daily-after.json`。备份目录另含恢复结果。配置、口令与日志不提交Git。
+本次主要日志为 `.local/review/final-clean-backend.log`、`final-contract-backend.log`、`.local/playwright-final-20261015.txt` 和 `.local/review/*image*build.log`；原迁移指纹为 `.local/platform-data-before.json`、`.local/platform-data-after.json`，本次发布前后指纹为 `.local/review/daily-before.json`、`daily-after.json`。备份目录另含恢复结果。配置、口令与日志不提交Git。
 
 本轮隔离验收项目及其3个专用卷、验收和回滚镜像标签完成项目范围清理；已验证备份与回滚镜像归档保留，最终仅保留日常环境4个CampusEats容器。其他项目的容器、镜像与持久卷不在清理范围内。

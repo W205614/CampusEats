@@ -375,7 +375,28 @@ class PlatformIntegrationTest {
             .andReturn()
             .getResponse()
             .getContentAsString(java.nio.charset.StandardCharsets.UTF_8);
+    var contract = json.map(spec);
+    assertLongParameter(contract, "/api/v1/user/orders", "beforeId", "query");
+    assertLongParameter(contract, "/api/v1/user/orders/{id}", "id", "path");
     java.nio.file.Files.writeString(java.nio.file.Path.of("target/platform-openapi.json"), spec);
+  }
+
+  private void assertLongParameter(
+      Map<String, Object> contract, String path, String name, String location) {
+    Map<?, ?> paths = assertInstanceOf(Map.class, contract.get("paths"));
+    Map<?, ?> pathItem = assertInstanceOf(Map.class, paths.get(path));
+    Map<?, ?> operation = assertInstanceOf(Map.class, pathItem.get("get"));
+    List<?> parameters = assertInstanceOf(List.class, operation.get("parameters"));
+    Map<?, ?> parameter =
+        parameters.stream()
+            .filter(value -> value instanceof Map<?, ?> map && name.equals(map.get("name")))
+            .map(value -> (Map<?, ?>) value)
+            .findFirst()
+            .orElseThrow(() -> new AssertionError("Missing parameter " + path + ": " + name));
+    assertEquals(location, parameter.get("in"));
+    Map<?, ?> schema = assertInstanceOf(Map.class, parameter.get("schema"));
+    assertEquals("string", schema.get("type"));
+    assertEquals("^[0-9]+$", schema.get("pattern"));
   }
 
   @Test
