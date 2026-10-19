@@ -1,8 +1,7 @@
 package com.sky.business;
 
-import com.sky.infra.Db;
+import com.sky.infra.*;
 import java.time.*;
-import org.slf4j.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -14,30 +13,42 @@ public class BackgroundJobs {
   private final OrderCommandService orders;
   private final Clock clock;
   private final boolean enabled;
-  private static final Logger log = LoggerFactory.getLogger(BackgroundJobs.class);
+  private final RuntimeOperations operations;
+  private final ExpirySweep expiry = new ExpirySweep();
 
   public BackgroundJobs(
       Db db,
       TaskRunner tasks,
       OrderCommandService orders,
       Clock clock,
-      @Value("${campus.tasks-enabled:true}") boolean enabled) {
+      @Value("${campus.tasks-enabled:true}") boolean enabled,
+      RuntimeOperations operations) {
     this.db = db;
     this.tasks = tasks;
     this.orders = orders;
     this.clock = clock;
     this.enabled = enabled;
+    this.operations = operations;
   }
 
   @Scheduled(fixedDelay = 2000)
   public void work() {
     if (!enabled) return;
-    try {
-      for (int i = 0; i < 20 && tasks.runRefund(); i++) {}
-      for (int i = 0; i < 50 && tasks.runEvent(); i++) {}
-    } catch (Exception ex) {
-      log.warn("Background processing temporarily unavailable: {}", ex.getClass().getSimpleName());
-    }
+    operations.run(
+        "legacyRefunds",
+        round -> {
+          for (int i = 0; i < 20 && round.withinBudget() && tasks.runRefund(round::failed); i++) {}
+        });
+  }
+
+  @Scheduled(fixedDelay = 2000)
+  public void notifications() {
+    if (!enabled) return;
+    operations.run(
+        "outbox",
+        round -> {
+          for (int i = 0; i < 50 && round.withinBudget() && tasks.runEvent(round::failed); i++) {}
+        });
   }
 
   @Scheduled(fixedDelay = 30000)
@@ -47,24 +58,17 @@ public class BackgroundJobs {
   }
 
   public void scanTimeouts() {
-    try {
-      for (var row :
-          db.rows(
-              "SELECT id FROM orders WHERE checkout_id IS NULL AND status=1 AND pay_expires_at<=?"
-                  + " ORDER BY id LIMIT 100",
-              LocalDateTime.now(clock)))
-        try {
-          orders.expire(Db.id(row, "id"));
-        } catch (Exception ex) {
-          log.warn("Expiry processing will retry; order={}", row.get("id"));
-        }
-      for (var row :
-          db.rows(
-              "SELECT id FROM orders WHERE status=4 AND delivery_started_at<? AND"
-                  + " delivery_overdue=false ORDER BY id LIMIT 100",
-              LocalDateTime.now(clock).minusMinutes(60))) orders.markOverdue(Db.id(row, "id"));
-    } catch (Exception ex) {
-      log.warn("Timeout processing temporarily unavailable");
-    }
+    operations.run(
+        "legacyExpiry",
+        round ->
+            expiry.run(
+                round,
+                cursor ->
+                    db.rows(
+                        "SELECT id FROM orders WHERE checkout_id IS NULL AND status=1"
+                            + " AND pay_expires_at<=? AND id>? ORDER BY id LIMIT 100",
+                        LocalDateTime.now(clock),
+                        cursor),
+                orders::expire));
   }
 }

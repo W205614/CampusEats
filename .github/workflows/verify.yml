@@ -36,6 +36,7 @@ jobs:
         shell: pwsh
         run: |
           ./scripts/test-release-safety.ps1
+          ./scripts/test-ops-check.ps1
           ./scripts/start.ps1 -SkipVerify
       - name: Compare live API schema
         run: node scripts/generate-contracts.mjs --fetch && git diff --exit-code -- frontend/contracts/openapi.json frontend/contracts/openapi.ts

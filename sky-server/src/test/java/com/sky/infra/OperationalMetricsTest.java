@@ -13,7 +13,12 @@ class OperationalMetricsTest {
     var db = mock(Db.class);
     var registry = new SimpleMeterRegistry();
     when(db.count(anyString())).thenReturn(4L);
-    var metrics = new OperationalMetrics(db, mock(StringRedisTemplate.class), registry);
+    var metrics =
+        new OperationalMetrics(
+            db,
+            mock(StringRedisTemplate.class),
+            registry,
+            new RuntimeOperations(java.time.Clock.systemUTC(), true));
     metrics.sample();
     assertEquals(1, registry.get("campus.metrics.valid").gauge().value());
     when(db.count(anyString())).thenThrow(new IllegalStateException());

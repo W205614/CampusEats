@@ -45,6 +45,10 @@ public class TaskRunner {
   }
 
   public boolean runRefund() {
+    return runRefund((ex, id) -> {});
+  }
+
+  public boolean runRefund(java.util.function.BiConsumer<Exception, Object> onFailure) {
     var task = claim("refund_task");
     if (task == null) return false;
     try {
@@ -86,12 +90,17 @@ public class TaskRunner {
             audit.write(null, "REFUND_SUCCESS", Db.id(task, "order_id"), "模拟退款完成");
           });
     } catch (Exception ex) {
+      onFailure.accept(ex, task.get("id"));
       failure("refund_task", task, ex);
     }
     return true;
   }
 
   public boolean runEvent() {
+    return runEvent((ex, id) -> {});
+  }
+
+  public boolean runEvent(java.util.function.BiConsumer<Exception, Object> onFailure) {
     var task = claim("outbox_event");
     if (task == null) return false;
     try {
@@ -113,6 +122,7 @@ public class TaskRunner {
           task.get("id"),
           task.get("lease_token"));
     } catch (Exception ex) {
+      onFailure.accept(ex, task.get("id"));
       failure("outbox_event", task, ex);
     }
     return true;

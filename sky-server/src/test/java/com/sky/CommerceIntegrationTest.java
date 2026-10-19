@@ -680,7 +680,7 @@ class CommerceIntegrationTest {
     commands.action(admin, id, "assign", new OrderAction(2L, "", 2L));
     commands.action(admin, id, "dispatch", new OrderAction(3L, "", null));
     clock.value.set(clock.instant().plusSeconds(3601));
-    jobs.scanTimeouts();
+    commands.markOverdue(id);
     assertEquals(4, db.count("SELECT status FROM orders WHERE id=?", id));
     assertTrue(
         Db.bool(db.one("SELECT delivery_overdue FROM orders WHERE id=?", id), "delivery_overdue"));

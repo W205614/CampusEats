@@ -62,6 +62,14 @@ public final class PlatformCommands {
       Long courierId,
       @Size(max = 12) String code) {}
 
+  public record Reassign(
+      @PositiveOrZero long version,
+      @NotNull @Positive Long courierId,
+      @NotBlank @Size(max = 200) String reason) {}
+
+  public record ExceptionCancel(
+      @PositiveOrZero long version, @NotBlank @Size(max = 200) String reason) {}
+
   public record Promotion(
       @NotNull @Pattern(regexp = "DISH|SETMEAL") String itemType,
       @Positive long itemId,

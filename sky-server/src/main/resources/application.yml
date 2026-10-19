@@ -21,6 +21,15 @@ spring:
       maximum-pool-size: 20
       minimum-idle: 20
       connection-timeout: 3000
+      connection-init-sql: SET SESSION innodb_lock_wait_timeout=3
+      data-source-properties:
+        connectTimeout: 2000
+        socketTimeout: 12000
+  jdbc:
+    template:
+      query-timeout: 5s
+  transaction:
+    default-timeout: 10s
   data:
     redis:
       host: ${REDIS_HOST:127.0.0.1}
@@ -51,6 +60,10 @@ management:
       group:
         readiness:
           include: readinessState,db
+        operations:
+          include: runtimeOperations
+          show-details: always
+          show-components: always
       show-details: never
   health:
     redis:

@@ -559,6 +559,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/platform/orders/{id}/reassign": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["reassign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/orders/{id}/exception-cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["exceptionCancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/platform/coupons": {
         parameters: {
             query?: never;
@@ -1873,6 +1905,15 @@ export interface components {
             courierId?: string;
             code?: string;
         };
+        Reassign: {
+            version?: string;
+            courierId: string;
+            reason: string;
+        };
+        ExceptionCancel: {
+            version?: string;
+            reason: string;
+        };
         Decision: {
             version?: string;
             approve?: boolean;
@@ -2988,6 +3029,72 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    reassign: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Reassign"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: Record<string, never>;
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    exceptionCancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExceptionCancel"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: Record<string, never>;
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
             };
         };
     };

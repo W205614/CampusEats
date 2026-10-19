@@ -52,10 +52,20 @@ export function api<T>(
         url: base() + "/api/v1/user" + path,
         method,
         data: data as any,
-        timeout: 15000,
+        timeout: 25000,
         header: requestHeaders,
         success(response) {
           const result = response.data as Envelope<T>;
+          if (!result || typeof result !== "object" || typeof result.code !== "string"
+            || (response.statusCode >= 200 && response.statusCode < 300
+              && (result.code !== "OK" || !("data" in result)))) {
+            reject(new ApiError(
+              "NETWORK",
+              method === "GET" ? "服务响应不完整，请重试" : "操作结果尚未确认，请刷新查看",
+              "", 0,
+            ));
+            return;
+          }
           if (
             response.statusCode >= 200 &&
             response.statusCode < 300 &&
@@ -82,7 +92,11 @@ export function api<T>(
           }
         },
         fail() {
-          reject(new ApiError("NETWORK", "网络连接失败，请重试", "", 0));
+          reject(new ApiError(
+            "NETWORK",
+            method === "GET" ? "网络连接失败，请重试" : "操作结果尚未确认，请刷新查看",
+            "", 0,
+          ));
         },
       });
     }

@@ -15,11 +15,14 @@ public class OperationalMetrics {
       outboxBacklog = new AtomicLong();
   private final AtomicLong valid = new AtomicLong();
   private final MeterRegistry registry;
+  private final RuntimeOperations operations;
 
-  public OperationalMetrics(Db db, StringRedisTemplate redis, MeterRegistry registry) {
+  public OperationalMetrics(
+      Db db, StringRedisTemplate redis, MeterRegistry registry, RuntimeOperations operations) {
     this.db = db;
     this.redis = redis;
     this.registry = registry;
+    this.operations = operations;
     registry.gauge("campus.redis.degraded", degraded);
     registry.gauge("campus.refund.failed", refundFailures);
     registry.gauge("campus.outbox.backlog", outboxBacklog);
@@ -28,6 +31,10 @@ public class OperationalMetrics {
 
   @Scheduled(fixedDelay = 10000)
   public void sample() {
+    operations.run("metrics", this::sampleRound);
+  }
+
+  private void sampleRound(RuntimeOperations.Round round) {
     try {
       try (var connection = redis.getConnectionFactory().getConnection()) {
         connection.ping();
@@ -40,11 +47,12 @@ public class OperationalMetrics {
       refundFailures.set(db.count("SELECT COUNT(*) FROM refund_request WHERE state='FAILED'"));
       outboxBacklog.set(db.count("SELECT COUNT(*) FROM outbox_event WHERE state<>'SUCCEEDED'"));
       valid.set(1);
-    } catch (Exception ignored) {
+    } catch (Exception ex) {
       valid.set(0);
       refundFailures.set(-1);
       outboxBacklog.set(-1);
       registry.counter("campus.metrics.failures").increment();
+      round.failed(ex, "metrics");
     }
   }
 }

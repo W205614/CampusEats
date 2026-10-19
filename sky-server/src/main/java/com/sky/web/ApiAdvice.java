@@ -86,6 +86,18 @@ public class ApiAdvice implements ResponseBodyAdvice<Object> {
   }
 
   @ExceptionHandler({
+    QueryTimeoutException.class,
+    org.springframework.transaction.TransactionTimedOutException.class
+  })
+  ResponseEntity<?> timeout(Exception e) {
+    log.warn(
+        "Request timed out; requestId={} type={}",
+        request.getAttribute("requestId"),
+        e.getClass().getSimpleName());
+    return error(503, "REQUEST_TIMEOUT", "操作超时，请刷新确认处理结果");
+  }
+
+  @ExceptionHandler({
     DataAccessException.class,
     org.springframework.transaction.CannotCreateTransactionException.class
   })

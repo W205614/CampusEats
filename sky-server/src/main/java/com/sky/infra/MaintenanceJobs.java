@@ -14,31 +14,37 @@ public class MaintenanceJobs {
   private final boolean enabled;
   private final MeterRegistry metrics;
   private final AtomicLong failed = new AtomicLong();
+  private final RuntimeOperations operations;
 
   public MaintenanceJobs(
       Db db,
       Clock clock,
       MeterRegistry metrics,
-      @Value("${campus.tasks-enabled:true}") boolean enabled) {
+      @Value("${campus.tasks-enabled:true}") boolean enabled,
+      RuntimeOperations operations) {
     this.db = db;
     this.clock = clock;
     this.metrics = metrics;
     this.enabled = enabled;
+    this.operations = operations;
     metrics.gauge("campus.maintenance.failed", failed);
   }
 
   @Scheduled(fixedDelay = 600000, initialDelay = 600000)
   public void work() {
     if (!enabled) return;
-    try {
-      clean();
-      failed.set(0);
-    } catch (Exception ex) {
-      failed.set(1);
-      metrics.counter("campus.maintenance.failures").increment();
-      org.slf4j.LoggerFactory.getLogger(getClass())
-          .warn("Maintenance failed: {}", ex.getClass().getSimpleName());
-    }
+    operations.run(
+        "maintenance",
+        round -> {
+          try {
+            clean();
+            failed.set(0);
+          } catch (Exception ex) {
+            failed.set(1);
+            metrics.counter("campus.maintenance.failures").increment();
+            round.failed(ex, "maintenance");
+          }
+        });
   }
 
   public void clean() {

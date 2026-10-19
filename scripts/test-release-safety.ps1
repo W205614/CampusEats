@@ -4,7 +4,7 @@ $root=Split-Path $PSScriptRoot -Parent
 $fixture=Join-Path $root ('.local/release-script-test-'+[guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path (Join-Path $fixture 'scripts') -Force | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $fixture 'sky-server/src/main/resources/db/migration') -Force | Out-Null
-Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'start.ps1'),(Join-Path $PSScriptRoot 'safe-backup.ps1'),(Join-Path $PSScriptRoot 'ops-check.ps1') -Destination (Join-Path $fixture 'scripts')
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'start.ps1'),(Join-Path $PSScriptRoot 'safe-backup.ps1'),(Join-Path $PSScriptRoot 'ops-check.ps1'),(Join-Path $PSScriptRoot 'docker-read.ps1') -Destination (Join-Path $fixture 'scripts')
 '-- fixture' | Set-Content (Join-Path $fixture 'sky-server/src/main/resources/db/migration/V8__fixture.sql')
 'DEMO_ADMIN_PASSWORD=FixturePasswordOnly2026' | Set-Content (Join-Path $fixture '.env')
 @'
@@ -84,7 +84,9 @@ try {
  @([ordered]@{path='.env';bytes=(Get-Item -LiteralPath $hidden -Force).Length;sha256=(Get-FileHash -LiteralPath $hidden).Hash}) | ConvertTo-Json -AsArray | Set-Content (Join-Path $checked 'sha256.json')
  [ordered]@{project='campuseats-v1';verifiedAt=[DateTime]::UtcNow.ToString('o');manifestSha256=(Get-FileHash (Join-Path $checked 'sha256.json')).Hash} | ConvertTo-Json | Set-Content (Join-Path $checked 'verified.json')
  $global:fixtureState=@{mysql=$true;redis=$true;server=$true;web=$true}
- $report=& (Join-Path $fixture 'scripts/ops-check.ps1') | ConvertFrom-Json
+ $opsConfig=Join-Path $fixture 'ops-docker.json'
+ '{}' | Set-Content -LiteralPath $opsConfig
+ $report=& (Join-Path $fixture 'scripts/ops-check.ps1') -DockerExecutable (Get-Process -Id $PID).Path -DockerPrefixArguments @('-NoProfile','-File',(Join-Path $PSScriptRoot 'tests/ops-docker-fixture.ps1'),$opsConfig) | ConvertFrom-Json
  if(!$report.checks.backupVerifiedAt -or $report.issues.Count){throw 'Hidden backup file caused a false operational failure.'}
  if(([DateTimeOffset]::UtcNow-([DateTimeOffset]$report.checks.backupVerifiedAt)).TotalMinutes -gt 2){throw 'Backup verification timestamp lost its timezone.'}
  Write-Host 'Release safety: stopped-database upgrade gate, failed backup state restoration, and success-marker policy passed.'

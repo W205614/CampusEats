@@ -1,7 +1,7 @@
 package com.sky.platform;
 
 import com.sky.business.PaymentGateway;
-import com.sky.infra.Db;
+import com.sky.infra.*;
 import java.time.*;
 import java.util.*;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,6 +19,9 @@ public class PlatformJobs {
   private final PlatformScope scope;
   private final TransactionTemplate tx;
   private final boolean enabled;
+  private final RuntimeOperations operations;
+  private final com.sky.business.OrderCommandService orders;
+  private final ExpirySweep checkoutExpiry = new ExpirySweep(), deliveryExpiry = new ExpirySweep();
 
   public PlatformJobs(
       Db db,
@@ -27,7 +30,9 @@ public class PlatformJobs {
       CheckoutService checkouts,
       PlatformScope scope,
       PlatformTransactionManager manager,
-      @Value("${campus.tasks-enabled:true}") boolean enabled) {
+      @Value("${campus.tasks-enabled:true}") boolean enabled,
+      RuntimeOperations operations,
+      com.sky.business.OrderCommandService orders) {
     this.db = db;
     this.clock = clock;
     this.gateway = gateway;
@@ -35,29 +40,59 @@ public class PlatformJobs {
     this.scope = scope;
     this.tx = new TransactionTemplate(manager);
     this.enabled = enabled;
+    this.operations = operations;
+    this.orders = orders;
   }
 
   @Scheduled(fixedDelay = 2000)
   public void work() {
     if (!enabled) return;
-    try {
-      for (int i = 0; i < 20 && refund(); i++) {}
-      for (var c :
-          db.rows(
-              "SELECT id FROM checkout WHERE state='PENDING' AND expires_at<=? ORDER BY id LIMIT"
-                  + " 100",
-              now())) checkouts.expire(Db.id(c, "id"));
-      db.update(
-          "UPDATE orders SET delivery_overdue=true,version=version+1 WHERE status=4 AND"
-              + " delivery_overdue=false AND delivery_started_at<?",
-          now().minusMinutes(60));
-    } catch (Exception e) {
-      org.slf4j.LoggerFactory.getLogger(getClass())
-          .warn("Platform jobs will retry: {}", e.getClass().getSimpleName());
-    }
+    operations.run(
+        "platformRefunds",
+        round -> {
+          for (int i = 0; i < 20 && round.withinBudget() && refund(round::failed); i++) {}
+        });
+  }
+
+  @Scheduled(fixedDelay = 2000)
+  public void expireCheckouts() {
+    if (!enabled) return;
+    operations.run(
+        "checkoutExpiry",
+        round ->
+            checkoutExpiry.run(
+                round,
+                cursor ->
+                    db.rows(
+                        "SELECT id FROM checkout WHERE state='PENDING' AND expires_at<=?"
+                            + " AND id>? ORDER BY id LIMIT 100",
+                        now(),
+                        cursor),
+                checkouts::expire));
+  }
+
+  @Scheduled(fixedDelay = 30000)
+  public void markOverdue() {
+    if (!enabled) return;
+    operations.run(
+        "deliveryOverdue",
+        round ->
+            deliveryExpiry.run(
+                round,
+                cursor ->
+                    db.rows(
+                        "SELECT id FROM orders WHERE status=4 AND delivery_overdue=false"
+                            + " AND delivery_started_at<? AND id>? ORDER BY id LIMIT 100",
+                        now().minusMinutes(60),
+                        cursor),
+                orders::markOverdue));
   }
 
   public boolean refund() {
+    return refund((ex, id) -> {});
+  }
+
+  private boolean refund(java.util.function.BiConsumer<Exception, Object> onFailure) {
     var task =
         tx.execute(
             s -> {
@@ -152,6 +187,7 @@ public class PlatformJobs {
                 order.get("campus_id"));
           });
     } catch (Exception ex) {
+      onFailure.accept(ex, task.get("id"));
       int attempts = Db.integer(task, "attempts") + 1;
       db.update(
           "UPDATE refund_request SET"

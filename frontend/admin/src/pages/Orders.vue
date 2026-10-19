@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed } from 'vue';
+import { ElAlert, ElCheckbox } from 'element-plus';
 import { request } from '../platform-api';
 import { notifyError } from '../api';
 import { selectedStore } from '../context';
@@ -18,13 +19,19 @@ const session = useSession(),
   reason = ref(''),
   code = ref(''),
   busy = ref(false),
+  needsRefresh = ref(false),
+  exceptionOrder = ref<Order>(),
+  exceptionKind = ref<'reassign' | 'exception-cancel'>('reassign'),
+  exceptionReason = ref(''),
+  exceptionCourier = ref(''),
+  handoverConfirmed = ref(false),
   socket = ref<WebSocket>(),
   timer = ref<ReturnType<typeof setInterval>>(),
   loading = ref(false),
   hasMore = ref(false);
 let loadedPages = 1;
 async function load(pages = loadedPages) {
-  if (loading.value) return;
+  if (loading.value || busy.value) return;
   loading.value = true;
   try {
     const path = courier.value ? '/courier/orders' : '/merchant/stores/' + selectedStore.value + '/orders';
@@ -38,6 +45,7 @@ async function load(pages = loadedPages) {
         '/merchant/stores/' + selectedStore.value + '/couriers',
       );
     if (selected.value) selected.value = orders.value.find((o) => o.id === selected.value?.id);
+    needsRefresh.value = false;
   } catch (e) {
     notifyError(e);
   } finally {
@@ -46,10 +54,28 @@ async function load(pages = loadedPages) {
 }
 const loadMore = () => load(loadedPages + 1);
 const refresh = () => load(1);
-async function action(o: Order, name: string) {
-  if (busy.value) return;
+async function perform(o: Order, operation: () => Promise<void>) {
+  if (busy.value || loading.value || needsRefresh.value) return;
   busy.value = true;
+  needsRefresh.value = true;
   try {
+    await operation();
+  } catch (e) {
+    notifyError(e);
+  } finally {
+    try {
+      const current = await request<Order>((courier.value ? '/courier' : '/merchant') + '/orders/' + o.id);
+      orders.value = orders.value.map((row) => row.id === current.id ? current : row);
+      if (selected.value?.id === current.id) selected.value = current;
+      needsRefresh.value = false;
+    } catch {
+      notifyError(new Error('未能确认订单最新状态，请刷新成功后再操作'));
+    }
+    busy.value = false;
+  }
+}
+async function action(o: Order, name: string) {
+  await perform(o, async () => {
     const result = await request<{ verified?: boolean }>(
       (courier.value ? '/courier' : '/merchant') + '/orders/' + o.id + '/actions/' + name,
       'POST',
@@ -63,36 +89,51 @@ async function action(o: Order, name: string) {
     if (result?.verified === false) throw new Error('核销码不正确，错误次数已记录');
     reason.value = '';
     code.value = '';
-    await load();
+  });
+}
+async function claim(t: (typeof pool.value)[number]) {
+  if (busy.value || loading.value || needsRefresh.value) return;
+  busy.value = true;
+  needsRefresh.value = true;
+  try {
+    await request('/courier/tasks/' + t.id + '/claim', 'POST', { version: t.version });
   } catch (e) {
     notifyError(e);
   } finally {
     busy.value = false;
-  }
-}
-async function claim(t: (typeof pool.value)[number]) {
-  try {
-    await request('/courier/tasks/' + t.id + '/claim', 'POST', { version: t.version });
     await load();
-  } catch (e) {
-    notifyError(e);
   }
 }
 async function unassign(o: Order) {
-  try {
+  await perform(o, async () => {
     await request('/platform/orders/' + o.id + '/unassign', 'POST', { version: o.version });
-    await load();
-  } catch (e) {
-    notifyError(e);
-  }
+  });
 }
 async function reset(o: Order) {
-  try {
+  await perform(o, async () => {
     await request('/platform/orders/' + o.id + '/reset-pickup', 'POST');
-    await load();
-  } catch (e) {
-    notifyError(e);
-  }
+  });
+}
+function openException(o: Order, kind: 'reassign' | 'exception-cancel') {
+  if (busy.value || loading.value || needsRefresh.value) return;
+  exceptionOrder.value = o;
+  exceptionKind.value = kind;
+  exceptionReason.value = '';
+  exceptionCourier.value = '';
+  handoverConfirmed.value = false;
+}
+async function submitException() {
+  const o = exceptionOrder.value;
+  if (!o || !exceptionReason.value.trim() || exceptionReason.value.length > 200) return;
+  if (exceptionKind.value === 'reassign' && (!exceptionCourier.value || (o.status === 4 && !handoverConfirmed.value))) return;
+  await perform(o, async () => {
+    await request('/platform/orders/' + o.id + '/' + exceptionKind.value, 'POST', {
+      version: o.version,
+      reason: exceptionReason.value.trim(),
+      ...(exceptionKind.value === 'reassign' ? { courierId: exceptionCourier.value } : {}),
+    });
+  });
+  exceptionOrder.value = undefined;
 }
 onMounted(async () => {
   await load();
@@ -135,7 +176,7 @@ onUnmounted(() => {
         label="送达楼栋"
       /><el-table-column label="操作"
         ><template #default="{ row }"
-          ><el-button type="primary" @click="claim(row)">抢单</el-button></template
+          ><el-button type="primary" :disabled="busy || loading || needsRefresh" @click="claim(row)">抢单</el-button></template
         ></el-table-column
       ></el-table
     >
@@ -176,6 +217,8 @@ onUnmounted(() => {
         {{ selected.fulfillment === 'PICKUP' ? '自取' : '配送' }}
       </p>
       <p>{{ selected.consignee }} {{ selected.phone }} {{ selected.address }}</p>
+      <el-alert v-if="needsRefresh" type="warning" :closable="false" title="操作结果尚未确认，请刷新成功后再操作" />
+      <el-button v-if="needsRefresh" :loading="loading" :disabled="busy" @click="load()">刷新订单</el-button>
       <el-table :data="selected.details"
         ><el-table-column prop="name" label="商品" /><el-table-column
           prop="number"
@@ -189,13 +232,13 @@ onUnmounted(() => {
           ><el-button
             v-if="selected.status === 2"
             type="primary"
-            :disabled="busy"
+            :disabled="busy || loading || needsRefresh"
             @click="action(selected, 'accept')"
             >接单备餐</el-button
           ><el-button
             v-if="selected.status === 3 && !selected.ready"
             type="primary"
-            :disabled="busy"
+            :disabled="busy || loading || needsRefresh"
             @click="action(selected, 'ready')"
             >备餐完成</el-button
           ><el-button
@@ -205,6 +248,7 @@ onUnmounted(() => {
               selected.fulfillment === 'DELIVERY' &&
               !selected.courierId
             "
+            :disabled="busy || loading || needsRefresh"
             @click="action(selected, 'publish')"
             >发布抢单任务</el-button
           ></template
@@ -212,11 +256,13 @@ onUnmounted(() => {
           ><el-button
             v-if="selected.status === 3"
             type="primary"
+            :disabled="busy || loading || needsRefresh"
             @click="action(selected, 'pickup')"
             >确认取餐</el-button
           ><el-button
             v-if="selected.status === 4"
             type="primary"
+            :disabled="busy || loading || needsRefresh"
             @click="action(selected, 'complete')"
             >确认送达</el-button
           ></template
@@ -238,7 +284,7 @@ onUnmounted(() => {
               :key="c.id"
               :value="c.id"
               :label="c.name" /></el-select
-          ><el-button :disabled="!courierId" @click="action(selected, 'assign')"
+          ><el-button :disabled="!courierId || busy || loading || needsRefresh" @click="action(selected, 'assign')"
             >指派配送</el-button
           >
         </div></template
@@ -249,12 +295,13 @@ onUnmounted(() => {
         ><h3>自取核销</h3>
         <div class="toolbar">
           <el-input v-model="code" maxlength="8" placeholder="输入用户出示的8位核销码" /><el-button
-            :disabled="!code || busy"
+            :disabled="!code || busy || loading || needsRefresh"
             @click="action(selected, 'verify')"
             >核销</el-button
           ><el-button
             v-if="session.session?.role === 'PLATFORM_ADMIN'"
             text
+            :disabled="busy || loading || needsRefresh"
             @click="reset(selected)"
             >重置核销码</el-button
           >
@@ -266,7 +313,7 @@ onUnmounted(() => {
       >
         <el-input v-model="reason" placeholder="拒单或取消原因" maxlength="200" /><el-button
           type="danger"
-          :disabled="!reason || busy"
+          :disabled="!reason.trim() || busy || loading || needsRefresh"
           @click="action(selected, selected.status === 2 ? 'reject' : 'cancel')"
           >{{ selected.status === 2 ? '拒单并退款' : '取消并退款' }}</el-button
         >
@@ -275,13 +322,35 @@ onUnmounted(() => {
         v-if="
           session.session?.role === 'PLATFORM_ADMIN' && selected.status === 3 && selected.courierId
         "
+        :disabled="busy || loading || needsRefresh"
         @click="unassign(selected)"
         >撤回配送分配</el-button
       >
+      <div v-if="session.session?.role === 'PLATFORM_ADMIN' && selected.fulfillment === 'DELIVERY' && ((selected.status === 3 && selected.ready) || selected.status === 4)" class="toolbar">
+        <el-button v-if="selected.courierId" :disabled="busy || loading || needsRefresh" @click="openException(selected, 'reassign')">平台改派</el-button>
+        <el-button type="danger" :disabled="busy || loading || needsRefresh" @click="openException(selected, 'exception-cancel')">异常取消并退款</el-button>
+      </div>
       <h3>退款进度</h3>
       <p v-for="r in selected.refunds" :key="r.id">
         ¥{{ cents(r.amountCents) }} · {{ states[r.state] || r.state }}
       </p></template
     ></el-drawer
   >
+  <el-dialog :model-value="!!exceptionOrder" :title="exceptionKind === 'reassign' ? '平台改派' : '异常取消订单'" :close-on-click-modal="false" :close-on-press-escape="!busy" :show-close="!busy" @close="exceptionOrder = undefined">
+    <template v-if="exceptionOrder">
+      <p>{{ exceptionOrder.number }}</p>
+      <template v-if="exceptionKind === 'reassign'">
+        <el-select v-model="exceptionCourier" placeholder="本校区其他启用配送员" :disabled="busy">
+          <el-option v-for="c in couriers.filter((c) => c.id !== exceptionOrder?.courierId)" :key="c.id" :value="c.id" :label="c.name" />
+        </el-select>
+        <el-checkbox v-if="exceptionOrder.status === 4" v-model="handoverConfirmed" :disabled="busy">我已安排餐品实际交接，配送计时及超时标记继续保留</el-checkbox>
+      </template>
+      <el-alert v-else type="warning" :closable="false" title="取消仅影响本子订单，退款通过现有模拟任务处理；已备餐库存和已使用优惠券不退回。请先处理已有售后或退款任务。" />
+      <el-input v-model="exceptionReason" type="textarea" maxlength="200" show-word-limit placeholder="必填：操作原因" :disabled="busy" />
+    </template>
+    <template #footer>
+      <el-button :disabled="busy" @click="exceptionOrder = undefined">返回</el-button>
+      <el-button type="primary" :loading="busy" :disabled="loading || needsRefresh || !exceptionReason.trim() || (exceptionKind === 'reassign' && (!exceptionCourier || (exceptionOrder?.status === 4 && !handoverConfirmed)))" @click="submitException">确认操作</el-button>
+    </template>
+  </el-dialog>
 </template>

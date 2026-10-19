@@ -100,6 +100,8 @@ class PlatformIntegrationTest {
   @Autowired Json json;
   @Autowired TestClock clock;
   @Autowired com.sky.infra.MaintenanceJobs maintenance;
+  @Autowired com.sky.infra.RuntimeOperations operations;
+  @Autowired com.sky.infra.OperationalMetrics operationalMetrics;
   @Autowired org.springframework.transaction.PlatformTransactionManager transactionManager;
   @org.junit.jupiter.api.io.TempDir java.nio.file.Path evidenceRoot;
   long user, dish3;
@@ -566,6 +568,311 @@ class PlatformIntegrationTest {
     } finally {
       db.update("UPDATE employee SET status=1 WHERE id=?", platform.id());
       db.update("DELETE FROM employee WHERE id=?", second);
+    }
+  }
+
+  long assignedDelivery(boolean picked) {
+    long id = paidOrder();
+    db.update("UPDATE orders SET fulfillment='DELIVERY' WHERE id=?", id);
+    act(platform);
+    fulfillment.action(id, "accept", new PlatformCommands.Action(1, null, null, null));
+    fulfillment.action(id, "ready", new PlatformCommands.Action(2, null, null, null));
+    Actor courier = staff("courier1");
+    fulfillment.action(id, "assign", new PlatformCommands.Action(3, null, courier.id(), null));
+    if (picked) {
+      act(courier);
+      fulfillment.action(id, "pickup", new PlatformCommands.Action(4, null, null, null));
+    }
+    act(platform);
+    return id;
+  }
+
+  @Test
+  void platformReassignRecoversDisabledCourierAndPreservesPickedClock() {
+    long id = assignedDelivery(true);
+    Actor old = staff("courier1"), replacement = staff("courier1b");
+    var before = db.one("SELECT * FROM orders WHERE id=?", id);
+    db.update("UPDATE orders SET delivery_overdue=true WHERE id=?", id);
+    db.update("UPDATE employee SET status=0,campus_id=2 WHERE id=?", old.id());
+    try {
+      String reason = "改".repeat(200);
+      var changed =
+          fulfillment.reassign(id, new PlatformCommands.Reassign(5, replacement.id(), reason));
+      assertEquals(4, Db.integer(changed, "status"));
+      assertEquals(replacement.id(), Db.id(changed, "courier_id"));
+      assertEquals(before.get("delivery_started_at"), changed.get("delivery_started_at"));
+      assertTrue(Db.bool(changed, "delivery_overdue"));
+      assertEquals(
+          "PICKED", db.one("SELECT state FROM delivery_task WHERE order_id=?", id).get("state"));
+      assertEquals(
+          1,
+          db.count(
+              "SELECT COUNT(*) FROM audit_log WHERE action='ORDER_REASSIGN' AND target_id=? AND"
+                  + " detail=?",
+              id,
+              reason));
+      assertEquals(
+          1,
+          db.count(
+              "SELECT COUNT(*) FROM audit_log WHERE action='DELIVERY_REASSIGN' AND target_id=? AND"
+                  + " detail=?",
+              id,
+              "courier=" + old.id() + "->" + replacement.id() + ";state=PICKED"));
+      act(old);
+      assertThrows(
+          BusinessException.class,
+          () ->
+              fulfillment.action(id, "complete", new PlatformCommands.Action(6, null, null, null)));
+      act(replacement);
+      fulfillment.action(id, "complete", new PlatformCommands.Action(6, null, null, null));
+      assertEquals(5, db.count("SELECT status FROM orders WHERE id=?", id));
+    } finally {
+      db.update("UPDATE employee SET status=1,campus_id=1 WHERE id=?", old.id());
+    }
+  }
+
+  @Test
+  void platformReassignBeforePickupValidatesRoleCampusStatusReasonAndVersion() {
+    long id = assignedDelivery(false);
+    long replacement = staff("courier1b").id();
+    for (Actor actor : List.of(staff("manager1"), staff("courier1"), user(user))) {
+      act(actor);
+      assertEquals(
+          "FORBIDDEN",
+          assertThrows(
+                  BusinessException.class,
+                  () ->
+                      fulfillment.reassign(id, new PlatformCommands.Reassign(4, replacement, "改派")))
+              .code());
+    }
+    act(platform);
+    for (long invalid : List.of(staff("courier1").id(), staff("courier2").id(), platform.id()))
+      assertEquals(
+          "INVALID_COURIER",
+          assertThrows(
+                  BusinessException.class,
+                  () -> fulfillment.reassign(id, new PlatformCommands.Reassign(4, invalid, "改派")))
+              .code());
+    db.update("UPDATE employee SET status=0 WHERE id=?", replacement);
+    try {
+      assertEquals(
+          "INVALID_COURIER",
+          assertThrows(
+                  BusinessException.class,
+                  () ->
+                      fulfillment.reassign(id, new PlatformCommands.Reassign(4, replacement, "改派")))
+              .code());
+    } finally {
+      db.update("UPDATE employee SET status=1 WHERE id=?", replacement);
+    }
+    assertEquals(
+        "REASON_REQUIRED",
+        assertThrows(
+                BusinessException.class,
+                () -> fulfillment.reassign(id, new PlatformCommands.Reassign(4, replacement, "  ")))
+            .code());
+    assertEquals(
+        "INVALID_REASON",
+        assertThrows(
+                BusinessException.class,
+                () ->
+                    fulfillment.reassign(
+                        id, new PlatformCommands.Reassign(4, replacement, "改".repeat(201))))
+            .code());
+    assertEquals(
+        "VERSION_CONFLICT",
+        assertThrows(
+                BusinessException.class,
+                () -> fulfillment.reassign(id, new PlatformCommands.Reassign(3, replacement, "改派")))
+            .code());
+    fulfillment.reassign(id, new PlatformCommands.Reassign(4, replacement, "原配送员不可用"));
+    assertEquals(
+        "ASSIGNED", db.one("SELECT state FROM delivery_task WHERE order_id=?", id).get("state"));
+    assertNull(
+        db.one("SELECT delivery_started_at FROM orders WHERE id=?", id).get("delivery_started_at"));
+    act(staff("courier1b"));
+    fulfillment.action(id, "pickup", new PlatformCommands.Action(5, null, null, null));
+  }
+
+  @Test
+  void exceptionCancelReservesRemainingOnceWithoutChangingOtherStoreOrConsumption() {
+    long id = assignedDelivery(true);
+    var before = db.one("SELECT * FROM orders WHERE id=?", id);
+    var other =
+        db.one("SELECT * FROM orders WHERE checkout_id=? AND id<>?", before.get("checkout_id"), id);
+    long coupon =
+        db.insert(
+            "INSERT INTO"
+                + " coupon(name,kind,threshold_cents,value,total,per_user,starts_at,ends_at,enabled)"
+                + " VALUES('已用测试券','REDUCTION',0,100,1,1,?,?,true)",
+            LocalDateTime.now(clock).minusDays(1),
+            LocalDateTime.now(clock).plusDays(1));
+    db.update(
+        "INSERT INTO user_coupon(user_id,coupon_id,state,checkout_id) VALUES(?,?,'USED',?)",
+        user,
+        coupon,
+        before.get("checkout_id"));
+    var quotasBefore = db.rows("SELECT * FROM daily_quota ORDER BY business_date,dish_id");
+    var couponsBefore = db.rows("SELECT * FROM user_coupon ORDER BY id");
+    long paid = Db.id(before, "paid_cents");
+    db.update("UPDATE orders SET refunded_cents=100 WHERE id=?", id);
+    fulfillment.exceptionCancel(id, new PlatformCommands.ExceptionCancel(5, "配送中断，平台确认取消"));
+    assertEquals(6, db.count("SELECT status FROM orders WHERE id=?", id));
+    assertEquals(
+        "CANCELLED", db.one("SELECT state FROM delivery_task WHERE order_id=?", id).get("state"));
+    assertEquals(paid - 100, db.count("SELECT reserved_refund_cents FROM orders WHERE id=?", id));
+    assertEquals(
+        paid - 100, db.count("SELECT amount_cents FROM refund_request WHERE order_id=?", id));
+    assertEquals(
+        "VERSION_CONFLICT",
+        assertThrows(
+                BusinessException.class,
+                () ->
+                    fulfillment.exceptionCancel(id, new PlatformCommands.ExceptionCancel(5, "重复")))
+            .code());
+    assertEquals(1, db.count("SELECT COUNT(*) FROM refund_request WHERE order_id=?", id));
+    assertEquals(other, db.one("SELECT * FROM orders WHERE id=?", other.get("id")));
+    assertEquals(quotasBefore, db.rows("SELECT * FROM daily_quota ORDER BY business_date,dish_id"));
+    assertEquals(couponsBefore, db.rows("SELECT * FROM user_coupon ORDER BY id"));
+    assertTrue(jobs.refund());
+    assertEquals(paid, db.count("SELECT refunded_cents FROM orders WHERE id=?", id));
+  }
+
+  @Test
+  void exceptionCancelRejectsOrdinaryRolesUnfinishedAftersaleAndReservedRefund() {
+    long id = assignedDelivery(false);
+    for (Actor actor : List.of(user(user), staff("manager1"), staff("courier1"))) {
+      act(actor);
+      assertEquals(
+          "FORBIDDEN",
+          assertThrows(
+                  BusinessException.class,
+                  () ->
+                      fulfillment.exceptionCancel(
+                          id, new PlatformCommands.ExceptionCancel(4, "取消")))
+              .code());
+    }
+    act(user(user));
+    long request =
+        aftersale.apply(id, new PlatformCommands.Aftersale("CANCEL", "无法取餐", null, null));
+    act(platform);
+    assertEquals(
+        "AFTERSALE_PENDING",
+        assertThrows(
+                BusinessException.class,
+                () ->
+                    fulfillment.exceptionCancel(id, new PlatformCommands.ExceptionCancel(4, "取消")))
+            .code());
+    db.update("UPDATE aftersale SET state='WITHDRAWN' WHERE id=?", request);
+    db.update("UPDATE orders SET reserved_refund_cents=1 WHERE id=?", id);
+    assertEquals(
+        "AFTERSALE_PENDING",
+        assertThrows(
+                BusinessException.class,
+                () ->
+                    fulfillment.exceptionCancel(id, new PlatformCommands.ExceptionCancel(4, "取消")))
+            .code());
+    db.update("UPDATE orders SET reserved_refund_cents=0,refunded_cents=paid_cents WHERE id=?", id);
+    fulfillment.exceptionCancel(id, new PlatformCommands.ExceptionCancel(4, "无需再退款"));
+    assertEquals(0, db.count("SELECT COUNT(*) FROM refund_request WHERE order_id=?", id));
+  }
+
+  @Test
+  void concurrentCompleteReassignAndExceptionCancelHaveOneWinner() throws Exception {
+    long id = assignedDelivery(true);
+    Actor original = staff("courier1");
+    long replacement = staff("courier1b").id();
+    var phase = new AtomicInteger();
+    Actor otherAdmin = new Actor(1, "ADMIN", "PLATFORM_ADMIN", "second-command", false);
+    var result =
+        race(
+            List.of(original, platform, otherAdmin),
+            actor -> {
+              if (actor.role().equals("DELIVERER"))
+                fulfillment.action(
+                    id, "complete", new PlatformCommands.Action(5, null, null, null));
+              else if (phase.getAndIncrement() == 0)
+                fulfillment.reassign(id, new PlatformCommands.Reassign(5, replacement, "异常改派"));
+              else fulfillment.exceptionCancel(id, new PlatformCommands.ExceptionCancel(5, "配送中断"));
+            });
+    assertEquals(1, result.successes());
+    assertEquals(2, result.failures().size());
+    assertEquals(6, db.count("SELECT version FROM orders WHERE id=?", id));
+    assertTrue(db.count("SELECT COUNT(*) FROM refund_request WHERE order_id=?", id) <= 1);
+  }
+
+  @Test
+  void exceptionEndpointsEnforceValidationAuthorizationAndVersion() throws Exception {
+    long id = assignedDelivery(false);
+    long replacement = staff("courier1b").id();
+    String adminToken =
+        auth.login(new Commands.Login("admin", "TestAdmin!2026")).get("token").toString();
+    String userToken = auth.demo(new Commands.DemoLogin(1)).get("token").toString();
+    String path = "/api/v1/platform/orders/" + id;
+    String body = json.write(Map.of("version", 4, "courierId", replacement, "reason", "平台处理"));
+    mvc.perform(
+            post(path + "/reassign")
+                .header("Authorization", "Bearer " + userToken)
+                .contentType("application/json")
+                .content(body))
+        .andExpect(status().isForbidden());
+    mvc.perform(
+            post(path + "/reassign")
+                .header("Authorization", "Bearer " + adminToken)
+                .contentType("application/json")
+                .content(json.write(Map.of("version", 4, "reason", "   "))))
+        .andExpect(status().isBadRequest());
+    mvc.perform(
+            post(path + "/reassign")
+                .header("Authorization", "Bearer " + adminToken)
+                .contentType("application/json")
+                .content(body))
+        .andExpect(status().isOk());
+    mvc.perform(
+            post(path + "/exception-cancel")
+                .header("Authorization", "Bearer " + adminToken)
+                .contentType("application/json")
+                .content(json.write(Map.of("version", 4, "reason", "取消"))))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.code").value("VERSION_CONFLICT"));
+    mvc.perform(
+            post(path + "/exception-cancel")
+                .header("Authorization", "Bearer " + adminToken)
+                .contentType("application/json")
+                .content(json.write(Map.of("version", 5, "reason", "配送无法完成"))))
+        .andExpect(status().isOk());
+    assertEquals(1, db.count("SELECT COUNT(*) FROM refund_request WHERE order_id=?", id));
+  }
+
+  @Test
+  void operationsHealthExposesDisabledJobsAndMetricsWithoutAffectingReadiness() throws Exception {
+    operationalMetrics.sample();
+    mvc.perform(get("/actuator/health/operations"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.components.runtimeOperations.details.tasksEnabled").value(false))
+        .andExpect(
+            jsonPath("$.components.runtimeOperations.details.jobs.checkoutExpiry.status")
+                .value("DISABLED"))
+        .andExpect(
+            jsonPath("$.components.runtimeOperations.details.jobs.maintenance.enabled")
+                .value(false))
+        .andExpect(
+            jsonPath("$.components.runtimeOperations.details.jobs.metrics.enabled").value(true))
+        .andExpect(
+            jsonPath("$.components.runtimeOperations.details.jobs.metrics.status").value("OK"));
+    try {
+      operations.run(
+          "metrics", round -> round.failed(new IllegalStateException("test failure"), "test"));
+      mvc.perform(get("/actuator/health/operations")).andExpect(status().isServiceUnavailable());
+      String readiness =
+          mvc.perform(get("/actuator/health/readiness"))
+              .andExpect(status().isOk())
+              .andReturn()
+              .getResponse()
+              .getContentAsString();
+      assertFalse(readiness.contains("runtimeOperations"));
+    } finally {
+      operationalMetrics.sample();
     }
   }
 

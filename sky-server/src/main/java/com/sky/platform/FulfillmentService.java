@@ -263,6 +263,110 @@ public class FulfillmentService {
     return detail(id);
   }
 
+  @Transactional
+  public Map<String, Object> reassign(long id, PlatformCommands.Reassign input) {
+    scope.platform();
+    String reason = exceptionReason(input.reason());
+    var order = scope.order(id, true);
+    require(Db.id(order, "version") == input.version(), 409, "VERSION_CONFLICT", "订单状态已变化，请刷新");
+    int status = Db.integer(order, "status");
+    require(
+        "DELIVERY".equals(order.get("fulfillment"))
+            && (status == 3 && Db.bool(order, "ready") || status == 4)
+            && order.get("courier_id") != null,
+        409,
+        "ORDER_STATE",
+        "仅已分配或配送中的配送订单可改派");
+    requireNoCancellation(id);
+    var courier = db.one("SELECT * FROM employee WHERE id=? FOR SHARE", input.courierId());
+    require(
+        courier != null
+            && "DELIVERER".equals(courier.get("role"))
+            && Db.integer(courier, "status") == 1
+            && Objects.equals(courier.get("campus_id"), order.get("campus_id"))
+            && !Objects.equals(input.courierId(), order.get("courier_id")),
+        400,
+        "INVALID_COURIER",
+        "请选择本校区启用的其他配送员");
+    var task = db.one("SELECT * FROM delivery_task WHERE order_id=? FOR UPDATE", id);
+    String expected = status == 4 ? "PICKED" : "ASSIGNED";
+    require(
+        task != null
+            && expected.equals(task.get("state"))
+            && Objects.equals(task.get("courier_id"), order.get("courier_id")),
+        409,
+        "DELIVERY_STATE",
+        "配送任务已变化，请刷新");
+    db.update(
+        "UPDATE delivery_task SET courier_id=?,version=version+1 WHERE order_id=?",
+        input.courierId(),
+        id);
+    db.update("UPDATE orders SET courier_id=?,version=version+1 WHERE id=?", input.courierId(), id);
+    long store = Db.id(order, "store_id");
+    scope.audit("ORDER_REASSIGN", id, store, reason);
+    // Reasons may use all 200 audit characters; keep assignment metadata in a separate row.
+    scope.audit(
+        "DELIVERY_REASSIGN",
+        id,
+        store,
+        "courier=" + order.get("courier_id") + "->" + input.courierId() + ";state=" + expected);
+    scope.event(id, "ORDER_REASSIGNED");
+    return detail(id);
+  }
+
+  @Transactional
+  public Map<String, Object> exceptionCancel(long id, PlatformCommands.ExceptionCancel input) {
+    scope.platform();
+    String reason = exceptionReason(input.reason());
+    var order = scope.order(id, true);
+    require(Db.id(order, "version") == input.version(), 409, "VERSION_CONFLICT", "订单状态已变化，请刷新");
+    int status = Db.integer(order, "status");
+    require(
+        "DELIVERY".equals(order.get("fulfillment"))
+            && (status == 3 && Db.bool(order, "ready") || status == 4),
+        409,
+        "ORDER_STATE",
+        "仅已备餐或配送中的配送订单可异常取消");
+    require(
+        Db.id(order, "reserved_refund_cents") == 0
+            && db.count(
+                    "SELECT COUNT(*) FROM aftersale WHERE order_id=? AND state"
+                        + " IN('PENDING','ESCALATED','APPROVED')",
+                    id)
+                == 0,
+        409,
+        "AFTERSALE_PENDING",
+        "请先处理当前售后申请或退款任务");
+    db.update(
+        "UPDATE orders SET status=6,cancel_time=?,cancel_reason=?,version=version+1 WHERE id=?",
+        now(),
+        reason,
+        id);
+    db.update("UPDATE delivery_task SET state='CANCELLED',version=version+1 WHERE order_id=?", id);
+    reserveCancellationRefund(order);
+    long store = Db.id(order, "store_id");
+    scope.audit("ORDER_EXCEPTION_CANCEL", id, store, reason);
+    scope.audit(
+        "DELIVERY_EXCEPTION_CANCEL",
+        id,
+        store,
+        "courier="
+            + order.get("courier_id")
+            + "->"
+            + order.get("courier_id")
+            + ";status="
+            + status
+            + "->6");
+    scope.event(id, "ORDER_EXCEPTION_CANCELLED");
+    return detail(id);
+  }
+
+  private String exceptionReason(String value) {
+    require(value != null && !value.isBlank(), 400, "REASON_REQUIRED", "请填写操作原因");
+    require(value.length() <= 200, 400, "INVALID_REASON", "操作原因不能超过200字");
+    return value.trim();
+  }
+
   /** Return failures normally so the failed-attempt counter is committed. */
   @Transactional
   public Map<String, Object> verify(long id, PlatformCommands.Action input) {
@@ -383,6 +487,11 @@ public class FulfillmentService {
         reason,
         id);
     db.update("UPDATE delivery_task SET state='CANCELLED',version=version+1 WHERE order_id=?", id);
+    reserveCancellationRefund(o);
+  }
+
+  private void reserveCancellationRefund(Map<String, Object> o) {
+    long id = Db.id(o, "id");
     long amount =
         Db.id(o, "paid_cents") - Db.id(o, "refunded_cents") - Db.id(o, "reserved_refund_cents");
     if (amount > 0) {

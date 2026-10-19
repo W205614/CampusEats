@@ -14,16 +14,25 @@ export async function api<T>(
   if (options.body && !(options.body instanceof FormData))
     headers.set("Content-Type", "application/json");
   let response: Response;
+  let result: Envelope<T>;
   try {
     response = await fetch("/api/v1/admin" + path, {
       ...options,
       headers,
-      signal: AbortSignal.timeout(15000),
+      signal: AbortSignal.timeout(25000),
     });
+    result = (await response.json()) as Envelope<T>;
+    if (!result || typeof result !== "object" || typeof result.code !== "string"
+      || (response.ok && (result.code !== "OK" || !("data" in result))))
+      throw new Error("Incomplete API response");
   } catch {
-    throw new ApiError("NETWORK", "网络连接失败，请重试", "", 0);
+    throw new ApiError(
+      "NETWORK",
+      !options.method || options.method.toUpperCase() === "GET"
+        ? "网络连接失败，请重试" : "操作结果尚未确认，请刷新查看",
+      "", 0,
+    );
   }
-  const result = (await response.json()) as Envelope<T>;
   if (!response.ok) {
     if (response.status === 401) store.set(null);
     if (result.code === "PASSWORD_CHANGE_REQUIRED")
@@ -45,7 +54,7 @@ export async function download(path: string) {
   const store = useSession();
   const response = await fetch("/api/v1/admin" + path, {
     headers: { Authorization: "Bearer " + store.session?.token },
-    signal: AbortSignal.timeout(15000),
+    signal: AbortSignal.timeout(25000),
   });
   if (!response.ok) throw new Error("导出失败");
   const url = URL.createObjectURL(await response.blob());

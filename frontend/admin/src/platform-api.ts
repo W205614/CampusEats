@@ -6,13 +6,23 @@ export async function request<T>(path: string, method = 'GET', data?: unknown): 
   if (store.session) headers.Authorization = 'Bearer ' + store.session.token;
   const form = data instanceof FormData;
   if (data && !form) headers['Content-Type'] = 'application/json';
-  const response = await fetch('/api/v1' + path, {
-    method,
-    headers,
-    body: data ? (form ? data : JSON.stringify(data)) : undefined,
-    signal: AbortSignal.timeout(20000),
-  });
-  const result = await response.json();
+  let response: Response;
+  let result;
+  try {
+    response = await fetch('/api/v1' + path, {
+      method,
+      headers,
+      body: data ? (form ? data : JSON.stringify(data)) : undefined,
+      signal: AbortSignal.timeout(25000),
+    });
+    result = await response.json();
+    if (!result || typeof result !== 'object' || typeof result.code !== 'string'
+      || (response.ok && (result.code !== 'OK' || !('data' in result))))
+      throw new Error('Incomplete API response');
+  } catch {
+    throw new ApiError('NETWORK', method.toUpperCase() === 'GET'
+      ? '网络连接失败，请重试' : '操作结果尚未确认，请刷新查看', '', 0);
+  }
   if (!response.ok) {
     if (response.status === 401) store.set(null);
     throw new ApiError(result.code, result.message, result.requestId, response.status);
@@ -21,7 +31,9 @@ export async function request<T>(path: string, method = 'GET', data?: unknown): 
 }
 export async function exportReport(path: string) {
   const token = useSession().session?.token;
-  const r = await fetch('/api/v1' + path, { headers: { Authorization: 'Bearer ' + token } });
+  const r = await fetch('/api/v1' + path, {
+    headers: { Authorization: 'Bearer ' + token }, signal: AbortSignal.timeout(25000),
+  });
   if (!r.ok) throw new Error('导出失败');
   const u = URL.createObjectURL(await r.blob());
   const a = document.createElement('a');

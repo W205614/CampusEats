@@ -382,6 +382,18 @@ public class PlatformController {
     return fulfillment.action(id, "unassign", input);
   }
 
+  @PostMapping("/platform/orders/{id}/reassign")
+  public Object reassign(
+      @PathVariable long id, @Valid @RequestBody PlatformCommands.Reassign input) {
+    return fulfillment.reassign(id, input);
+  }
+
+  @PostMapping("/platform/orders/{id}/exception-cancel")
+  public Object exceptionCancel(
+      @PathVariable long id, @Valid @RequestBody PlatformCommands.ExceptionCancel input) {
+    return fulfillment.exceptionCancel(id, input);
+  }
+
   @GetMapping("/courier/pool")
   public Object pool() {
     return fulfillment.pool();

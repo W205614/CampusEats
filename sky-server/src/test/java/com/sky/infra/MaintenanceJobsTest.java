@@ -13,7 +13,9 @@ class MaintenanceJobsTest {
     var db = mock(Db.class);
     var registry = new SimpleMeterRegistry();
     when(db.update(anyString(), any(Object[].class))).thenThrow(new IllegalStateException());
-    var jobs = new MaintenanceJobs(db, Clock.systemUTC(), registry, true);
+    var jobs =
+        new MaintenanceJobs(
+            db, Clock.systemUTC(), registry, true, new RuntimeOperations(Clock.systemUTC(), true));
     jobs.work();
     assertEquals(1, registry.get("campus.maintenance.failed").gauge().value());
     assertEquals(1, registry.get("campus.maintenance.failures").counter().count());
@@ -25,7 +27,13 @@ class MaintenanceJobsTest {
   @Test
   void taskSwitchDisablesMaintenance() {
     var db = mock(Db.class);
-    new MaintenanceJobs(db, Clock.systemUTC(), new SimpleMeterRegistry(), false).work();
+    new MaintenanceJobs(
+            db,
+            Clock.systemUTC(),
+            new SimpleMeterRegistry(),
+            false,
+            new RuntimeOperations(Clock.systemUTC(), false))
+        .work();
     verifyNoInteractions(db);
   }
 }
