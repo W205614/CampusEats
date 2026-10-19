@@ -1,6 +1,6 @@
 package com.sky.platform;
 
-import com.sky.business.MockPaymentGateway;
+import com.sky.business.PaymentGateway;
 import com.sky.infra.Db;
 import java.time.*;
 import java.util.*;
@@ -14,7 +14,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 public class PlatformJobs {
   private final Db db;
   private final Clock clock;
-  private final MockPaymentGateway gateway;
+  private final PaymentGateway gateway;
   private final CheckoutService checkouts;
   private final PlatformScope scope;
   private final TransactionTemplate tx;
@@ -23,7 +23,7 @@ public class PlatformJobs {
   public PlatformJobs(
       Db db,
       Clock clock,
-      MockPaymentGateway gateway,
+      PaymentGateway gateway,
       CheckoutService checkouts,
       PlatformScope scope,
       PlatformTransactionManager manager,
@@ -81,7 +81,13 @@ public class PlatformJobs {
             });
     if (task == null) return false;
     try {
-      gateway.refund(Db.id(task, "id"), Db.id(task, "amount_cents"));
+      var payment = db.one("SELECT checkout_id FROM orders WHERE id=?", task.get("order_id"));
+      gateway.refund(
+          new PaymentGateway.Refund(
+              "refund-request:" + task.get("id"),
+              "checkout:" + payment.get("checkout_id"),
+              Db.id(task, "amount_cents"),
+              "CNY"));
       tx.executeWithoutResult(
           s -> {
             var order = db.one("SELECT * FROM orders WHERE id=? FOR UPDATE", task.get("order_id"));

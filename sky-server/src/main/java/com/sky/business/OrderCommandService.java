@@ -14,7 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class OrderCommandService {
-  private final MockPaymentGateway gateway;
+  private final PaymentGateway gateway;
   private final Db db;
   private final Json json;
   private final CartService cart;
@@ -25,7 +25,7 @@ public class OrderCommandService {
   private final Clock clock;
 
   public OrderCommandService(
-      MockPaymentGateway gateway,
+      PaymentGateway gateway,
       Db db,
       Json json,
       CartService cart,
@@ -132,7 +132,12 @@ public class OrderCommandService {
         "PAYMENT_EXPIRED",
         "支付时间已过期");
     expected(row, version);
-    String gatewayRef = gateway.pay(id);
+    String gatewayRef =
+        gateway
+            .pay(
+                new PaymentGateway.Payment(
+                    "legacy-order:" + id, com.sky.platform.Money.cents(row.get("amount")), "CNY"))
+            .reference();
     require(
         db.update(
                 "UPDATE orders SET status=2,pay_status=1,checkout_time=?,version=version+1 WHERE"

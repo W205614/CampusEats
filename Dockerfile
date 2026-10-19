@@ -11,6 +11,8 @@ COPY sky-pojo/src sky-pojo/src
 COPY sky-server/src/main sky-server/src/main
 RUN --mount=type=cache,target=/root/.m2 mvn -s /workspace/maven-settings.xml -Dmaven.mirror.url=$MAVEN_MIRROR_URL -U -B -ntp -Dmaven.test.skip=true -Dmaven.wagon.http.retryHandler.count=3 package
 FROM eclipse-temurin:21-jre
+ARG SOURCE_REVISION=unknown
+LABEL org.opencontainers.image.revision=$SOURCE_REVISION
 RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 RUN mkdir -p /app/uploads && chown -R 10001:10001 /app

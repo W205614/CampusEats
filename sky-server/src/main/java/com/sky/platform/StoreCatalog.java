@@ -211,6 +211,34 @@ public class StoreCatalog {
     else scope.store(store, true);
     var rows = admin ? load(store) : cache.load(key(store), () -> load(store));
     var out = new ArrayList<Map<String, Object>>();
+    var stock = new HashMap<Long, Integer>();
+    for (var d :
+        db.rows(
+            "SELECT"
+                + " d.id,COALESCE(q.total,d.default_quota)-COALESCE(q.reserved,0)-COALESCE(q.consumed,0)"
+                + " remaining FROM dish d LEFT JOIN daily_quota q ON q.dish_id=d.id AND"
+                + " q.business_date=? WHERE d.store_id=?",
+            LocalDate.now(clock),
+            store)) stock.put(Db.id(d, "id"), Db.integer(d, "remaining"));
+    var components =
+        grouped(
+            db.rows(
+                "SELECT sd.* FROM setmeal_dish sd JOIN setmeal s ON s.id=sd.setmeal_id WHERE"
+                    + " s.store_id=? ORDER BY sd.dish_id",
+                store),
+            "setmeal_id");
+    var promotions = new HashMap<String, Map<String, Object>>();
+    var at = now();
+    for (var promo :
+        db.rows(
+            "SELECT id,item_type,item_id,price_cents,ends_at FROM promotion WHERE store_id=? AND"
+                + " enabled=true AND starts_at<=? AND ends_at>? ORDER BY id",
+            store,
+            at,
+            at)) {
+      String k = promo.remove("item_type") + ":" + promo.remove("item_id");
+      promotions.putIfAbsent(k, promo);
+    }
     for (var source : rows) {
       var row = normalized(source);
       if (!admin
@@ -221,23 +249,43 @@ public class StoreCatalog {
         continue;
       String type = row.get("item_type").toString();
       long id = Long.parseLong(row.get("id").toString());
-      row.put("remaining", remaining(type, id));
-      var promo =
-          db.one(
-              "SELECT id,price_cents,ends_at FROM promotion WHERE store_id=? AND item_type=? AND"
-                  + " item_id=? AND enabled=true AND starts_at<=? AND ends_at>?",
-              store,
-              type,
-              id,
-              now(),
-              now());
-      row.put("promotion", promo);
+      int left = stock.getOrDefault(id, 0);
+      if (type.equals("SETMEAL")) {
+        var parts = components.getOrDefault(id, List.of());
+        left = parts.isEmpty() ? 0 : Integer.MAX_VALUE;
+        for (var part : parts)
+          left =
+              Math.min(
+                  left, stock.getOrDefault(Db.id(part, "dish_id"), 0) / Db.integer(part, "copies"));
+      }
+      row.put("remaining", left);
+      row.put("promotion", promotions.get(type + ":" + id));
       out.add(row);
     }
     return out;
   }
 
   private List<Map<String, Object>> load(long store) {
+    var flavors =
+        grouped(
+            db.rows(
+                "SELECT f.* FROM dish_flavor f JOIN dish d ON d.id=f.dish_id WHERE d.store_id=?"
+                    + " ORDER BY f.id",
+                store),
+            "dish_id");
+    for (var fs : flavors.values())
+      for (var f : fs) {
+        f.remove("dish_id");
+        f.put("values", json.strings(f.remove("value").toString()));
+      }
+    var components =
+        grouped(
+            db.rows(
+                "SELECT sd.*,d.name current_name,d.status FROM setmeal_dish sd JOIN setmeal s ON"
+                    + " s.id=sd.setmeal_id JOIN dish d ON d.id=sd.dish_id WHERE s.store_id=? ORDER"
+                    + " BY sd.dish_id",
+                store),
+            "setmeal_id");
     var out = new ArrayList<Map<String, Object>>();
     for (String type : List.of("DISH", "SETMEAL")) {
       var rows =
@@ -249,43 +297,20 @@ public class StoreCatalog {
               store);
       for (var row : rows) {
         row.put("item_type", type);
-        if (type.equals("DISH")) {
-          var fs =
-              db.rows(
-                  "SELECT id,name,value FROM dish_flavor WHERE dish_id=? ORDER BY id",
-                  row.get("id"));
-          for (var f : fs) f.put("values", json.strings(f.remove("value").toString()));
-          row.put("flavors", fs);
-        } else
-          row.put(
-              "components",
-              db.rows(
-                  "SELECT sd.*,d.name current_name,d.status FROM setmeal_dish sd JOIN dish d ON"
-                      + " d.id=sd.dish_id WHERE sd.setmeal_id=? ORDER BY sd.dish_id",
-                  row.get("id")));
+        row.put(
+            type.equals("DISH") ? "flavors" : "components",
+            (type.equals("DISH") ? flavors : components).getOrDefault(Db.id(row, "id"), List.of()));
         out.add(row);
       }
     }
     return out;
   }
 
-  public int remaining(String type, long id) {
-    if (type.equals("DISH")) {
-      var r =
-          db.one(
-              "SELECT"
-                  + " COALESCE(q.total,d.default_quota)-COALESCE(q.reserved,0)-COALESCE(q.consumed,0)"
-                  + " remaining FROM dish d LEFT JOIN daily_quota q ON q.dish_id=d.id AND"
-                  + " q.business_date=? WHERE d.id=?",
-              LocalDate.now(clock),
-              id);
-      return r == null ? 0 : Db.integer(r, "remaining");
-    }
-    var cs = db.rows("SELECT dish_id,copies FROM setmeal_dish WHERE setmeal_id=?", id);
-    int left = cs.isEmpty() ? 0 : Integer.MAX_VALUE;
-    for (var c : cs)
-      left = Math.min(left, remaining("DISH", Db.id(c, "dish_id")) / Db.integer(c, "copies"));
-    return left;
+  private Map<Long, List<Map<String, Object>>> grouped(List<Map<String, Object>> rows, String key) {
+    var result = new HashMap<Long, List<Map<String, Object>>>();
+    for (var row : rows)
+      result.computeIfAbsent(Db.id(row, key), ignored -> new ArrayList<>()).add(row);
+    return result;
   }
 
   public List<Map<String, Object>> quotas(long store, LocalDate date) {

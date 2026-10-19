@@ -99,6 +99,9 @@ class PlatformIntegrationTest {
   @Autowired MockMvc mvc;
   @Autowired Json json;
   @Autowired TestClock clock;
+  @Autowired com.sky.infra.MaintenanceJobs maintenance;
+  @Autowired org.springframework.transaction.PlatformTransactionManager transactionManager;
+  @org.junit.jupiter.api.io.TempDir java.nio.file.Path evidenceRoot;
   long user, dish3;
   Actor platform = new Actor(1, "ADMIN", "PLATFORM_ADMIN", "", false);
 
@@ -966,6 +969,136 @@ class PlatformIntegrationTest {
     assertTrue(fulfillment.orders(null, orders.get(99)).isEmpty());
     assertThrows(BusinessException.class, () -> checkout.list(0L));
     assertThrows(BusinessException.class, () -> fulfillment.orders(null, -1L));
+  }
+
+  @Test
+  void maintenanceBoundsDeletionAndKeepsBusinessAndPendingRecords() {
+    var now = LocalDateTime.now(clock);
+    for (int i = 0; i < 205; i++) {
+      db.update(
+          "INSERT INTO auth_session(jti,subject_type,subject_id,auth_version,expires_at)"
+              + " VALUES(?,'USER',?,0,?)",
+          "old-" + i,
+          user,
+          now.minusDays(8));
+      db.update(
+          "INSERT INTO"
+              + " outbox_event(event_type,aggregate_id,payload,state,next_attempt_at,created_at)"
+              + " VALUES('TEST',0,'{}','SUCCEEDED',?,?)",
+          now,
+          now.minusDays(31));
+    }
+    db.update(
+        "INSERT INTO outbox_event(event_type,aggregate_id,payload,state,next_attempt_at,created_at)"
+            + " VALUES('TEST',0,'{}','FAILED',?,?)",
+        now,
+        now.minusDays(40));
+    long audit = db.count("SELECT COUNT(*) FROM audit_log");
+    db.update(
+        "INSERT INTO auth_session(jti,subject_type,subject_id,auth_version,expires_at)"
+            + " VALUES('boundary','USER',?,0,?)",
+        user,
+        now.minusDays(7));
+    for (String state : List.of("REQUESTED", "PROCESSING"))
+      db.update(
+          "INSERT INTO"
+              + " outbox_event(event_type,aggregate_id,payload,state,next_attempt_at,created_at)"
+              + " VALUES('TEST',0,'{}',?,?,?)",
+          state,
+          now,
+          now.minusDays(40));
+    maintenance.clean();
+    assertEquals(5, db.count("SELECT COUNT(*) FROM auth_session WHERE jti LIKE 'old-%'"));
+    assertEquals(5, db.count("SELECT COUNT(*) FROM outbox_event WHERE state='SUCCEEDED'"));
+    assertEquals(1, db.count("SELECT COUNT(*) FROM outbox_event WHERE state='FAILED'"));
+    assertEquals(
+        2, db.count("SELECT COUNT(*) FROM outbox_event WHERE state IN('REQUESTED','PROCESSING')"));
+    assertNotNull(db.one("SELECT jti FROM auth_session WHERE jti='boundary'"));
+    assertEquals(audit, db.count("SELECT COUNT(*) FROM audit_log"));
+    assertNotNull(db.one("SELECT id FROM user WHERE id=?", user));
+    assertEquals(1, db.count("SELECT COUNT(*) FROM auth_session WHERE expires_at>?", now));
+  }
+
+  @Test
+  void concurrentEvidenceCannotExceedPendingLimitAndFailedInsertLeavesNoFile() throws Exception {
+    long order = completed();
+    for (int i = 0; i < 19; i++) {
+      String id = UUID.randomUUID().toString();
+      db.update(
+          "INSERT INTO evidence(id,user_id,order_id,path,created_at)"
+              + " VALUES(?,?,?,?,CURRENT_TIMESTAMP)",
+          id,
+          user,
+          order,
+          id + ".png");
+    }
+    var storage =
+        new com.sky.business.ImageStorage(
+            evidenceRoot.toString(),
+            2,
+            1000000,
+            0,
+            new io.micrometer.core.instrument.simple.SimpleMeterRegistry());
+    var service =
+        new EvidenceService(
+            evidenceRoot.toString(), db, new PlatformScope(db), storage, transactionManager);
+    var out = new java.io.ByteArrayOutputStream();
+    javax.imageio.ImageIO.write(
+        new java.awt.image.BufferedImage(2, 2, java.awt.image.BufferedImage.TYPE_INT_RGB),
+        "png",
+        out);
+    var start = new CountDownLatch(1);
+    try (var pool = Executors.newFixedThreadPool(2)) {
+      var futures = new ArrayList<Future<Boolean>>();
+      for (int i = 0; i < 2; i++)
+        futures.add(
+            pool.submit(
+                () -> {
+                  act(user(user));
+                  start.await();
+                  try {
+                    service.upload(
+                        order,
+                        new org.springframework.mock.web.MockMultipartFile(
+                            "file", "x.png", "image/png", out.toByteArray()));
+                    return true;
+                  } catch (BusinessException ex) {
+                    assertEquals("EVIDENCE_LIMIT", ex.code());
+                    return false;
+                  } finally {
+                    SecurityContextHolder.clearContext();
+                  }
+                }));
+      start.countDown();
+      int succeeded = 0;
+      for (var future : futures) if (future.get(20, TimeUnit.SECONDS)) succeeded++;
+      assertEquals(1, succeeded);
+    }
+    assertEquals(20, db.count("SELECT COUNT(*) FROM evidence WHERE order_id=?", order));
+    var brokenDb = org.mockito.Mockito.mock(Db.class);
+    org.mockito.Mockito.when(
+            brokenDb.update(
+                org.mockito.ArgumentMatchers.anyString(),
+                org.mockito.ArgumentMatchers.any(Object[].class)))
+        .thenThrow(
+            new org.springframework.dao.DataIntegrityViolationException("forced insert failure"));
+    var failing =
+        new EvidenceService(
+            evidenceRoot.toString(),
+            brokenDb,
+            org.mockito.Mockito.mock(PlatformScope.class),
+            storage,
+            transactionManager);
+    assertThrows(
+        org.springframework.dao.DataIntegrityViolationException.class,
+        () ->
+            failing.upload(
+                order,
+                new org.springframework.mock.web.MockMultipartFile(
+                    "file", "x.png", "image/png", out.toByteArray())));
+    try (var files = java.nio.file.Files.walk(evidenceRoot)) {
+      assertEquals(1, files.filter(java.nio.file.Files::isRegularFile).count());
+    }
   }
 
   private void assertCursorPages(

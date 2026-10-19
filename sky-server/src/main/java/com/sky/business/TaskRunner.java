@@ -16,7 +16,7 @@ public class TaskRunner {
   private final Db db;
   private final Clock clock;
   private final Json json;
-  private final MockPaymentGateway gateway;
+  private final PaymentGateway gateway;
   private final OrderSocket socket;
   private final MenuCache cache;
   private final TransactionTemplate tx;
@@ -27,7 +27,7 @@ public class TaskRunner {
       Db db,
       Clock clock,
       Json json,
-      MockPaymentGateway gateway,
+      PaymentGateway gateway,
       OrderSocket socket,
       MenuCache cache,
       PlatformTransactionManager manager,
@@ -48,7 +48,13 @@ public class TaskRunner {
     var task = claim("refund_task");
     if (task == null) return false;
     try {
-      gateway.refund(Db.id(task, "order_id"));
+      var order = db.one("SELECT amount FROM orders WHERE id=?", task.get("order_id"));
+      gateway.refund(
+          new PaymentGateway.Refund(
+              "legacy-refund:" + task.get("id"),
+              "legacy-order:" + task.get("order_id"),
+              com.sky.platform.Money.cents(order.get("amount")),
+              "CNY"));
       tx.executeWithoutResult(
           s -> {
             var current =

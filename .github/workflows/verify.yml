@@ -34,7 +34,9 @@ jobs:
           node --test scripts/check-client-audit.test.mjs
       - name: Start source-built demo
         shell: pwsh
-        run: ./scripts/start.ps1 -SkipVerify
+        run: |
+          ./scripts/test-release-safety.ps1
+          ./scripts/start.ps1 -SkipVerify
       - name: Compare live API schema
         run: node scripts/generate-contracts.mjs --fetch && git diff --exit-code -- frontend/contracts/openapi.json frontend/contracts/openapi.ts
       - name: Check deployment smoke and root redirect
@@ -46,16 +48,9 @@ jobs:
       - name: Verify independent backup restore
         shell: pwsh
         run: |
-          docker compose stop web server
-          if ($LASTEXITCODE -ne 0) { throw 'Failed to pause application writers.' }
-          try {
-            ./scripts/backup.ps1 -Destination (Join-Path $PWD '.local/backups/ci-restore')
-            ./scripts/restore-check.ps1 -BackupDirectory (Join-Path $PWD '.local/backups/ci-restore')
-          } finally {
-            docker compose up -d --wait --wait-timeout 300
-            if ($LASTEXITCODE -ne 0) { throw 'Failed to restore healthy application services.' }
-          }
+          ./scripts/safe-backup.ps1 -Destination (Join-Path $PWD '.local/backups/ci-restore')
           ./scripts/smoke.ps1
+          ./scripts/ops-check.ps1
       - uses: actions/upload-artifact@v4
         if: always()
         with:

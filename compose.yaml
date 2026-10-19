@@ -1,6 +1,12 @@
 name: campuseats-v1
+x-logging: &bounded-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
 services:
   mysql:
+    logging: *bounded-logging
     image: mysql:8.4
     restart: unless-stopped
     environment:
@@ -18,6 +24,7 @@ services:
       retries: 30
     mem_limit: 768m
   redis:
+    logging: *bounded-logging
     image: redis:7.4-alpine
     restart: unless-stopped
     environment:
@@ -31,6 +38,7 @@ services:
       retries: 20
     mem_limit: 160m
   server:
+    logging: *bounded-logging
     image: ${SERVER_IMAGE:-campuseats-server:v1}
     build: .
     restart: unless-stopped
@@ -44,6 +52,9 @@ services:
       WECHAT_SECRET: ${WECHAT_SECRET:-}
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:18083,http://127.0.0.1:18083}
       CAMPUS_MOCK_PAYMENT_ENABLED: ${MOCK_PAYMENT_ENABLED:-true}
+      CAMPUS_UPLOAD_CONCURRENCY: ${UPLOAD_CONCURRENCY:-1}
+      CAMPUS_UPLOAD_QUOTA_BYTES: ${UPLOAD_QUOTA_BYTES:-2147483648}
+      CAMPUS_UPLOAD_MIN_FREE_BYTES: ${UPLOAD_MIN_FREE_BYTES:-268435456}
       TZ: Asia/Shanghai
     volumes: ["uploads:/app/uploads"]
     depends_on:
@@ -59,6 +70,7 @@ services:
       start_period: 60s
     mem_limit: 768m
   web:
+    logging: *bounded-logging
     image: ${WEB_IMAGE:-campuseats-web:v1}
     build:
       context: .

@@ -1,11 +1,11 @@
 package com.sky;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.Mockito.doAnswer;
 
 import com.sky.api.Commands;
 import com.sky.business.MockPaymentGateway;
+import com.sky.business.PaymentGateway;
 import com.sky.common.BusinessException;
 import com.sky.infra.Db;
 import com.sky.platform.*;
@@ -191,7 +191,7 @@ class PlatformConcurrencyTest {
               return invocation.callRealMethod();
             })
         .when(gateway)
-        .pay(anyLong());
+        .pay(org.mockito.ArgumentMatchers.any(PaymentGateway.Payment.class));
     try (var pool = Executors.newFixedThreadPool(2)) {
       Future<?> payment = run(pool, user, () -> checkouts.pay(id, 0));
       try {
@@ -312,7 +312,9 @@ class PlatformConcurrencyTest {
     aftersales.decide(aftersale, new PlatformCommands.Decision(0, true, "同意"), false);
     long request = db.count("SELECT id FROM refund_request WHERE aftersale_id=?", aftersale);
     long amount = db.count("SELECT amount_cents FROM refund_request WHERE id=?", request);
-    gateway.refund(request, amount);
+    gateway.refund(
+        new PaymentGateway.Refund(
+            "refund-request:" + request, "checkout:" + checkout, amount, "CNY"));
     db.update(
         "UPDATE refund_request SET state='PROCESSING',lease_token='worker-lost',lease_until=? WHERE"
             + " id=?",
@@ -326,6 +328,11 @@ class PlatformConcurrencyTest {
     assertEquals(amount, db.count("SELECT refunded_cents FROM orders WHERE id=?", order));
     assertEquals(0, db.count("SELECT reserved_refund_cents FROM orders WHERE id=?", order));
     assertEquals(2, db.count("SELECT refunded_quantity FROM order_detail WHERE order_id=?", order));
-    assertThrows(BusinessException.class, () -> gateway.refund(request + 1000000, 1));
+    assertThrows(
+        BusinessException.class,
+        () ->
+            gateway.refund(
+                new PaymentGateway.Refund(
+                    "refund-request:" + (request + 1000000), "checkout:" + checkout, 1, "CNY")));
   }
 }

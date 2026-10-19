@@ -80,11 +80,22 @@ public class AuthFilter extends OncePerRequestFilter {
     } catch (BusinessException ex) {
       errors.write(req, res, ex.status(), ex.code(), ex.getMessage());
     } finally {
-      if (req.getMethod().equals("POST") && req.getRequestURI().equals("/api/v1/user/orders")) {
+      if (req.getMethod().equals("POST")
+          && res.getStatus() >= 400
+          && (req.getRequestURI().endsWith("/uploads")
+              || req.getRequestURI().endsWith("/evidence")))
+        metrics
+            .counter("campus.upload.rejected", "status", String.valueOf(res.getStatus()))
+            .increment();
+      if (req.getMethod().equals("POST")
+          && Set.of("/api/v1/user/checkouts", "/api/v1/user/orders")
+              .contains(req.getRequestURI())) {
         int status = res.getStatus();
         metrics
             .counter(
                 "campus.order.requests",
+                "api",
+                req.getRequestURI().endsWith("/checkouts") ? "checkout" : "legacy",
                 "result",
                 status < 300 ? "accepted" : status < 500 ? "business_rejected" : "error")
             .increment();

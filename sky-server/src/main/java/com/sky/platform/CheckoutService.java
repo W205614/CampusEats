@@ -63,7 +63,7 @@ public class CheckoutService {
   private final MarketingService marketing;
   private final AddressService addresses;
   private final QuotaService quotas;
-  private final MockPaymentGateway gateway;
+  private final PaymentGateway gateway;
 
   public CheckoutService(
       Db db,
@@ -77,7 +77,7 @@ public class CheckoutService {
       MarketingService marketing,
       AddressService addresses,
       QuotaService quotas,
-      MockPaymentGateway gateway) {
+      PaymentGateway gateway) {
     this.db = db;
     this.json = json;
     this.clock = clock;
@@ -425,7 +425,12 @@ public class CheckoutService {
       cancelLocked(c);
       return detail(id);
     }
-    if (Db.id(c, "total_cents") > 0) gateway.pay(id);
+    String paymentRef =
+        Db.id(c, "total_cents") > 0
+            ? gateway
+                .pay(new PaymentGateway.Payment("checkout:" + id, Db.id(c, "total_cents"), "CNY"))
+                .reference()
+            : "ZERO-CHECKOUT-" + id;
     db.update("UPDATE checkout SET state='PAID',paid_at=?,version=version+1 WHERE id=?", now(), id);
     for (var o : db.rows("SELECT * FROM orders WHERE checkout_id=? ORDER BY id FOR UPDATE", id)) {
       db.update(
@@ -437,7 +442,7 @@ public class CheckoutService {
       db.update(
           "INSERT INTO payment_attempt(order_id,gateway_ref,created_at) VALUES(?,?,?)",
           o.get("id"),
-          "MOCK-CHECKOUT-" + id + "-" + o.get("id"),
+          paymentRef + "-" + o.get("id"),
           now());
       scope.event(Db.id(o, "id"), "ORDER_PAID");
     }
