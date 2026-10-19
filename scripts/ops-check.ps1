@@ -47,7 +47,7 @@ SELECT COUNT(*) FROM evidence WHERE request_id IS NULL;
   $checks.temporaryFiles=@($files | Where-Object {$_ -eq 'TEMP'}).Count
   if($checks.suspectedOrphanEvidence -gt 0 -or $checks.temporaryFiles -gt 0){$issues.Add('Unreferenced or temporary images need manual review')}
  }
- $markers=@(Get-ChildItem -LiteralPath (Join-Path $taskRoot '.local/backups') -Filter verified.json -File -Recurse -ErrorAction SilentlyContinue | Sort-Object LastWriteTimeUtc -Descending)
+ $markers=@(Get-ChildItem -LiteralPath (Join-Path $taskRoot '.local/backups') -Filter verified.json -File -Recurse -Force -ErrorAction SilentlyContinue | Sort-Object LastWriteTimeUtc -Descending)
  $latest=$null
  foreach($markerFile in $markers){
   try {
@@ -60,7 +60,8 @@ SELECT COUNT(*) FROM evidence WHERE request_id IS NULL;
    foreach($entry in $entries){
     $path=[IO.Path]::GetFullPath((Join-Path $markerFile.DirectoryName $entry.path))
     if(!$path.StartsWith($markerFile.DirectoryName+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)){$complete=$false;break}
-    if(!(Test-Path -LiteralPath $path -PathType Leaf) -or (Get-Item -LiteralPath $path).Length -ne $entry.bytes){$complete=$false;break}
+    # The protected .env snapshot is hidden on Linux (and may have the Hidden attribute on Windows).
+    if(!(Test-Path -LiteralPath $path -PathType Leaf) -or (Get-Item -LiteralPath $path -Force).Length -ne $entry.bytes){$complete=$false;break}
    }
    if(!$complete){continue}
    $latest=if($marker.verifiedAt -is [DateTime]){[DateTimeOffset]::new($marker.verifiedAt)}else{[DateTimeOffset]::Parse([string]$marker.verifiedAt,[Globalization.CultureInfo]::InvariantCulture)}
