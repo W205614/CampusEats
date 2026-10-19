@@ -110,6 +110,7 @@ export interface Order {
   payStatus: number;
   fulfillment: string;
   ready: boolean;
+  reviewed?: boolean;
   pickupCode?: string;
   amount: string;
   paidCents: Id;

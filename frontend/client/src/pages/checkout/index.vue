@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import { onShow } from '@dcloudio/uni-app';
 import { api, toast, loggedIn, uuid, ApiError } from '../../api';
 import { useSession } from '../../stores/session';
@@ -24,20 +24,40 @@ const session = useSession(),
   busy = ref(false),
   pending = ref<{ key: string; body: CheckoutInput }>();
 const pendingKey = () => 'checkout-pending-' + session.session?.id;
+let sessionVersion = 0, loadSequence = 0, quoteSequence = 0;
+watch(() => session.session?.token, () => {
+  sessionVersion++;
+  loadSequence++;
+  carts.value = [];
+  addresses.value = [];
+  wallet.value = [];
+  selections.value = [];
+  platformCoupon.value = null;
+  remark.value = '';
+  pending.value = undefined;
+  busy.value = false;
+  invalidate();
+}, { flush: 'sync' });
 function invalidate() {
+  quoteSequence++;
   quote.value = undefined;
 }
 async function load() {
   if (!loggedIn()) return;
+  const owner = sessionVersion, sequence = ++loadSequence;
+  invalidate();
   try {
     pending.value = uni.getStorageSync(pendingKey()) || undefined;
     const selected = (uni.getStorageSync('checkout-stores') as string[]) || [];
-    [carts.value, addresses.value, wallet.value] = await Promise.all([
+    const [loadedCarts, loadedAddresses, loadedWallet] = await Promise.all([
       api<Cart[]>('/carts'),
       api<Address[]>('/addresses'),
       api<Coupon[]>('/wallet'),
     ]);
-    carts.value = carts.value.filter((c) => selected.includes(c.storeId) && c.items.length);
+    if (owner !== sessionVersion || sequence !== loadSequence) return;
+    carts.value = loadedCarts.filter((c) => selected.includes(c.storeId) && c.items.length);
+    addresses.value = loadedAddresses;
+    wallet.value = loadedWallet;
     selections.value = carts.value.map(
       (c) =>
         selections.value.find(
@@ -52,7 +72,7 @@ async function load() {
     );
     invalidate();
   } catch (e) {
-    toast(e);
+    if (owner === sessionVersion || !session.session) toast(e);
   }
 }
 function eligible(c: Cart) {
@@ -78,13 +98,17 @@ const input = (): CheckoutInput => ({
   remark: remark.value,
 });
 async function preview() {
+  if (busy.value) return;
+  invalidate();
+  const owner = sessionVersion, sequence = quoteSequence;
   busy.value = true;
   try {
-    quote.value = await api<Quote>('/checkouts/preview', 'POST', input());
+    const result = await api<Quote>('/checkouts/preview', 'POST', JSON.parse(JSON.stringify(input())));
+    if (owner === sessionVersion && sequence === quoteSequence) quote.value = result;
   } catch (e) {
-    toast(e);
+    if (owner === sessionVersion && sequence === quoteSequence) toast(e);
   } finally {
-    busy.value = false;
+    if (owner === sessionVersion) busy.value = false;
   }
 }
 function finish() {
@@ -94,10 +118,11 @@ function finish() {
 }
 async function send() {
   if (!pending.value) return;
+  const owner = sessionVersion;
   await api<Checkout>('/checkouts', 'POST', pending.value.body, {
     'Idempotency-Key': pending.value.key,
   });
-  finish();
+  if (owner === sessionVersion) finish();
 }
 function releaseRejectedRequest(e: unknown) {
   if (e instanceof ApiError && e.status >= 400 && e.status < 500) {
@@ -108,6 +133,7 @@ function releaseRejectedRequest(e: unknown) {
 }
 async function submit() {
   if (!quote.value || busy.value) return;
+  const owner = sessionVersion;
   busy.value = true;
   try {
     pending.value = {
@@ -117,24 +143,30 @@ async function submit() {
     uni.setStorageSync(pendingKey(), pending.value);
     await send();
   } catch (e) {
-    releaseRejectedRequest(e);
-    toast(e);
+    if (owner === sessionVersion) {
+      releaseRejectedRequest(e);
+      toast(e);
+    }
   } finally {
-    busy.value = false;
+    if (owner === sessionVersion) busy.value = false;
   }
 }
 async function recover() {
   if (!pending.value || busy.value) return;
+  const owner = sessionVersion;
   busy.value = true;
   try {
     try {
       await api<Checkout>('/checkouts/by-request/' + pending.value.key);
+      if (owner !== sessionVersion) return;
       finish();
     } catch (e) {
+      if (owner !== sessionVersion) return;
       if (e instanceof ApiError && e.status === 404) {
         try {
           await send();
         } catch (rejected) {
+          if (owner !== sessionVersion) return;
           releaseRejectedRequest(rejected);
           throw rejected;
         }
@@ -142,9 +174,9 @@ async function recover() {
       else throw e;
     }
   } catch (e) {
-    toast(e);
+    if (owner === sessionVersion) toast(e);
   } finally {
-    busy.value = false;
+    if (owner === sessionVersion) busy.value = false;
   }
 }
 const navTo = (url: string) => uni.navigateTo({ url });

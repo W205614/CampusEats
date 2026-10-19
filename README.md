@@ -157,12 +157,15 @@ pwsh -NoProfile -File ./scripts/safe-backup.ps1
 
 开放真实用户前仍需独立用户身份、关闭共享演示登录、HTTPS及异机备份；当前默认配置仍用于演示，模拟支付成功不能作为真实收款凭证。
 
+四角色用户验收覆盖了点餐、商家备餐、配送／自取、售后和平台异常处理。已修复重复评价入口、待取消订单仍可抢单、报价过期回写及切换账号后的旧页面数据残留；平台介入入口按“商家拒绝或48小时未处理”的既有规则显示。验收继续使用模拟支付与退款，详情见[本轮验收记录](docs/role-acceptance-20261019.md)。
+
 ## 进一步了解
 
 - [架构与接口](docs/platform-architecture.md)：模块划分、权限范围与交易规则。
 - [升级与回滚](docs/platform-deployment.md)：已有数据的升级、备份恢复和独立验收。
 - [稳定性改造验证](docs/stability-verification-20261019.md)：查询、上传保护、维护与停止态升级的验证范围和限制。
 - [最小稳定性修复验证](docs/minimal-stability-verification-20261019.md)：异常订单、超时、任务隔离和运维检查的定向验证与交付边界。
+- [四角色真实操作验收](docs/role-acceptance-20261019.md)：实际页面旅程、异常复现、修复复验及数据隔离边界。
 - [功能验收记录](docs/platform-verification-20261015.md) · [完整浏览器旅程](docs/browser-journey-20261015.md) · [跨校区配送／自取与退款记录](docs/mixed-fulfillment-20261015.md)：查看已有功能验证的范围与证据。
 
 需要阅读源码时，从后端 `sky-server/`、工作台 `frontend/admin/`、用户端 `frontend/client/` 入手；部署入口为 `compose.yaml` 和 `scripts/start.ps1`。

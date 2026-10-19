@@ -86,6 +86,11 @@ public class DiscoveryService {
     long user = Actor.user().id();
     var o = scope.order(order, true);
     require(Db.integer(o, "status") == 5, 409, "REVIEW_STATE", "完成订单后才可评价");
+    require(
+        db.count("SELECT COUNT(*) FROM review WHERE order_id=?", order) == 0,
+        409,
+        "REVIEW_EXISTS",
+        "该订单已评价");
     return db.insert(
         "INSERT INTO review(order_id,user_id,store_id,rating,content,created_at)"
             + " VALUES(?,?,?,?,?,?)",

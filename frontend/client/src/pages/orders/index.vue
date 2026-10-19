@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import { onShow, onHide, onUnload } from '@dcloudio/uni-app';
-import { api, toast, loggedIn, confirm, base } from '../../api';
+import { api, toast, loggedIn, confirm, base, ApiError } from '../../api';
 import { useSession } from '../../stores/session';
 import { readPages } from '../../../../contracts/paging';
 import {
@@ -27,9 +27,27 @@ const session = useSession(),
   loading = ref(false),
   hasMore = ref(false);
 let loadedPages = 1;
+let sessionVersion = 0, loadSequence = 0;
+watch(() => session.session?.token, () => {
+  sessionVersion++;
+  loadSequence++;
+  orders.value = [];
+  checkouts.value = [];
+  requests.value = [];
+  chosen.value = undefined;
+  reason.value = '';
+  content.value = '';
+  quantities.value = {};
+  images.value = [];
+  loadedPages = 1;
+  hasMore.value = false;
+  loading.value = false;
+  busy.value = false;
+}, { flush: 'sync' });
 let timer: ReturnType<typeof setInterval> | undefined;
 async function load(pages = loadedPages) {
   if (!loggedIn() || loading.value) return;
+  const owner = sessionVersion, sequence = ++loadSequence;
   loading.value = true;
   try {
     const [orderPages, checkoutPages, aftersales] = await Promise.all([
@@ -37,6 +55,7 @@ async function load(pages = loadedPages) {
       readPages((before) => api<Checkout[]>('/checkouts' + (before ? '?beforeId=' + before : '')), pages),
       api<Aftersale[]>('/aftersales'),
     ]);
+    if (owner !== sessionVersion || sequence !== loadSequence) return;
     orders.value = orderPages.items;
     checkouts.value = checkoutPages.items;
     requests.value = aftersales;
@@ -44,37 +63,43 @@ async function load(pages = loadedPages) {
     loadedPages = pages;
     if (chosen.value) chosen.value = orders.value.find((o) => o.id === chosen.value?.id);
   } catch (e) {
-    toast(e);
+    if (owner === sessionVersion || !session.session) toast(e);
   } finally {
-    loading.value = false;
+    if (owner === sessionVersion && sequence === loadSequence) loading.value = false;
   }
 }
 const loadMore = () => load(loadedPages + 1);
 const refresh = () => load(1);
 async function pay(c: Checkout) {
   if (busy.value) return;
+  const owner = sessionVersion;
   busy.value = true;
   try {
     const result = await api<Checkout>('/checkouts/' + c.id + '/pay', 'POST', {
       version: c.version,
     });
+    if (owner !== sessionVersion) return;
     if (result.state !== 'PAID') throw new Error('结算单已过期或取消');
     uni.showToast({ title: '模拟支付成功', icon: 'success' });
     await load();
   } catch (e) {
-    toast(e);
-    await load();
+    if (owner === sessionVersion) {
+      toast(e);
+      await load();
+    }
   } finally {
-    busy.value = false;
+    if (owner === sessionVersion) busy.value = false;
   }
 }
 async function cancelCheckout(c: Checkout) {
+  const owner = sessionVersion;
   if (!(await confirm('取消该结算单的全部未支付订单？'))) return;
+  if (owner !== sessionVersion) return;
   try {
     await api('/checkouts/' + c.id + '/cancel', 'POST', { version: c.version });
-    await load();
+    if (owner === sessionVersion) await load();
   } catch (e) {
-    toast(e);
+    if (owner === sessionVersion) toast(e);
   }
 }
 function show(o: Order, m: string) {
@@ -87,6 +112,7 @@ function show(o: Order, m: string) {
 }
 async function submit() {
   if (!chosen.value || busy.value) return;
+  const owner = sessionVersion;
   busy.value = true;
   try {
     const o = chosen.value;
@@ -112,28 +138,37 @@ async function submit() {
             : null,
         evidenceIds: images.value,
       });
+    if (owner !== sessionVersion) return;
     chosen.value = undefined;
     await load();
-    uni.showToast({ title: '已提交', icon: 'success' });
+    if (owner === sessionVersion) uni.showToast({ title: '已提交', icon: 'success' });
   } catch (e) {
-    toast(e);
+    if (owner === sessionVersion) {
+      if (e instanceof ApiError && e.code === 'REVIEW_EXISTS') {
+        chosen.value = undefined;
+        await load();
+      }
+      toast(e);
+    }
   } finally {
-    busy.value = false;
+    if (owner === sessionVersion) busy.value = false;
   }
 }
 async function upload() {
   if (!chosen.value || images.value.length >= 3) return;
+  const owner = sessionVersion, orderId = chosen.value.id, token = session.session?.token;
   try {
     const result = await new Promise<UniApp.ChooseImageSuccessCallbackResult>((resolve, reject) =>
       uni.chooseImage({ count: 3 - images.value.length, success: resolve, fail: reject }),
     );
     for (const filePath of result.tempFilePaths) {
+      if (owner !== sessionVersion || chosen.value?.id !== orderId) return;
       const data = await new Promise<{ id: string }>((resolve, reject) =>
         uni.uploadFile({
-          url: base() + '/api/v1/user/orders/' + chosen.value!.id + '/evidence',
+          url: base() + '/api/v1/user/orders/' + orderId + '/evidence',
           filePath,
           name: 'file',
-          header: { Authorization: 'Bearer ' + session.session?.token },
+          header: { Authorization: 'Bearer ' + token },
           success: (r) => {
             try {
               const value = JSON.parse(r.data);
@@ -146,26 +181,38 @@ async function upload() {
           fail: reject,
         }),
       );
+      if (owner !== sessionVersion || chosen.value?.id !== orderId) return;
       images.value.push(data.id);
     }
   } catch (e) {
-    toast(e);
+    if (owner === sessionVersion) toast(e);
   }
 }
+function canAppeal(a: Aftersale) {
+  if (a.appealed) return false;
+  if (a.state === 'REJECTED') return true;
+  if (a.state !== 'PENDING') return false;
+  // Local server timestamps use Shanghai time; preserve explicit ISO offsets.
+  const createdAt = /(?:Z|[+-]\d{2}:?\d{2})$/i.test(a.createdAt)
+    ? a.createdAt : a.createdAt + '+08:00';
+  return Date.now() - Date.parse(createdAt) >= 48 * 60 * 60 * 1000;
+}
 async function appeal(a: Aftersale) {
+  const owner = sessionVersion;
   try {
     await api('/aftersales/' + a.id + '/appeal', 'POST', { version: a.version });
-    await load();
+    if (owner === sessionVersion) await load();
   } catch (e) {
-    toast(e);
+    if (owner === sessionVersion) toast(e);
   }
 }
 async function withdraw(a: Aftersale) {
+  const owner = sessionVersion;
   try {
     await api('/aftersales/' + a.id + '/withdraw', 'POST', { version: a.version });
-    await load();
+    if (owner === sessionVersion) await load();
   } catch (e) {
-    toast(e);
+    if (owner === sessionVersion) toast(e);
   }
 }
 function quantityChanged(id: string, event: { detail: unknown }) {
@@ -173,11 +220,14 @@ function quantityChanged(id: string, event: { detail: unknown }) {
   quantities.value[id] = Number(d && typeof d === 'object' && 'value' in d ? d.value : d) || 0;
 }
 async function reorder(o: Order) {
+  const owner = sessionVersion;
   try {
     const cart = await api<{ cartVersion: string }>('/stores/' + o.storeId + '/cart');
+    if (owner !== sessionVersion) return;
     const result = await api<{ skipped: string[] }>('/orders/' + o.id + '/reorder', 'POST', {
       version: cart.cartVersion,
     });
+    if (owner !== sessionVersion) return;
     if (result.skipped.length)
       uni.showModal({
         title: '部分餐品需重新选择',
@@ -186,15 +236,16 @@ async function reorder(o: Order) {
       });
     else uni.showToast({ title: '已加入原店购物车', icon: 'none' });
   } catch (e) {
-    toast(e);
+    if (owner === sessionVersion) toast(e);
   }
 }
 async function remind(o: Order) {
+  const owner = sessionVersion;
   try {
     await api('/orders/' + o.id + '/reminder', 'POST');
-    uni.showToast({ title: '已通知店铺', icon: 'success' });
+    if (owner === sessionVersion) uni.showToast({ title: '已通知店铺', icon: 'success' });
   } catch (e) {
-    toast(e);
+    if (owner === sessionVersion) toast(e);
   }
 }
 function stop() {
@@ -246,7 +297,8 @@ onUnload(stop);
         ><template v-if="o.status === 5"
           ><button class="secondary small-button" @click="show(o, 'PARTIAL')">部分退款</button
           ><button class="secondary small-button" @click="show(o, 'FULL')">整单退款</button
-          ><button class="secondary small-button" @click="show(o, 'REVIEW')">
+          ><text v-if="o.reviewed" class="muted">已评价</text
+          ><button v-else class="secondary small-button" @click="show(o, 'REVIEW')">
             评价订单
           </button></template
         ></view
@@ -266,12 +318,14 @@ onUnload(stop);
         ><button v-if="a.state === 'PENDING'" class="secondary small-button" @click="withdraw(a)">
           撤销申请</button
         ><button
-          v-if="!a.appealed && ['PENDING', 'REJECTED'].includes(a.state)"
+          v-if="canAppeal(a)"
           class="secondary small-button"
           @click="appeal(a)"
         >
           申请平台介入
         </button></view
+      ><view v-if="a.state === 'PENDING' && !a.appealed && !canAppeal(a)" class="muted"
+        >商家拒绝或超过48小时未处理时可申请平台介入</view
       ></view
     ><view class="modal" v-if="chosen" @click="chosen = undefined"
       ><view class="card" @click.stop

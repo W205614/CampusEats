@@ -10,6 +10,7 @@ test('browser journey: meal selection, delivery, partial refund and platform int
   browser, request, adminSession,
 }, testInfo) => {
   test.setTimeout(180000);
+  expect(process.env.CI === 'true' || new URL(String(testInfo.project.use.baseURL)).port !== '18083').toBe(true);
   const suffix = randomUUID().slice(0, 8);
   const names = {
     campus: '旅程校区-' + suffix,
@@ -379,6 +380,22 @@ test('browser journey: meal selection, delivery, partial refund and platform int
     await expect(orderCard().getByText('已退 ¥40.00', { exact: true })).toBeVisible();
     await capture(customer, '05-customer-completed-and-fully-refunded');
     checkpoints.push({ name: 'page refusal, user appeal and platform approval', finalRefundedCents: '4000', fulfillmentStatus: 5 });
+    await orderCard().getByText('评价订单', { exact: true }).click();
+    await modal().locator('textarea').fill('验收：配送完成，售后已解决');
+    await postFromUI(customer, '/user/orders/' + orderId + '/review', () =>
+      modal().getByText('确认提交', { exact: true }).click(),
+    );
+    await expect(orderCard().getByText('已评价', { exact: true })).toBeVisible();
+    await expect(orderCard().getByText('评价订单', { exact: true })).toHaveCount(0);
+    await customer.getByText('重新加载', { exact: true }).click();
+    await expect(orderCard().getByText('已评价', { exact: true })).toBeVisible();
+    const duplicateReview = await request.post('/api/v1/user/orders/' + orderId + '/review', {
+      headers: { Authorization: 'Bearer ' + u }, data: { rating: 5, content: '重复评价' },
+    });
+    expect(duplicateReview.status()).toBe(409);
+    expect((await duplicateReview.json()).code).toBe('REVIEW_EXISTS');
+    await capture(customer, '06-customer-reviewed-once');
+    checkpoints.push({ name: 'review submitted on page, retained after refresh, duplicate API explicitly rejected' });
     expect(pageErrors).toEqual([]);
     expect(httpErrors).toEqual([]);
   } catch (error) {

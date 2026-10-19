@@ -1,18 +1,31 @@
 <script setup lang="ts">
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import { onShow } from '@dcloudio/uni-app';
 import { api, toast, loggedIn, confirm } from '../../api';
+import { useSession } from '../../stores/session';
 import type { Cart, CartItem } from '../../../../contracts/platform';
-const carts = ref<Cart[]>([]),
+const session = useSession(),
+  carts = ref<Cart[]>([]),
   selected = ref<string[]>([]),
   busy = ref(false);
+let sessionVersion = 0, loadSequence = 0;
+watch(() => session.session?.token, () => {
+  sessionVersion++;
+  loadSequence++;
+  carts.value = [];
+  selected.value = [];
+  busy.value = false;
+}, { flush: 'sync' });
 async function load() {
   if (!loggedIn()) return;
+  const owner = sessionVersion, sequence = ++loadSequence;
   try {
-    carts.value = (await api<Cart[]>('/carts')).filter((c) => c.items.length);
+    const result = await api<Cart[]>('/carts');
+    if (owner !== sessionVersion || sequence !== loadSequence) return;
+    carts.value = result.filter((c) => c.items.length);
     selected.value = selected.value.filter((id) => carts.value.some((c) => c.storeId === id));
   } catch (e) {
-    toast(e);
+    if (owner === sessionVersion || !session.session) toast(e);
   }
 }
 function toggle(id: string) {
@@ -22,6 +35,7 @@ function toggle(id: string) {
 }
 async function change(c: Cart, item: CartItem, delta: number) {
   if (busy.value) return;
+  const owner = sessionVersion;
   busy.value = true;
   try {
     await api('/stores/' + c.storeId + '/cart/items', 'POST', {
@@ -31,12 +45,14 @@ async function change(c: Cart, item: CartItem, delta: number) {
       flavors: item.flavors,
       delta,
     });
-    await load();
+    if (owner === sessionVersion) await load();
   } catch (e) {
-    toast(e);
-    await load();
+    if (owner === sessionVersion) {
+      toast(e);
+      await load();
+    }
   } finally {
-    busy.value = false;
+    if (owner === sessionVersion) busy.value = false;
   }
 }
 function checkout() {
@@ -44,12 +60,14 @@ function checkout() {
   uni.navigateTo({ url: '/pages/checkout/index' });
 }
 async function clearCart(c: Cart) {
+  const owner = sessionVersion;
   if (!(await confirm('清空这家店的购物车？'))) return;
+  if (owner !== sessionVersion) return;
   try {
     await api('/stores/' + c.storeId + '/cart/clear', 'POST', { version: c.cartVersion });
-    await load();
+    if (owner === sessionVersion) await load();
   } catch (e) {
-    toast(e);
+    if (owner === sessionVersion) toast(e);
   }
 }
 onShow(load);

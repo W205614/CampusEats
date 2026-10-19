@@ -1027,6 +1027,85 @@ class PlatformIntegrationTest {
   }
 
   @Test
+  void reviewedOrdersExposeReviewStateAndRejectDuplicateReviews() {
+    long id = completed();
+    assertEquals(false, fulfillment.detail(id).get("reviewed"));
+    discovery.review(id, new PlatformCommands.Review(5, "餐品很好"));
+    assertEquals(true, fulfillment.detail(id).get("reviewed"));
+    var orders = fulfillment.orders(null);
+    assertEquals(
+        true,
+        orders.stream().filter(o -> Db.id(o, "id") == id).findFirst().orElseThrow().get("reviewed"));
+    assertTrue(
+        orders.stream()
+            .filter(o -> Db.id(o, "id") != id)
+            .allMatch(o -> Boolean.FALSE.equals(o.get("reviewed"))));
+    var error =
+        assertThrows(
+            BusinessException.class,
+            () -> discovery.review(id, new PlatformCommands.Review(4, "再次评价")));
+    assertEquals(409, error.status());
+    assertEquals("REVIEW_EXISTS", error.code());
+    assertEquals(1, db.count("SELECT COUNT(*) FROM review WHERE order_id=?", id));
+  }
+
+  @Test
+  void concurrentReviewReturnsReviewExists() throws Exception {
+    long id = completed();
+    var result =
+        race(
+            List.of(user(user), user(user)),
+            a -> discovery.review(id, new PlatformCommands.Review(5, "并发评价")));
+    assertEquals(1, result.successes());
+    assertEquals(List.of("REVIEW_EXISTS"), result.failures());
+    assertEquals(1, db.count("SELECT COUNT(*) FROM review WHERE order_id=?", id));
+  }
+
+  @Test
+  void cancellationRequestHidesPoolTaskAndBlocksStaleClaim() {
+    long id = paidOrder();
+    db.update("UPDATE orders SET fulfillment='DELIVERY' WHERE id=?", id);
+    act(platform);
+    fulfillment.action(id, "accept", new PlatformCommands.Action(1, null, null, null));
+    fulfillment.action(id, "ready", new PlatformCommands.Action(2, null, null, null));
+    fulfillment.action(id, "publish", new PlatformCommands.Action(3, null, null, null));
+    long task = db.count("SELECT id FROM delivery_task WHERE order_id=?", id);
+    Actor courier = staff("courier1");
+    act(courier);
+    assertEquals(1, fulfillment.pool().size());
+    act(user(user));
+    long first = aftersale.apply(id, new PlatformCommands.Aftersale("CANCEL", "暂不需要", null, null));
+    act(courier);
+    assertTrue(fulfillment.pool().isEmpty());
+    assertEquals(
+        "CANCELLATION_PENDING",
+        assertThrows(BusinessException.class, () -> fulfillment.claim(task, 0)).code());
+    assertEquals("OPEN", db.one("SELECT state FROM delivery_task WHERE id=?", task).get("state"));
+    assertNull(db.one("SELECT courier_id FROM orders WHERE id=?", id).get("courier_id"));
+    act(user(user));
+    aftersale.withdraw(first, 0);
+    act(courier);
+    assertEquals(1, fulfillment.pool().size());
+    act(user(user));
+    long second = aftersale.apply(id, new PlatformCommands.Aftersale("CANCEL", "申请取消", null, null));
+    act(platform);
+    aftersale.decide(second, new PlatformCommands.Decision(0, false, "已备餐"), false);
+    act(user(user));
+    aftersale.appeal(second, 1);
+    act(courier);
+    assertTrue(fulfillment.pool().isEmpty());
+    assertEquals(
+        "CANCELLATION_PENDING",
+        assertThrows(BusinessException.class, () -> fulfillment.claim(task, 0)).code());
+    act(platform);
+    aftersale.decide(second, new PlatformCommands.Decision(2, false, "平台确认继续履约"), true);
+    act(courier);
+    assertEquals(1, fulfillment.pool().size());
+    fulfillment.claim(task, 0);
+    assertEquals(courier.id(), db.count("SELECT courier_id FROM orders WHERE id=?", id));
+  }
+
+  @Test
   void zeroAmountCombinedPaymentDoesNotCallGateway() {
     db.update("UPDATE store SET packaging_fee=0 WHERE id=1");
     act(platform);

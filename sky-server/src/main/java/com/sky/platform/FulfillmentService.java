@@ -86,6 +86,7 @@ public class FulfillmentService {
     var deliveries = grouped("delivery_task", ids);
     var aftersales = grouped("aftersale", ids);
     var refunds = grouped("refund_request", ids);
+    var reviews = grouped("review", ids);
     for (var row : rows) {
       long id = Db.id(row, "id");
       row.remove("pickup_hash");
@@ -96,6 +97,7 @@ public class FulfillmentService {
       row.put("delivery", own.isEmpty() ? null : own.getFirst());
       row.put("aftersales", aftersales.getOrDefault(id, List.of()));
       row.put("refunds", refunds.getOrDefault(id, List.of()));
+      row.put("reviewed", reviews.containsKey(id));
     }
   }
 
@@ -440,7 +442,9 @@ public class FulfillmentService {
         "SELECT t.id,t.order_id,t.version,s.name store_name,b.name building_name,o.ready FROM"
             + " delivery_task t JOIN orders o ON o.id=t.order_id JOIN store s ON s.id=o.store_id"
             + " LEFT JOIN campus_building b ON b.name=o.building_name AND b.campus_id=o.campus_id"
-            + " WHERE t.campus_id=? AND t.state='OPEN' AND o.status=3 ORDER BY t.id LIMIT 100",
+            + " WHERE t.campus_id=? AND t.state='OPEN' AND o.status=3 AND NOT EXISTS (SELECT 1"
+            + " FROM aftersale a WHERE a.order_id=o.id AND a.kind='CANCEL' AND a.state"
+            + " IN('PENDING','ESCALATED')) ORDER BY t.id LIMIT 100",
         a.campusId());
   }
 
@@ -451,6 +455,7 @@ public class FulfillmentService {
     Actor a = scope.courier(Db.id(initial, "campus_id"));
     var o = db.one("SELECT * FROM orders WHERE id=? FOR UPDATE", initial.get("order_id"));
     require(Db.integer(o, "status") == 3, 409, "ORDER_STATE", "订单已不能配送");
+    requireNoCancellation(Db.id(o, "id"));
     require(
         db.update(
                 "UPDATE delivery_task SET courier_id=?,state='ASSIGNED',version=version+1 WHERE"
