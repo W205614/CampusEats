@@ -9,11 +9,7 @@
 .idea
 *.iml
 
-# 测试文件
-*Test.java
-**/test/
-!**/src/test/
-!**/src/test/**
+# 测试源码正常入库；仅排除仍依赖外部服务的本机课程样例。
 # Original lesson samples require external services and remain local.
 **/src/test/java/com/sky/test/
 
@@ -22,6 +18,8 @@ application-dev.yml
 application-*.yml
 !application-docker.yml
 .env
+.env.*
+!.env.example
 /deploy/admin/
 /deploy/uploads/
 

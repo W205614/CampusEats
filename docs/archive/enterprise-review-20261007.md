@@ -1,6 +1,8 @@
+> 历史归档：本文仅记录当时版本，不作为当前部署、账号、接口或安全状态的说明。当前使用请从[项目首页](../../README.md)和[文档导航](../README.md)开始。
+
 > 历史记录：本文所引用的课程实现及旧部署资源已于 2026-10-11 移出当前目录，可在[整理前提交](https://github.com/W205614/CampusEats/tree/f85f3e7faf36b9ef3bd8d6e4a58c33155b3a18e8)中追溯。当前运行与验证以 README 为准。
 
-> 本报告针对升级前版本；原代码现存于 `legacy/`。新版实施和实际验收见 [v1-verification.md](v1-verification.md)。
+> 本报告针对升级前版本；原代码可从上方整理前提交追溯。新版实施和实际验收见 [v1-verification.md](v1-verification.md)。
 
 # CampusEats 企业工程审查与个人开发改造计划
 

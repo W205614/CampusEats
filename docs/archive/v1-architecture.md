@@ -1,4 +1,6 @@
-> 历史单店版本文档。当前多校区版本请使用 [平台架构](platform-architecture.md) 与 [升级说明](platform-deployment.md)。
+> 历史归档：本文仅记录当时版本，不作为当前部署、账号、接口或安全状态的说明。当前使用请从[项目首页](../../README.md)和[文档导航](../README.md)开始。
+
+> 历史单店版本文档。当前多校区版本请使用 [平台架构](../platform-architecture.md) 与 [升级说明](../platform-deployment.md)。
 
 # CampusEats v1 架构与接口
 
