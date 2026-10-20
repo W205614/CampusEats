@@ -81,8 +81,12 @@ public class DirectoryService {
   }
 
   public boolean accepting(Map<String, Object> s) {
+    return accepting(s, LocalDateTime.now(clock.withZone(ZoneId.of("Asia/Shanghai"))));
+  }
+
+  public boolean accepting(Map<String, Object> s, LocalDateTime at) {
     if (!Db.bool(s, "open") || !Db.bool(s, "enabled")) return false;
-    int now = LocalTime.now(clock).getHour() * 60 + LocalTime.now(clock).getMinute();
+    int now = at.getHour() * 60 + at.getMinute();
     for (String w : json.strings(s.get("hours").toString())) {
       String[] x = w.split("-");
       if (now >= minutes(x[0]) && now < minutes(x[1])) return true;

@@ -147,13 +147,42 @@ export interface Aftersale {
   items: { detailId: Id; quantity: number; name: string }[];
   evidence: { id: string }[];
 }
-export interface Refund {
+export interface Task {
   id: Id;
-  orderId: Id;
-  amountCents: Id;
   state: string;
   attempts: number;
   lastError: string;
+}
+export interface Refund extends Task {
+  orderId: Id;
+  amountCents: Id;
+}
+export interface OutboxEvent extends Task {
+  aggregateId: Id;
+  eventType: string;
+  storeId?: Id;
+}
+export interface HistoryFilters {
+  state: string;
+  orderNumber: string;
+  begin: string;
+  end: string;
+  taskId?: string;
+}
+export const aftersaleStates = ['PENDING', 'ESCALATED', 'APPROVED', 'REJECTED', 'WITHDRAWN', 'REFUNDED'];
+export const taskStates = ['REQUESTED', 'PROCESSING', 'FAILED', 'SUCCEEDED'];
+export function historyQuery(filters: HistoryFilters, beforeId?: string) {
+  const entries = Object.entries({ ...filters, beforeId }).filter(([, value]) => value?.trim());
+  return entries.length ? '?' + entries.map(([key, value]) =>
+    encodeURIComponent(key) + '=' + encodeURIComponent(value!.trim())).join('&') : '';
+}
+export function validateHistoryFilters(filters: HistoryFilters) {
+  if (!!filters.begin !== !!filters.end) throw new Error('请同时选择开始和结束日期');
+  if (filters.begin && filters.end) {
+    const days = (Date.parse(filters.end + 'T00:00:00+08:00') - Date.parse(filters.begin + 'T00:00:00+08:00')) / 86400000;
+    if (!Number.isFinite(days) || days < 0 || days >= 366) throw new Error('日期须按先后选择，最多366天（含首尾）');
+  }
+  if (filters.taskId && !/^[1-9]\d*$/.test(filters.taskId.trim())) throw new Error('任务编号须为正整数');
 }
 export interface Coupon {
   id: Id;

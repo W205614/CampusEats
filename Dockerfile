@@ -10,6 +10,9 @@ COPY sky-common/src sky-common/src
 COPY sky-pojo/src sky-pojo/src
 COPY sky-server/src/main sky-server/src/main
 RUN --mount=type=cache,target=/root/.m2 mvn -s /workspace/maven-settings.xml -Dmaven.mirror.url=$MAVEN_MIRROR_URL -U -B -ntp -Dmaven.test.skip=true -Dmaven.wagon.http.retryHandler.count=3 package
+RUN cd /workspace/sky-server/target && test -s bom.json && \
+    sha256sum sky-server-1.0-SNAPSHOT.jar bom.json | \
+    sed 's/sky-server-1.0-SNAPSHOT.jar/app.jar/; s/bom.json/sbom.cdx.json/' > runtime-manifest.sha256
 FROM eclipse-temurin:21-jre
 ARG SOURCE_REVISION=unknown
 LABEL org.opencontainers.image.revision=$SOURCE_REVISION
@@ -17,6 +20,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf 
 WORKDIR /app
 RUN mkdir -p /app/uploads && chown -R 10001:10001 /app
 COPY --from=build --chown=10001:10001 /workspace/sky-server/target/sky-server-1.0-SNAPSHOT.jar /app/app.jar
+COPY --from=build --chown=10001:10001 /workspace/sky-server/target/bom.json /app/sbom.cdx.json
+COPY --from=build --chown=10001:10001 /workspace/sky-server/target/runtime-manifest.sha256 /app/runtime-manifest.sha256
 USER 10001:10001
 ENV TZ=Asia/Shanghai
 EXPOSE 8080

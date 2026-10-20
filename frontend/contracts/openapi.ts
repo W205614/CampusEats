@@ -4481,7 +4481,14 @@ export interface operations {
     };
     userAftersales: {
         parameters: {
-            query?: never;
+            query?: {
+                beforeId?: string;
+                state?: string;
+                orderNumber?: string;
+                begin?: string;
+                end?: string;
+                taskId?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -4508,7 +4515,14 @@ export interface operations {
     };
     refunds: {
         parameters: {
-            query?: never;
+            query?: {
+                beforeId?: string;
+                state?: string;
+                orderNumber?: string;
+                begin?: string;
+                end?: string;
+                taskId?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -4535,7 +4549,14 @@ export interface operations {
     };
     events: {
         parameters: {
-            query?: never;
+            query?: {
+                beforeId?: string;
+                state?: string;
+                orderNumber?: string;
+                begin?: string;
+                end?: string;
+                taskId?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -4589,7 +4610,14 @@ export interface operations {
     };
     platformAftersales: {
         parameters: {
-            query?: never;
+            query?: {
+                beforeId?: string;
+                state?: string;
+                orderNumber?: string;
+                begin?: string;
+                end?: string;
+                taskId?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -4701,7 +4729,14 @@ export interface operations {
     };
     storeRefunds: {
         parameters: {
-            query?: never;
+            query?: {
+                beforeId?: string;
+                state?: string;
+                orderNumber?: string;
+                begin?: string;
+                end?: string;
+                taskId?: string;
+            };
             header?: never;
             path: {
                 storeId: string;
@@ -4790,7 +4825,14 @@ export interface operations {
     };
     storeEvents: {
         parameters: {
-            query?: never;
+            query?: {
+                beforeId?: string;
+                state?: string;
+                orderNumber?: string;
+                begin?: string;
+                end?: string;
+                taskId?: string;
+            };
             header?: never;
             path: {
                 storeId: string;
@@ -4877,7 +4919,14 @@ export interface operations {
     };
     merchantAftersales: {
         parameters: {
-            query?: never;
+            query?: {
+                beforeId?: string;
+                state?: string;
+                orderNumber?: string;
+                begin?: string;
+                end?: string;
+                taskId?: string;
+            };
             header?: never;
             path: {
                 storeId: string;

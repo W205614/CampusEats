@@ -204,13 +204,30 @@ public class PlatformJobs {
   }
 
   public List<Map<String, Object>> refunds(Long store) {
+    return refunds(store, HistoryQuery.EMPTY);
+  }
+
+  public List<Map<String, Object>> refunds(Long store, HistoryQuery query) {
     if (store == null) scope.platform();
     else scope.merchant(store, false);
-    return db.rows(
-        "SELECT * FROM refund_request"
-            + (store == null ? "" : " WHERE store_id=?")
-            + " ORDER BY id DESC LIMIT 100",
-        store == null ? new Object[] {} : new Object[] {store});
+    query.validate(Set.of("REQUESTED", "PROCESSING", "FAILED", "SUCCEEDED"), true);
+    var args = new ArrayList<Object>();
+    String filter = "";
+    if (store != null) {
+      filter = " AND r.store_id=?";
+      args.add(store);
+    }
+    filter += query.conditions("r", args);
+    if (query.orderNumber() != null) {
+      filter += " AND EXISTS (SELECT 1 FROM orders o WHERE o.id=r.order_id AND o.number=?)";
+      args.add(query.orderNumber());
+    }
+    var rows =
+        db.rows(
+            "SELECT r.* FROM refund_request r WHERE 1=1" + filter + " ORDER BY r.id DESC LIMIT 100",
+            args.toArray());
+    rows.forEach(r -> r.remove("lease_token"));
+    return rows;
   }
 
   public void retry(long id) {
@@ -236,14 +253,32 @@ public class PlatformJobs {
   }
 
   public List<Map<String, Object>> events(Long store) {
+    return events(store, HistoryQuery.EMPTY);
+  }
+
+  public List<Map<String, Object>> events(Long store, HistoryQuery query) {
     if (store == null) scope.platform();
     else scope.merchant(store, true);
+    query.validate(Set.of("REQUESTED", "PROCESSING", "FAILED", "SUCCEEDED"), true);
+    var args = new ArrayList<Object>();
+    String filter = "";
+    if (store != null) {
+      filter = " AND e.store_id=?";
+      args.add(store);
+    }
+    filter += query.conditions("e", args);
+    if (query.orderNumber() != null) {
+      filter +=
+          " AND e.event_type<>'CACHE_INVALIDATE' AND EXISTS"
+              + " (SELECT 1 FROM orders o WHERE o.id=e.aggregate_id AND o.number=?)";
+      args.add(query.orderNumber());
+    }
     return db.rows(
-        "SELECT id,event_type,aggregate_id,state,attempts,last_error,next_attempt_at,store_id FROM"
-            + " outbox_event"
-            + (store == null ? "" : " WHERE store_id=?")
-            + " ORDER BY id DESC LIMIT 100",
-        store == null ? new Object[] {} : new Object[] {store});
+        "SELECT e.id,e.event_type,e.aggregate_id,e.state,e.attempts,e.last_error,"
+            + "e.next_attempt_at,e.store_id,e.created_at FROM outbox_event e WHERE 1=1"
+            + filter
+            + " ORDER BY e.id DESC LIMIT 100",
+        args.toArray());
   }
 
   public void retryEvent(long id) {

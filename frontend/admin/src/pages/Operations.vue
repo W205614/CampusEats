@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { ref, onMounted, computed, onUnmounted } from 'vue';
+import { ref, onMounted, computed, onUnmounted, watch } from 'vue';
 import { useRoute } from 'vue-router';
 import { request } from '../platform-api';
 import { notifyError } from '../api';
 import { selectedStore } from '../context';
 import { useSession } from '../stores/session';
 import { roles } from '../../../contracts/models';
+import { readPages } from '../../../contracts/paging';
 import {
   cents,
   states,
@@ -14,6 +15,10 @@ import {
   type Staff,
   type Aftersale,
   type Refund,
+  type OutboxEvent,
+  type Task,
+  type HistoryFilters,
+  historyQuery, validateHistoryFilters, aftersaleStates, taskStates,
   type Review,
 } from '../../../contracts/platform';
 const route = useRoute(),
@@ -27,6 +32,7 @@ const route = useRoute(),
   buildings = ref<{ id: string; name: string; enabled: boolean }[]>([]),
   aftersales = ref<Aftersale[]>([]),
   refunds = ref<Refund[]>([]),
+  events = ref<OutboxEvent[]>([]),
   reviews = ref<Review[]>([]),
   audit = ref<{ id: string; actorId: string; action: string; detail: string; createdAt: string }[]>(
     [],
@@ -37,6 +43,22 @@ const route = useRoute(),
   decision = ref(''),
   reply = ref(''),
   imageUrl = ref('');
+const history = ['aftersales', 'refunds', 'outbox'].includes(kind);
+const emptyFilters = (): HistoryFilters => ({ state: '', orderNumber: '', begin: '', end: '', ...(kind === 'aftersales' ? {} : { taskId: '' }) });
+const filters = ref(emptyFilters()), applied = ref(emptyFilters()), loading = ref(false), hasMore = ref(false);
+const tasks = computed(() => kind === 'outbox' ? events.value : refunds.value);
+let loadedPages = 1, sequence = 0, mounted = false;
+let timer: ReturnType<typeof setInterval> | undefined;
+watch([() => session.session?.token, selectedStore], () => {
+  sequence++;
+  loadedPages = 1;
+  filters.value = emptyFilters();
+  applied.value = emptyFilters();
+  aftersales.value = []; refunds.value = []; events.value = [];
+  hasMore.value = false;
+  loading.value = false;
+  if (mounted) void load();
+}, { flush: 'sync' });
 const form = ref({
   name: '',
   username: '',
@@ -56,7 +78,10 @@ const titles: Record<string, string> = {
   audit: '操作记录',
 };
 const base = () => '/merchant/stores/' + selectedStore.value;
-async function load() {
+async function load(pages = loadedPages) {
+  if (loading.value) return;
+  const current = ++sequence;
+  loading.value = true;
   try {
     if (kind === 'staff')
       staff.value = await request<Staff[]>(platform.value ? '/platform/staff' : base() + '/staff');
@@ -64,18 +89,18 @@ async function load() {
       buildings.value = await request<typeof buildings.value>(
         '/platform/campuses/' + campus.value + '/buildings',
       );
-    if (kind === 'aftersales')
-      aftersales.value = await request<Aftersale[]>(
-        platform.value ? '/platform/aftersales' : base() + '/aftersales',
-      );
-    if (kind === 'outbox')
-      refunds.value = await request<Refund[]>(
-        platform.value ? '/platform/events' : base() + '/events',
-      );
-    if (kind === 'refunds')
-      refunds.value = await request<Refund[]>(
-        platform.value ? '/platform/refunds' : base() + '/refunds',
-      );
+    if (history) {
+      const endpoint = kind === 'outbox' ? 'events' : kind;
+      const path = (platform.value ? '/platform' : base()) + '/' + endpoint;
+      const selectedFilters = { ...applied.value };
+      const result = await readPages((before) => request<(Aftersale | Refund | OutboxEvent)[]>(path + historyQuery(selectedFilters, before)), pages);
+      if (current !== sequence) return;
+      if (kind === 'aftersales') aftersales.value = result.items as Aftersale[];
+      else if (kind === 'outbox') events.value = result.items as OutboxEvent[];
+      else refunds.value = result.items as Refund[];
+      hasMore.value = result.hasMore;
+      loadedPages = pages;
+    }
     if (kind === 'reviews')
       reviews.value = (await request<{ records: Review[] }>(base() + '/reviews')).records;
     if (kind === 'audit')
@@ -83,8 +108,23 @@ async function load() {
         platform.value ? '/platform/audit' : base() + '/audit',
       );
   } catch (e) {
-    notifyError(e);
+    if (current === sequence) notifyError(e);
+  } finally {
+    if (current === sequence) loading.value = false;
   }
+}
+async function search(clear = false) {
+  try {
+    if (clear) filters.value = emptyFilters();
+    validateHistoryFilters(filters.value);
+    applied.value = { ...filters.value };
+    sequence++;
+    loading.value = false;
+    loadedPages = 1;
+    aftersales.value = []; refunds.value = []; events.value = [];
+    hasMore.value = false;
+    await load();
+  } catch (e) { notifyError(e); }
 }
 function edit(s?: Staff) {
   editing.value = s?.id || '';
@@ -159,7 +199,7 @@ async function decide(r: Aftersale, approve: boolean) {
     notifyError(e);
   }
 }
-async function retry(r: Refund) {
+async function retry(r: Task) {
   try {
     await request(
       '/merchant/' + (kind === 'outbox' ? 'events' : 'refunds') + '/' + r.id + '/retry',
@@ -201,16 +241,22 @@ async function viewEvidence(id: string) {
   }
 }
 onMounted(async () => {
+  mounted = true;
   if (platform.value) {
     [campuses.value, stores.value] = await Promise.all([
       request<Campus[]>('/platform/campuses'),
       request<Store[]>('/merchant/stores'),
     ]);
+    if (!mounted) return;
     campus.value = campuses.value[0]?.id || '';
   }
   await load();
+  if (mounted && history) timer = setInterval(() => void load(), 15000);
 });
 onUnmounted(() => {
+  mounted = false;
+  sequence++;
+  if (timer) clearInterval(timer);
   if (imageUrl.value) URL.revokeObjectURL(imageUrl.value);
 });
 </script>
@@ -220,7 +266,17 @@ onUnmounted(() => {
       <h1>{{ titles[kind] }}</h1>
       <p class="muted">按当前身份与店铺权限展示，重要操作留有审计记录。</p>
     </div>
-    <el-button @click="load">刷新</el-button>
+    <el-button :loading="loading" @click="load()">刷新</el-button>
+  </section>
+  <section class="panel" v-if="history" aria-label="历史记录筛选">
+    <el-form inline @submit.prevent="search()">
+      <el-form-item label="状态"><el-select v-model="filters.state" placeholder="全部状态" clearable style="width: 150px"><el-option v-for="s in kind === 'aftersales' ? aftersaleStates : taskStates" :key="s" :value="s" :label="states[s] || s" /></el-select></el-form-item>
+      <el-form-item label="订单号"><el-input v-model="filters.orderNumber" placeholder="完整订单号" maxlength="64" /></el-form-item>
+      <el-form-item v-if="kind !== 'aftersales'" label="任务编号"><el-input v-model="filters.taskId" placeholder="完整任务编号" maxlength="19" /></el-form-item>
+      <el-form-item label="上海日期"><el-date-picker v-model="filters.begin" type="date" value-format="YYYY-MM-DD" placeholder="开始日期" /><el-date-picker v-model="filters.end" type="date" value-format="YYYY-MM-DD" placeholder="结束日期" /></el-form-item>
+      <el-form-item><el-button type="primary" native-type="submit" :disabled="loading">筛选</el-button><el-button :disabled="loading" @click="search(true)">清空筛选</el-button></el-form-item>
+    </el-form>
+    <p class="muted">每页最多100条，日期包含首尾（上海时间），最多366天。刷新保留已加载历史。</p>
   </section>
   <section class="panel" v-if="kind === 'staff'">
     <el-button type="primary" @click="edit()">新增员工</el-button
@@ -295,7 +351,7 @@ onUnmounted(() => {
     <p v-if="!aftersales.length" class="muted">暂无售后申请。</p>
   </section>
   <section class="panel" v-if="kind === 'refunds' || kind === 'outbox'">
-    <el-table :data="refunds"
+    <el-table :data="tasks"
       ><el-table-column prop="id" :label="kind === 'outbox' ? '通知编号' : '退款编号'" /><el-table-column
         :prop="kind === 'outbox' ? 'aggregateId' : 'orderId'"
         label="订单"
@@ -314,6 +370,10 @@ onUnmounted(() => {
         ></el-table-column
       ></el-table
     >
+  </section>
+  <section v-if="history" class="toolbar">
+    <el-button v-if="hasMore" :loading="loading" @click="load(loadedPages + 1)">加载更早记录</el-button>
+    <span v-else-if="!loading" class="muted">已展示全部匹配记录</span>
   </section>
   <section class="panel" v-if="kind === 'reviews'">
     <div class="toolbar">

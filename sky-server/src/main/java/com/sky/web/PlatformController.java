@@ -35,13 +35,16 @@ public class PlatformController {
   }
 
   @GetMapping("/platform/events")
-  public Object events() {
-    return jobs.events(null);
+  public Object events(
+      @org.springdoc.core.annotations.ParameterObject @ModelAttribute HistoryQuery query) {
+    return jobs.events(null, query);
   }
 
   @GetMapping("/merchant/stores/{storeId}/events")
-  public Object storeEvents(@PathVariable long storeId) {
-    return jobs.events(storeId);
+  public Object storeEvents(
+      @PathVariable long storeId,
+      @org.springdoc.core.annotations.ParameterObject @ModelAttribute HistoryQuery query) {
+    return jobs.events(storeId, query);
   }
 
   @PostMapping("/merchant/events/{id}/retry")
@@ -495,18 +498,22 @@ public class PlatformController {
   }
 
   @GetMapping("/user/aftersales")
-  public Object userAftersales() {
-    return aftersale.list(null, false);
+  public Object userAftersales(
+      @org.springdoc.core.annotations.ParameterObject @ModelAttribute HistoryQuery query) {
+    return aftersale.list(null, false, query);
   }
 
   @GetMapping("/merchant/stores/{storeId}/aftersales")
-  public Object merchantAftersales(@PathVariable long storeId) {
-    return aftersale.list(storeId, false);
+  public Object merchantAftersales(
+      @PathVariable long storeId,
+      @org.springdoc.core.annotations.ParameterObject @ModelAttribute HistoryQuery query) {
+    return aftersale.list(storeId, false, query);
   }
 
   @GetMapping("/platform/aftersales")
-  public Object platformAftersales() {
-    return aftersale.list(null, true);
+  public Object platformAftersales(
+      @org.springdoc.core.annotations.ParameterObject @ModelAttribute HistoryQuery query) {
+    return aftersale.list(null, true, query);
   }
 
   @PostMapping("/merchant/aftersales/{id}/decision")
@@ -544,13 +551,16 @@ public class PlatformController {
   }
 
   @GetMapping("/platform/refunds")
-  public Object refunds() {
-    return jobs.refunds(null);
+  public Object refunds(
+      @org.springdoc.core.annotations.ParameterObject @ModelAttribute HistoryQuery query) {
+    return jobs.refunds(null, query);
   }
 
   @GetMapping("/merchant/stores/{storeId}/refunds")
-  public Object storeRefunds(@PathVariable long storeId) {
-    return jobs.refunds(storeId);
+  public Object storeRefunds(
+      @PathVariable long storeId,
+      @org.springdoc.core.annotations.ParameterObject @ModelAttribute HistoryQuery query) {
+    return jobs.refunds(storeId, query);
   }
 
   @PostMapping("/merchant/refunds/{id}/retry")

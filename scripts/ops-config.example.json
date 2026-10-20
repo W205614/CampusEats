@@ -1,0 +1,7 @@
+{
+  "schemaVersion": 1,
+  "replicaDirectory": null,
+  "alertWebhookUrl": null,
+  "alertTimeoutSeconds": 5,
+  "alertMaxAttempts": 2
+}

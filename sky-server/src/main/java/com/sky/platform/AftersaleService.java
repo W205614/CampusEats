@@ -152,23 +152,54 @@ public class AftersaleService {
   }
 
   public List<Map<String, Object>> list(Long store, boolean platform) {
+    return list(store, platform, HistoryQuery.EMPTY);
+  }
+
+  public List<Map<String, Object>> list(Long store, boolean platform, HistoryQuery query) {
     if (platform) scope.platform();
     else if (store != null) scope.merchant(store, false);
     else Actor.user();
+    query.validate(
+        Set.of("PENDING", "ESCALATED", "APPROVED", "REJECTED", "WITHDRAWN", "REFUNDED"), false);
+    var args = new ArrayList<Object>();
+    String filter = "";
+    if (!platform) {
+      filter = store == null ? " AND a.user_id=?" : " AND a.store_id=?";
+      args.add(store == null ? Actor.user().id() : store);
+    }
+    filter += query.conditions("a", args);
+    if (query.orderNumber() != null) {
+      filter += " AND o.number=?";
+      args.add(query.orderNumber());
+    }
     var rows =
         db.rows(
-            "SELECT a.*,o.number FROM aftersale a JOIN orders o ON o.id=a.order_id"
-                + (platform ? "" : store != null ? " WHERE a.store_id=?" : " WHERE a.user_id=?")
+            "SELECT a.*,o.number FROM aftersale a JOIN orders o ON o.id=a.order_id WHERE 1=1"
+                + filter
                 + " ORDER BY a.id DESC LIMIT 100",
-            platform ? new Object[] {} : new Object[] {store == null ? Actor.user().id() : store});
-    for (var r : rows) {
-      r.put(
-          "items",
-          db.rows(
-              "SELECT i.*,d.name FROM aftersale_item i JOIN order_detail d ON d.id=i.detail_id"
-                  + " WHERE request_id=?",
-              r.get("id")));
-      r.put("evidence", db.rows("SELECT id FROM evidence WHERE request_id=?", r.get("id")));
+            args.toArray());
+    if (rows.isEmpty()) return rows;
+    var ids = rows.stream().map(r -> Db.id(r, "id")).toList();
+    var items = new HashMap<Long, List<Map<String, Object>>>();
+    for (var item :
+        db.named.queryForList(
+            "SELECT i.*,d.name FROM aftersale_item i JOIN order_detail d ON d.id=i.detail_id"
+                + " WHERE i.request_id IN (:ids) ORDER BY i.request_id,i.detail_id",
+            Map.of("ids", ids)))
+      items.computeIfAbsent(Db.id(item, "request_id"), ignored -> new ArrayList<>()).add(item);
+    var evidence = new HashMap<Long, List<Map<String, Object>>>();
+    for (var item :
+        db.named.queryForList(
+            "SELECT id,request_id FROM evidence WHERE request_id IN (:ids) ORDER BY id",
+            Map.of("ids", ids))) {
+      long request = Db.id(item, "request_id");
+      item.remove("request_id");
+      evidence.computeIfAbsent(request, ignored -> new ArrayList<>()).add(item);
+    }
+    for (var row : rows) {
+      long id = Db.id(row, "id");
+      row.put("items", items.getOrDefault(id, List.of()));
+      row.put("evidence", evidence.getOrDefault(id, List.of()));
     }
     return rows;
   }

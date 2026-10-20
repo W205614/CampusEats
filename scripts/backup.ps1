@@ -1,13 +1,15 @@
-param([string]$ProjectName='campuseats-v1',[string]$Destination,[string]$EnvFile='.env')
+param([string]$ProjectName='campuseats-v1',[string]$Destination,[string]$EnvFile='.env',[string]$OperationToken='')
 $ErrorActionPreference='Stop'
 $taskRoot=Split-Path $PSScriptRoot -Parent
 if(-not $Destination){$Destination=Join-Path $taskRoot ('.local/backups/'+(Get-Date -Format 'yyyyMMdd-HHmmss'))}
 $backupRoot=[IO.Path]::GetFullPath($Destination)
 $localRoot=[IO.Path]::GetFullPath((Join-Path $taskRoot '.local'))
 if(-not $backupRoot.StartsWith($localRoot+[IO.Path]::DirectorySeparatorChar)){throw 'Backups must remain inside the protected workspace .local directory.'}
-New-Item -ItemType Directory -Path $backupRoot -Force | Out-Null
+. (Join-Path $PSScriptRoot 'operations-lock.ps1')
+$operationLease=Enter-OperationsLock -Root $taskRoot -ProjectName $ProjectName -Token $OperationToken
 Push-Location $taskRoot
 try {
+ New-Item -ItemType Directory -Path $backupRoot -Force | Out-Null
  $countSql='SELECT COUNT(*) FROM orders; SELECT COUNT(*) FROM order_detail; SELECT COUNT(*) FROM user; SELECT COUNT(*) FROM refund_task; SELECT COUNT(*) FROM outbox_event; SELECT COUNT(*) FROM daily_quota;'
  $before=$countSql | docker compose --env-file $EnvFile -p $ProjectName exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_PASSWORD" mysql -u campus sky_take_out -N'
  if($LASTEXITCODE -ne 0){throw 'Backup source checks failed.'}
@@ -42,4 +44,4 @@ try {
   & icacls.exe $backupRoot /inheritance:r /grant:r "${owner}:(OI)(CI)F" | Out-Null
  }
  Write-Host "Verified backup files saved: $backupRoot"
-} finally { Pop-Location }
+} finally { Pop-Location;Exit-OperationsLock $operationLease }

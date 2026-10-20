@@ -320,6 +320,12 @@ test('browser journey: meal selection, delivery, partial refund and platform int
     expect(partial.amountCents).toBe('1600');
     expect(partial.evidence).toHaveLength(1);
     await manager.getByRole('link', { name: '售后处理', exact: true }).click();
+    await manager.getByPlaceholder('完整订单号', { exact: true }).fill(order.number);
+    const merchantFilter = manager.waitForResponse(response =>
+      new URL(response.url()).pathname === '/api/v1/merchant/stores/' + store.id + '/aftersales' &&
+      new URL(response.url()).searchParams.get('orderNumber') === order.number);
+    await manager.getByRole('button', { name: '筛选', exact: true }).click();
+    expect((await merchantFilter).ok()).toBeTruthy();
     const requestCard = (page: Page, id: string) =>
       page.locator('article').filter({ hasText: '申请 ' + id + ' ·' });
     await requestCard(manager, partial.id).getByRole('button', { name: '查看举证 1', exact: true }).click();
@@ -361,6 +367,12 @@ test('browser journey: meal selection, delivery, partial refund and platform int
     const platform = await pageFor();
     await staffLogin(platform, 'admin', password());
     await platform.getByRole('link', { name: '售后处理', exact: true }).click();
+    await platform.getByPlaceholder('完整订单号', { exact: true }).fill(order.number);
+    const platformFilter = platform.waitForResponse(response =>
+      new URL(response.url()).pathname === '/api/v1/platform/aftersales' &&
+      new URL(response.url()).searchParams.get('orderNumber') === order.number);
+    await platform.getByRole('button', { name: '筛选', exact: true }).click();
+    expect((await platformFilter).ok()).toBeTruthy();
     await expect(requestCard(platform, full.id).getByText('平台介入中', { exact: true })).toBeVisible();
     await platform.getByPlaceholder('本次处理说明', { exact: true }).fill('同意剩余实付和未退配送包装费，累计不超过原支付');
     await postFromUI(platform, '/platform/aftersales/' + full.id + '/decision', () =>
@@ -378,6 +390,17 @@ test('browser journey: meal selection, delivery, partial refund and platform int
       expect(wallet.find((coupon) => coupon.name === name)?.state).toBe('USED');
     await customer.getByText('重新加载', { exact: true }).click();
     await expect(orderCard().getByText('已退 ¥40.00', { exact: true })).toBeVisible();
+    // uni-app H5 renders a separate placeholder element beside the native input.
+    await customer.locator('uni-view.card').filter({
+      has: customer.getByText('筛选售后', { exact: true }),
+    }).locator('input[type="text"]').fill(order.number);
+    const customerFilter = customer.waitForResponse(response =>
+      new URL(response.url()).pathname === '/api/v1/user/aftersales' &&
+      new URL(response.url()).searchParams.get('orderNumber') === order.number);
+    await customer.getByText('筛选售后', { exact: true }).click();
+    expect((await customerFilter).ok()).toBeTruthy();
+    await expect(customer.getByText('申请 ' + full.id, { exact: true })).toBeVisible();
+    checkpoints.push({ name: 'real user, merchant and platform aftersale order-number filters keep the same scoped request' });
     await capture(customer, '05-customer-completed-and-fully-refunded');
     checkpoints.push({ name: 'page refusal, user appeal and platform approval', finalRefundedCents: '4000', fulfillmentStatus: 5 });
     await orderCard().getByText('评价订单', { exact: true }).click();

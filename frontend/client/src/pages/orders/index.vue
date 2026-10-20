@@ -11,6 +11,8 @@ import {
   type Order,
   type Checkout,
   type Aftersale,
+  type HistoryFilters,
+  historyQuery, validateHistoryFilters, aftersaleStates,
 } from '../../../../contracts/platform';
 const session = useSession(),
   orders = ref<Order[]>([]),
@@ -27,6 +29,11 @@ const session = useSession(),
   loading = ref(false),
   hasMore = ref(false);
 let loadedPages = 1;
+const emptyFilters = (): HistoryFilters => ({ state: '', orderNumber: '', begin: '', end: '' });
+const requestStateLabels = ['全部状态', ...aftersaleStates.map(state => states[state] || state)];
+const requestFilters = ref(emptyFilters()), appliedRequestFilters = ref(emptyFilters());
+const requestsLoading = ref(false), requestsHaveMore = ref(false);
+let requestPages = 1, requestSequence = 0;
 let sessionVersion = 0, loadSequence = 0;
 watch(() => session.session?.token, () => {
   sessionVersion++;
@@ -43,6 +50,12 @@ watch(() => session.session?.token, () => {
   hasMore.value = false;
   loading.value = false;
   busy.value = false;
+  requestSequence++;
+  requestPages = 1;
+  requestFilters.value = emptyFilters();
+  appliedRequestFilters.value = emptyFilters();
+  requestsLoading.value = false;
+  requestsHaveMore.value = false;
 }, { flush: 'sync' });
 let timer: ReturnType<typeof setInterval> | undefined;
 async function load(pages = loadedPages) {
@@ -50,15 +63,14 @@ async function load(pages = loadedPages) {
   const owner = sessionVersion, sequence = ++loadSequence;
   loading.value = true;
   try {
-    const [orderPages, checkoutPages, aftersales] = await Promise.all([
+    const [orderPages, checkoutPages] = await Promise.all([
       readPages((before) => api<Order[]>('/orders' + (before ? '?beforeId=' + before : '')), pages),
       readPages((before) => api<Checkout[]>('/checkouts' + (before ? '?beforeId=' + before : '')), pages),
-      api<Aftersale[]>('/aftersales'),
+      loadRequests(),
     ]);
     if (owner !== sessionVersion || sequence !== loadSequence) return;
     orders.value = orderPages.items;
     checkouts.value = checkoutPages.items;
-    requests.value = aftersales;
     hasMore.value = orderPages.hasMore || checkoutPages.hasMore;
     loadedPages = pages;
     if (chosen.value) chosen.value = orders.value.find((o) => o.id === chosen.value?.id);
@@ -67,6 +79,36 @@ async function load(pages = loadedPages) {
   } finally {
     if (owner === sessionVersion && sequence === loadSequence) loading.value = false;
   }
+}
+async function loadRequests(pages = requestPages) {
+  if (!session.session || requestsLoading.value) return;
+  const owner = sessionVersion, sequence = ++requestSequence;
+  const filters = { ...appliedRequestFilters.value };
+  requestsLoading.value = true;
+  try {
+    const result = await readPages((before) => api<Aftersale[]>('/aftersales' + historyQuery(filters, before)), pages);
+    if (owner !== sessionVersion || sequence !== requestSequence) return;
+    requests.value = result.items;
+    requestsHaveMore.value = result.hasMore;
+    requestPages = pages;
+  } catch (e) {
+    if (owner === sessionVersion && sequence === requestSequence) toast(e);
+  } finally {
+    if (owner === sessionVersion && sequence === requestSequence) requestsLoading.value = false;
+  }
+}
+async function searchRequests(clear = false) {
+  try {
+    if (clear) requestFilters.value = emptyFilters();
+    validateHistoryFilters(requestFilters.value);
+    appliedRequestFilters.value = { ...requestFilters.value };
+    requestSequence++;
+    requestPages = 1;
+    requests.value = [];
+    requestsHaveMore.value = false;
+    requestsLoading.value = false;
+    await loadRequests();
+  } catch (e) { toast(e); }
 }
 const loadMore = () => load(loadedPages + 1);
 const refresh = () => load(1);
@@ -255,7 +297,7 @@ function stop() {
 onShow(() => {
   load();
   stop();
-  timer = setInterval(load, 15000);
+  timer = setInterval(() => void load(), 15000);
 });
 onHide(stop);
 onUnload(stop);
@@ -307,7 +349,14 @@ onUnload(stop);
       ></view
     ><view v-if="!orders.length" class="empty">还没有订单，先去看看校园好店吧。</view
     ><button v-if="hasMore" class="secondary" :disabled="loading" @click="loadMore">加载更早订单与结算单</button
-    ><view class="section-title" v-if="requests.length">售后进度</view
+    ><view class="section-title">售后进度</view
+    ><view class="card" aria-label="售后记录筛选">
+      <picker :range="requestStateLabels" :value="aftersaleStates.indexOf(requestFilters.state) + 1" @change="requestFilters.state = aftersaleStates[Number($event.detail.value) - 1] || ''"><view class="field-label">售后状态：{{ states[requestFilters.state] || '全部状态' }} ▾</view></picker>
+      <input v-model="requestFilters.orderNumber" placeholder="筛选完整订单号" maxlength="64" />
+      <view class="row"><picker mode="date" :value="requestFilters.begin" @change="requestFilters.begin = $event.detail.value"><view class="tap">开始日期：{{ requestFilters.begin || '未选择' }}</view></picker><picker mode="date" :value="requestFilters.end" @change="requestFilters.end = $event.detail.value"><view class="tap">结束日期：{{ requestFilters.end || '未选择' }}</view></picker></view>
+      <view class="muted">上海日期包含首尾，最多366天；刷新保留已加载历史。</view>
+      <view class="row"><button class="primary small-button" :disabled="requestsLoading" @click="searchRequests()">筛选售后</button><button class="secondary small-button" :disabled="requestsLoading" @click="searchRequests(true)">清空售后筛选</button></view>
+    </view
     ><view class="card" v-for="a in requests" :key="a.id"
       ><view class="row"
         ><text>申请 {{ a.id }}</text
@@ -327,6 +376,8 @@ onUnload(stop);
       ><view v-if="a.state === 'PENDING' && !a.appealed && !canAppeal(a)" class="muted"
         >商家拒绝或超过48小时未处理时可申请平台介入</view
       ></view
+    ><button v-if="requestsHaveMore" class="secondary" :disabled="requestsLoading" @click="loadRequests(requestPages + 1)">加载更早售后</button
+    ><view v-else-if="!requestsLoading" class="muted">已展示全部匹配售后</view
     ><view class="modal" v-if="chosen" @click="chosen = undefined"
       ><view class="card" @click.stop
         ><scroll-view scroll-y style="max-height: 75vh"

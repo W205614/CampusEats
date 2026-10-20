@@ -1,4 +1,4 @@
-param([string]$ProjectName='campuseats-v1',[string]$Destination,[string]$EnvFile='.env')
+param([string]$ProjectName='campuseats-v1',[string]$Destination,[string]$EnvFile='.env',[string]$OperationToken='')
 $ErrorActionPreference='Stop'
 $taskRoot=Split-Path $PSScriptRoot -Parent
 if(!$Destination){$Destination=Join-Path $taskRoot ('.local/backups/'+(Get-Date -Format 'yyyyMMdd-HHmmss')+'-verified')}
@@ -8,6 +8,8 @@ if(!$Destination.StartsWith($protected,[StringComparison]::OrdinalIgnoreCase)){t
 if(Test-Path -LiteralPath $Destination){throw 'Backup destination already exists; choose a new directory.'}
 $composeArgs=@('compose','--env-file',$EnvFile,'-p',$ProjectName)
 $running=@()
+. (Join-Path $PSScriptRoot 'operations-lock.ps1')
+$operationLease=Enter-OperationsLock -Root $taskRoot -ProjectName $ProjectName -Token $OperationToken
 Push-Location $taskRoot
 try {
  foreach($service in @('mysql','redis','server','web')){
@@ -29,7 +31,7 @@ try {
    Start-Sleep -Seconds 2
   }
   if(!$ready){throw 'Backup database not ready.'}
-  & (Join-Path $PSScriptRoot 'backup.ps1') -ProjectName $ProjectName -Destination $Destination -EnvFile $EnvFile
+   & (Join-Path $PSScriptRoot 'backup.ps1') -ProjectName $ProjectName -Destination $Destination -EnvFile $EnvFile -OperationToken $operationLease.Token
   & (Join-Path $PSScriptRoot 'restore-check.ps1') -BackupDirectory $Destination
   $manifest=Join-Path $Destination 'sha256.json'
   $marker=[ordered]@{project=$ProjectName;verifiedAt=[DateTime]::UtcNow.ToString('o');directory=$Destination;manifestSha256=(Get-FileHash -LiteralPath $manifest -Algorithm SHA256).Hash}
@@ -64,4 +66,4 @@ try {
  }
  $marker | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $Destination 'verified.json') -Encoding utf8
  Write-Host "Backup independently restored and verified: $Destination"
-} finally {Pop-Location}
+} finally {Pop-Location;Exit-OperationsLock $operationLease}

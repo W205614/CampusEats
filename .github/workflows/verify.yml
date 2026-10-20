@@ -5,7 +5,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -32,11 +32,15 @@ jobs:
           npm audit --prefix frontend/client --registry=https://registry.npmjs.org --json > .local/audit-client.json || true
           node scripts/check-client-audit.mjs
           node --test scripts/check-client-audit.test.mjs
+      - name: Verify isolated performance fixture boundaries
+        run: node --test scripts/prepare-performance.test.mjs
       - name: Start source-built demo
         shell: pwsh
         run: |
           ./scripts/test-release-safety.ps1
           ./scripts/test-ops-check.ps1
+          ./scripts/test-ops-run.ps1
+          ./scripts/test-image-scan.ps1
           ./scripts/start.ps1 -SkipVerify
       - name: Compare live API schema
         run: node scripts/generate-contracts.mjs --fetch && git diff --exit-code -- frontend/contracts/openapi.json frontend/contracts/openapi.ts
@@ -52,6 +56,9 @@ jobs:
           ./scripts/safe-backup.ps1 -Destination (Join-Path $PWD '.local/backups/ci-restore')
           ./scripts/smoke.ps1
           ./scripts/ops-check.ps1
+      - name: Scan source-built application images and retain SBOMs
+        shell: pwsh
+        run: ./scripts/scan-images.ps1 -ServerImage campuseats-server:v1 -WebImage campuseats-web:v1 -OutputDirectory '.local/security'
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -62,4 +69,5 @@ jobs:
             .local/playwright-report
             .local/audit-client.json
             .local/backups/ci-restore/restore-check.txt
+            .local/security/
           retention-days: 7

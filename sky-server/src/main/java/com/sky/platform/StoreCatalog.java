@@ -265,6 +265,135 @@ public class StoreCatalog {
     return out;
   }
 
+  /**
+   * Bounded candidates first; all response details are fetched in batches, independent of store
+   * count.
+   */
+  public List<Map<String, Object>> search(
+      List<Long> stores, String query, Long category, LocalDateTime at) {
+    if (stores.isEmpty()) return List.of();
+    var params = new HashMap<String, Object>();
+    params.put("stores", stores);
+    params.put("query", query == null ? "" : query.strip());
+    if (category != null) params.put("category", category);
+    var branches = new ArrayList<String>();
+    for (String type : List.of("DISH", "SETMEAL")) {
+      branches.add(
+          "SELECT p.id,p.store_id,'"
+              + type
+              + "' item_type,"
+              + (type.equals("DISH") ? "0" : "1")
+              + " item_rank,s.name store_name FROM "
+              + PlatformScope.table(type)
+              + " p JOIN category c ON c.id=p.category_id"
+              + " AND c.store_id=p.store_id JOIN store s ON s.id=p.store_id"
+              + " JOIN campus campus ON campus.id=s.campus_id WHERE p.store_id IN (:stores)"
+              + " AND s.enabled=true AND campus.enabled=true AND p.status=1 AND c.status=1"
+              + (category == null ? "" : " AND p.category_id=:category")
+              // Binary substring matching preserves Java String.contains case and literal %/_
+              // semantics.
+              + " AND (LOCATE(CAST(:query AS BINARY),CAST(p.name AS BINARY))>0"
+              + " OR LOCATE(CAST(:query AS BINARY),CAST(s.name AS BINARY))>0)");
+    }
+    var candidates =
+        db.named.queryForList(
+            String.join(" UNION ALL ", branches) + " ORDER BY store_id,item_rank,id LIMIT 200",
+            params);
+    if (candidates.isEmpty()) return List.of();
+    var dishIds = new ArrayList<Long>();
+    var setmealIds = new ArrayList<Long>();
+    for (var row : candidates)
+      (row.get("item_type").equals("DISH") ? dishIds : setmealIds).add(Db.id(row, "id"));
+    var products = new HashMap<String, Map<String, Object>>();
+    for (String type : List.of("DISH", "SETMEAL")) {
+      var ids = type.equals("DISH") ? dishIds : setmealIds;
+      if (ids.isEmpty()) continue;
+      for (var row :
+          db.named.queryForList(
+              "SELECT p.*,c.status category_status FROM "
+                  + PlatformScope.table(type)
+                  + " p JOIN category c ON c.id=p.category_id"
+                  + " AND c.store_id=p.store_id WHERE p.id IN (:ids)",
+              Map.of("ids", ids))) products.put(type + ":" + Db.id(row, "id"), row);
+    }
+    var flavors =
+        dishIds.isEmpty()
+            ? Map.<Long, List<Map<String, Object>>>of()
+            : grouped(
+                db.named.queryForList(
+                    "SELECT * FROM dish_flavor WHERE dish_id IN (:ids) ORDER BY id",
+                    Map.of("ids", dishIds)),
+                "dish_id");
+    for (var rows : flavors.values())
+      for (var row : rows) {
+        row.remove("dish_id");
+        row.put("values", json.strings(row.remove("value").toString()));
+      }
+    var components =
+        setmealIds.isEmpty()
+            ? Map.<Long, List<Map<String, Object>>>of()
+            : grouped(
+                db.named.queryForList(
+                    "SELECT sd.*,d.name current_name,d.status FROM setmeal_dish sd JOIN dish d ON"
+                        + " d.id=sd.dish_id WHERE sd.setmeal_id IN (:ids) ORDER BY sd.dish_id",
+                    Map.of("ids", setmealIds)),
+                "setmeal_id");
+    var stockIds = new HashSet<>(dishIds);
+    for (var rows : components.values()) for (var row : rows) stockIds.add(Db.id(row, "dish_id"));
+    var stock = new HashMap<Long, Integer>();
+    if (!stockIds.isEmpty())
+      for (var row :
+          db.named.queryForList(
+              "SELECT d.id,COALESCE(q.total,d.default_quota)"
+                  + "-COALESCE(q.reserved,0)-COALESCE(q.consumed,0) remaining FROM dish d"
+                  + " LEFT JOIN daily_quota q ON q.dish_id=d.id AND q.business_date=:date"
+                  + " WHERE d.id IN (:ids)",
+              Map.of("date", at.toLocalDate(), "ids", stockIds)))
+        stock.put(Db.id(row, "id"), Db.integer(row, "remaining"));
+    var promotions = new HashMap<String, Map<String, Object>>();
+    var promoParams = new HashMap<String, Object>();
+    promoParams.put("stores", stores);
+    promoParams.put("dishes", dishIds.isEmpty() ? List.of(0L) : dishIds);
+    promoParams.put("setmeals", setmealIds.isEmpty() ? List.of(0L) : setmealIds);
+    promoParams.put("at", at);
+    for (var promo :
+        db.named.queryForList(
+            "SELECT id,item_type,item_id,price_cents,ends_at FROM promotion WHERE store_id IN"
+                + " (:stores) AND enabled=true AND starts_at<=:at AND ends_at>:at AND"
+                + " ((item_type='DISH' AND item_id IN (:dishes)) OR (item_type='SETMEAL' AND"
+                + " item_id IN (:setmeals))) ORDER BY id",
+            promoParams)) {
+      String key = promo.remove("item_type") + ":" + promo.remove("item_id");
+      promotions.putIfAbsent(key, promo);
+    }
+    var out = new ArrayList<Map<String, Object>>();
+    for (var candidate : candidates) {
+      String type = candidate.get("item_type").toString();
+      long id = Db.id(candidate, "id");
+      var source = products.get(type + ":" + id);
+      if (source == null) continue; // A concurrently removed item is no longer a result.
+      var row = normalized(source);
+      row.put("item_type", type);
+      row.put("store_name", candidate.get("store_name"));
+      row.put(
+          type.equals("DISH") ? "flavors" : "components",
+          (type.equals("DISH") ? flavors : components).getOrDefault(id, List.of()));
+      int left = stock.getOrDefault(id, 0);
+      if (type.equals("SETMEAL")) {
+        var parts = components.getOrDefault(id, List.of());
+        left = parts.isEmpty() ? 0 : Integer.MAX_VALUE;
+        for (var part : parts)
+          left =
+              Math.min(
+                  left, stock.getOrDefault(Db.id(part, "dish_id"), 0) / Db.integer(part, "copies"));
+      }
+      row.put("remaining", left);
+      row.put("promotion", promotions.get(type + ":" + id));
+      out.add(row);
+    }
+    return out;
+  }
+
   private List<Map<String, Object>> load(long store) {
     var flavors =
         grouped(

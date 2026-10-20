@@ -35,8 +35,64 @@ pwsh -NoProfile -File ./scripts/safe-backup.ps1
 
 升级会先保留旧镜像、构建源码，再检查已停止或运行中的数据库。有旧数据时先暂停写入，完成备份与独立恢复检查，再执行迁移；有业务表但无 Flyway 历史时自动升级会停止。保留原数据卷，回滚需匹配数据库和文件备份。
 
-本项目没有自动注册系统定时任务、异地备份或外部告警；备份仍在本机，需要自行保留异机副本。支付与退款已通过内部 `PaymentGateway` 接口隔离，当前只有模拟实现。未来真实接入需另行设计异步支付、回调验签、查询和对账，不能只替换网关就用于真实收费。
+本项目没有自动注册系统定时任务，也没有默认接入异机备份或外部告警。可以通过下方的一次性运维入口配置副本和通知；本机目录复制与本地通知夹具不等于异地灾备或已上线监控。支付与退款已通过内部 `PaymentGateway` 接口隔离，当前只有模拟实现。未来真实接入需另行设计异步支付、回调验签、查询和对账，不能只替换网关就用于真实收费。
 
 开放真实用户前仍需独立用户身份、关闭共享演示登录、HTTPS及异机备份；当前默认配置仍用于演示，模拟支付成功不能作为真实收款凭证。
 
 四角色用户验收覆盖了点餐、商家备餐、配送／自取、售后和平台异常处理。已修复重复评价入口、待取消订单仍可抢单、报价过期回写及切换账号后的旧页面数据残留；平台介入入口按“商家拒绝或48小时未处理”的既有规则显示。验收继续使用模拟支付与退款，详情见[本轮验收记录](verification/role-acceptance-20261019.md)。
+
+## 可配置的一次性运维入口
+
+```powershell
+Copy-Item ./scripts/ops-config.example.json ./.local/ops-config.json
+pwsh -NoProfile -File ./scripts/ops-run.ps1 -Action Check
+# 有意执行备份时才会暂停业务写入
+pwsh -NoProfile -File ./scripts/ops-run.ps1 -Action Backup
+```
+
+`Check` 仅检查并更新本机运维状态，不创建备份、不停止容器；`Backup` 调用原有安全备份与独立恢复流程，再按配置复制。升级、备份和运维入口共用项目锁，同一项目重复运行会失败，不会相互恢复错误的运行状态。不同项目有独立的锁。
+
+配置文件字段：`schemaVersion` 固定为1；`replicaDirectory` 为受控文件系统目录；`alertWebhookUrl` 为通用 HTTP POST 接收地址；默认 `alertTimeoutSeconds=5`、`alertMaxAttempts=2`，允许范围分别为1—10秒、1—3次。缺少配置会明确报告未接入并返回非零，不会自动寻找外部服务。配置中的地址可能包含密钥，应仅保存在 `.local` 并限制访问。
+
+备份副本包含数据库、上传文件、隐藏的 `.env` 及恢复材料，因此目标目录必须具有与本机备份相同的访问保护，不能使用公开同步目录。工具不加密备份；目录加密与异机保存由部署者另行配置。只有来源验证标记、完整清单与哈希通过后才复制，副本逐文件核对后通过同目录重命名发布，最后使用 `replica-complete.json` 识别完整副本。`.partial-*` 为失败现场，不能用于判断备份成功；不自动删除历史备份或失败目录。
+
+告警只发送项目、状态、时间、问题代码及指纹，不发送配置、原始错误、订单资料或文件内容。首次正常检查保持安静；异常变化或恢复时通知，同一异常不重复通知，发送失败下次重试。接收地址要求 HTTPS，仅本地夹具允许 loopback HTTP；不跟随重定向。`.local/operations-state/` 保存本地状态和最近报告。任务调度、通知接收和停机窗口需要部署者自行安排。
+
+## 历史异常记录
+
+用户售后，以及商家／平台的售后、退款和通知任务支持筛选与加载更早记录。订单号和任务编号为精确匹配，日期筛选按上海时区的创建日期计算，开始与结束日期需同时填写、最多366天。每页100条按编号倒序；刷新保留已加载页与已应用筛选，切换账号或店铺会重置。权限仍按服务端用户、店铺范围检查，查询旧记录不会自动重试任务。
+
+## 镜像依赖与安全清单
+
+```powershell
+pwsh -NoProfile -File ./scripts/scan-images.ps1 `
+  -ServerImage campuseats-server:v1 -WebImage campuseats-web:v1 `
+  -OutputDirectory .local/security
+```
+
+入口下载固定版本并验证官方归档SHA-256，分别扫描两镜像的系统包与后端Java运行时依赖。后端构建时由CycloneDX按实际解析的compile／runtime依赖生成清单，排除test／provided／system范围；JAR、清单及同次构建的SHA-256清单一起进入镜像。扫描器从指定镜像ID创建不启动的临时容器提取这些文件，核对JAR和清单哈希，再用Trivy扫描依赖清单；临时容器只按本次创建ID移除，不删除卷或操作运行服务。
+
+该方式不依赖近1GiB的Java识别库，也不跳过Java依赖检查。完整系统包／Java漏洞JSON、CycloneDX清单、镜像与JAR／清单来源证据、可修复高危／严重漏洞门禁结果分别保留。缺失或不匹配的运行时清单、数据库下载、扫描或转换失败都会失败；未修复漏洞和其它等级仍在完整报告中，不代表全项目零漏洞或安全认证。首次使用需要联网，报告保存在 `.local`，CI保留相应产物。
+
+## 有限性能测量
+
+只在已有独立项目、数据卷、镜像标签与loopback端口的环境执行。下面假设隔离项目为 `campuseats-perf`、端口为28086、配置文件为 `.local/perf.env`；先按[独立验收说明](platform-deployment.md#独立验收)准备环境，不能只改访问端口后对日常数据库运行。
+
+```powershell
+node ./scripts/prepare-performance.mjs --project campuseats-perf `
+  --config .local/perf.env --base-url http://127.0.0.1:28086 `
+  --output .local/perf-sessions.json
+$env:BASE_URL='http://127.0.0.1:28086'
+$env:PERF_PROJECT_NAME='campuseats-perf'
+$env:PERF_USER_TOKENS_FILE='.local/perf-sessions.json'
+$env:ADMIN_PASSWORD=([regex]::Match((Get-Content .local/perf.env -Raw),'(?m)^DEMO_ADMIN_PASSWORD=([^\r\n]+)')).Groups[1].Value
+$env:PERF_OUTPUT='.local/performance/report.json'
+node ./scripts/measure-performance.mjs
+Remove-Item Env:ADMIN_PASSWORD
+```
+
+身份准备先核对容器项目、工作目录、实际loopback端口和隔离配置，再直接在隔离数据库建立10个用户及会话，按应用协议签发令牌并通过普通鉴权接口核验。它是数据库夹具，不是注册／登录验收。私有会话文件和匹配的metadata只保存在 `.local`，测量前需在一小时内重新准备，使用新输出文件名避免覆盖。不要提交、分享或打印其中的令牌。
+
+默认并发1／5／10、每档60秒。每个客户端每档执行一条下单、模拟支付、接单、取消申请、同意及模拟退款的完整交易，其余时间浏览菜单、搜索和周期性报价。保留服务端真实限流，并记录客户端的等待预算；这些数据不能换算成最大交易TPS。可通过 `PERF_CONCURRENCY`、`PERF_SECONDS`、`PERF_READ_PAUSE_MS` 调整，报告始终记录实际策略。
+
+JSON报告包含请求量、成功吞吐、HTTP与交易P95、非预期错误、失败客户端，以及退款／通知积压的前后快照；积压列表达到100条时明确标记截断。测量期间另用 `docker stats --no-stream` 记录隔离容器资源。任何非预期错误或未完成交易都返回非零，不将部分完成报告当作通过。短时本机测量不代表生产峰值、长期稳定性、高可用或真实资金成功率。

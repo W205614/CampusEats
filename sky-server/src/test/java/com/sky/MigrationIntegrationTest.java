@@ -3,6 +3,7 @@ package com.sky;
 import static org.junit.jupiter.api.Assertions.*;
 
 import java.sql.*;
+import java.util.*;
 import org.flywaydb.core.Flyway;
 import org.flywaydb.core.api.MigrationVersion;
 import org.junit.jupiter.api.*;
@@ -46,6 +47,96 @@ class MigrationIntegrationTest {
                 + " VALUES(1,'legacy-order',1,1,'2025-01-01 12:00:00',20.00)");
       }
     }
+  }
+
+  @Test
+  void v8ToV9OnlyAddsIndexesAndPreservesBusinessRows() throws Exception {
+    String url = create("v8_history_upgrade");
+    Flyway.configure().dataSource(url, "root", "test").target("8").load().migrate();
+    try (var c = DriverManager.getConnection(url, "root", "test");
+        var s = c.createStatement()) {
+      s.execute("INSERT INTO user(id,openid,name) VALUES(1,'upgrade-v8','升级用户')");
+      s.execute("INSERT INTO category(id,store_id,type,name,status) VALUES(1,1,1,'分类',1)");
+      s.execute("INSERT INTO dish(id,store_id,category_id,name,price) VALUES(1,1,1,'菜品',5)");
+      s.execute("INSERT INTO store_cart_state VALUES(1,1,4)");
+      s.execute(
+          "INSERT INTO"
+              + " store_cart_item(user_id,store_id,item_type,item_id,flavors,flavor_hash,quantity)"
+              + " VALUES(1,1,'DISH',1,'{}',REPEAT('a',64),2)");
+      s.execute(
+          "INSERT INTO"
+              + " checkout(id,user_id,request_id,request_hash,state,total_cents,paid_at,expires_at,created_at,quote_json)"
+              + " VALUES(1,1,'stable-key',REPEAT('b',64),'PAID',1000,'2026-10-15"
+              + " 12:01:00','2026-10-15 12:15:00','2026-10-15 12:00:00','{}')");
+      s.execute(
+          "INSERT INTO"
+              + " orders(id,number,status,user_id,address_book_id,order_time,amount,store_id,campus_id,checkout_id,paid_cents,reserved_refund_cents)"
+              + " VALUES(1,'v8-order',5,1,0,'2026-10-15 12:00:00',10,1,1,1,1000,500)");
+      s.execute(
+          "INSERT INTO"
+              + " order_detail(id,order_id,dish_id,name,number,amount,line_total_cents,reserved_quantity)"
+              + " VALUES(1,1,1,'原商品快照',2,5,1000,1)");
+      s.execute("INSERT INTO daily_quota VALUES('2026-10-15',1,10,0,2)");
+      s.execute("INSERT INTO order_reservation VALUES(1,1,'2026-10-15',2,'CONSUMED')");
+      s.execute(
+          "INSERT INTO payment_attempt(order_id,gateway_ref,created_at)"
+              + " VALUES(1,'immutable-ref','2026-10-15 12:01:00')");
+      s.execute(
+          "INSERT INTO"
+              + " aftersale(id,order_id,user_id,store_id,kind,state,reason,amount_cents,created_at)"
+              + " VALUES(1,1,1,1,'PARTIAL','APPROVED','升级前申请',500,'2026-10-15 13:00:00')");
+      s.execute("INSERT INTO aftersale_item VALUES(1,1,1,500)");
+      s.execute(
+          "INSERT INTO"
+              + " refund_request(order_id,aftersale_id,store_id,amount_cents,state,attempts,next_attempt_at,lease_token,lease_until,created_at)"
+              + " VALUES(1,1,1,500,'PROCESSING',2,'2026-10-15"
+              + " 13:00:00','lease-before-upgrade','2026-10-15 13:00:30','2026-10-15 13:00:00')");
+      s.execute(
+          "INSERT INTO"
+              + " outbox_event(event_type,aggregate_id,payload,state,next_attempt_at,created_at,store_id,campus_id)"
+              + " VALUES('ORDER_PAID',1,'{\"orderId\":\"1\"}','FAILED','2026-10-15"
+              + " 12:01:00','2026-10-15 12:01:00',1,1)");
+    }
+    var before = businessRows(url);
+    assertEquals(1, before.get("orders").size());
+    assertEquals(1, before.get("refund_request").size());
+    var result = Flyway.configure().dataSource(url, "root", "test").load().migrate();
+    assertEquals(1, result.migrationsExecuted);
+    assertEquals(before, businessRows(url));
+    try (var c = DriverManager.getConnection(url, "root", "test");
+        var s = c.createStatement();
+        var rows =
+            s.executeQuery(
+                "SELECT COUNT(DISTINCT INDEX_NAME) FROM information_schema.statistics WHERE"
+                    + " table_schema='v8_history_upgrade' AND INDEX_NAME IN"
+                    + " ('ix_aftersale_user_history','ix_refund_store_history','ix_dish_discovery','ix_setmeal_discovery')")) {
+      rows.next();
+      assertEquals(4, rows.getInt(1));
+    }
+  }
+
+  private Map<String, List<List<String>>> businessRows(String url) throws Exception {
+    var result = new TreeMap<String, List<List<String>>>();
+    try (var c = DriverManager.getConnection(url, "root", "test");
+        var tables = c.getMetaData().getTables(c.getCatalog(), null, "%", new String[] {"TABLE"})) {
+      while (tables.next()) {
+        String table = tables.getString("TABLE_NAME");
+        if (table.equals("flyway_schema_history")) continue;
+        var rows = new ArrayList<List<String>>();
+        try (var s = c.createStatement();
+            var data = s.executeQuery("SELECT * FROM `" + table + "`")) {
+          while (data.next()) {
+            var row = new ArrayList<String>();
+            for (int i = 1; i <= data.getMetaData().getColumnCount(); i++)
+              row.add(data.getString(i));
+            rows.add(row);
+          }
+        }
+        rows.sort(Comparator.comparing(Object::toString));
+        result.put(table, rows);
+      }
+    }
+    return result;
   }
 
   @Test

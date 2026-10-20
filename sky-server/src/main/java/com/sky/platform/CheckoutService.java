@@ -100,10 +100,10 @@ public class CheckoutService {
 
   @Transactional
   public Quote preview(PlatformCommands.Checkout input) {
-    return prepare(Actor.user().id(), input);
+    return prepare(Actor.user().id(), input, now());
   }
 
-  private Quote prepare(long user, PlatformCommands.Checkout input) {
+  private Quote prepare(long user, PlatformCommands.Checkout input, LocalDateTime at) {
     db.one("SELECT id FROM user WHERE id=? FOR UPDATE", user);
     var parts = new ArrayList<Part>();
     var rules = new ArrayList<Map<String, Object>>();
@@ -112,7 +112,7 @@ public class CheckoutService {
       long store = selection.storeId();
       require(stores.add(store), 400, "DUPLICATE_STORE", "同一店铺不能重复结算");
       var s = scope.store(store, true);
-      require(directory.accepting(s), 409, "SHOP_CLOSED", "店铺当前不接单：" + s.get("name"));
+      require(directory.accepting(s, at), 409, "SHOP_CLOSED", "店铺当前不接单：" + s.get("name"));
       long version = carts.lock(user, store);
       require(version == selection.cartVersion(), 409, "CART_CHANGED", "店铺购物车已变化");
       Map<String, Object> address = Map.of();
@@ -145,7 +145,7 @@ public class CheckoutService {
             catalog.product(store, "DISH", Db.id(component, "dish_id"), true);
         int quantity = Db.integer(item, "quantity");
         long normal = Money.cents(item.get("price"));
-        var activityRule = marketing.activity(store, type, id);
+        var activityRule = marketing.activity(store, type, id, at);
         long activity =
             activityRule == null ? normal : Math.min(normal, Db.id(activityRule, "price_cents"));
         if (activityRule != null) rules.add(activityRule);
@@ -166,7 +166,7 @@ public class CheckoutService {
       }
       if (selection.couponId() != null)
         require(coupons.add(selection.couponId()), 400, "DUPLICATE_COUPON", "同一张券不能重复使用");
-      long shopDiscount = marketing.discount(user, selection.couponId(), store, subtotal);
+      long shopDiscount = marketing.discount(user, selection.couponId(), store, subtotal, at);
       if (selection.couponId() != null) rules.add(marketing.couponSnapshot(selection.couponId()));
       long[] discounts =
           Money.allocate(shopDiscount, lines.stream().mapToLong(Line::paidCents).toArray());
@@ -212,7 +212,7 @@ public class CheckoutService {
     if (input.platformCouponId() != null)
       require(coupons.add(input.platformCouponId()), 400, "DUPLICATE_COUPON", "同一张券不能重复使用");
     long available = parts.stream().mapToLong(p -> p.subtotalCents - p.shopDiscountCents).sum();
-    long platformDiscount = marketing.discount(user, input.platformCouponId(), null, available);
+    long platformDiscount = marketing.discount(user, input.platformCouponId(), null, available, at);
     if (input.platformCouponId() != null)
       rules.add(marketing.couponSnapshot(input.platformCouponId()));
     var flat = parts.stream().flatMap(p -> p.items.stream()).toList();
@@ -261,7 +261,7 @@ public class CheckoutService {
     }
     long total = result.stream().mapToLong(Part::totalCents).sum();
     require(total <= 9999999999L, 400, "AMOUNT_LIMIT", "结算金额超出上限");
-    String date = LocalDate.now(clock).toString();
+    String date = at.toLocalDate().toString();
     String hash =
         Hashes.sha256(
             json.write(
@@ -293,7 +293,8 @@ public class CheckoutService {
           requestHash.equals(old.get("request_hash")), 409, "IDEMPOTENCY_CONFLICT", "同一请求键不能更换内容");
       return detail(Db.id(old, "id"));
     }
-    Quote q = prepare(user, input);
+    LocalDateTime at = now();
+    Quote q = prepare(user, input, at);
     require(q.quoteHash.equals(input.quoteHash()), 409, "QUOTE_CHANGED", "报价已变化，请重新确认");
     long checkout =
         db.insert(
@@ -304,8 +305,8 @@ public class CheckoutService {
             key,
             requestHash,
             q.totalCents,
-            now().plusMinutes(15),
-            now(),
+            at.plusMinutes(15),
+            at,
             json.write(q));
     marketing.reserve(user, q.platformCouponId, checkout);
     for (var p : q.stores) {
@@ -319,7 +320,7 @@ public class CheckoutService {
               "CE-" + checkout + "-" + p.storeId,
               user,
               p.addressId == null ? 0 : p.addressId,
-              now(),
+              at,
               Money.decimal(p.totalCents),
               input.remark(),
               a.get("phone"),
@@ -329,13 +330,13 @@ public class CheckoutService {
               a.get("consignee"),
               UUID.randomUUID().toString(),
               requestHash,
-              LocalDate.now(clock),
+              at.toLocalDate(),
               "ORIGINAL",
               a.get("building_name"),
               a.get("room"),
               Money.decimal(p.deliveryCents),
               Money.decimal(p.packagingCents),
-              now().plusMinutes(15),
+              at.plusMinutes(15),
               p.storeId,
               p.campusId,
               checkout,
@@ -366,7 +367,7 @@ public class CheckoutService {
             quantities.merge(
                 Db.id(c, "dish_id"), l.quantity * Db.integer(c, "copies"), Integer::sum);
       }
-      quotas.reserve(order, LocalDate.now(clock), quantities);
+      quotas.reserve(order, at.toLocalDate(), quantities);
       carts.clear(user, p.storeId);
       scope.event(order, "ORDER_SUBMIT");
       scope.audit("ORDER_SUBMIT", order, p.storeId, "创建店铺子订单");
@@ -498,6 +499,6 @@ public class CheckoutService {
   }
 
   private LocalDateTime now() {
-    return LocalDateTime.now(clock);
+    return LocalDateTime.now(clock.withZone(ZoneId.of("Asia/Shanghai")));
   }
 }

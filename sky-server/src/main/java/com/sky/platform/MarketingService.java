@@ -147,6 +147,10 @@ public class MarketingService {
   }
 
   public long discount(long user, Long ownedCoupon, Long store, long subtotal) {
+    return discount(user, ownedCoupon, store, subtotal, now());
+  }
+
+  public long discount(long user, Long ownedCoupon, Long store, long subtotal, LocalDateTime at) {
     if (ownedCoupon == null) return 0;
     var c =
         db.one(
@@ -162,8 +166,8 @@ public class MarketingService {
         "COUPON_UNAVAILABLE",
         "请选择本人可用的对应优惠券");
     require(
-        !now().isBefore(Db.time(c.get("starts_at")))
-            && now().isBefore(Db.time(c.get("ends_at")))
+        !at.isBefore(Db.time(c.get("starts_at")))
+            && at.isBefore(Db.time(c.get("ends_at")))
             && subtotal >= Db.id(c, "threshold_cents"),
         409,
         "COUPON_THRESHOLD",
@@ -289,6 +293,10 @@ public class MarketingService {
   }
 
   public Map<String, Object> activity(long store, String type, long item) {
+    return activity(store, type, item, now());
+  }
+
+  public Map<String, Object> activity(long store, String type, long item, LocalDateTime at) {
     return db.one(
         "SELECT id,store_id,item_type,item_id,price_cents,starts_at,ends_at FROM promotion WHERE"
             + " store_id=? AND item_type=? AND item_id=? AND enabled=true AND starts_at<=? AND"
@@ -296,7 +304,7 @@ public class MarketingService {
         store,
         type,
         item,
-        now(),
-        now());
+        at,
+        at);
   }
 }

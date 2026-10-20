@@ -69,8 +69,13 @@ class PlatformIntegrationTest {
       return this;
     }
 
+    final AtomicReference<Instant> advanceAfterRead = new AtomicReference<>();
+
     public Instant instant() {
-      return value.get();
+      Instant current = value.get();
+      Instant next = advanceAfterRead.getAndSet(null);
+      if (next != null) value.set(next);
+      return current;
     }
   }
 
@@ -130,6 +135,7 @@ class PlatformIntegrationTest {
 
   @BeforeEach
   void reset() {
+    clock.advanceAfterRead.set(null);
     clock.value.set(Instant.parse("2026-10-15T04:00:00Z"));
     for (String table :
         List.of(
@@ -1035,7 +1041,11 @@ class PlatformIntegrationTest {
     var orders = fulfillment.orders(null);
     assertEquals(
         true,
-        orders.stream().filter(o -> Db.id(o, "id") == id).findFirst().orElseThrow().get("reviewed"));
+        orders.stream()
+            .filter(o -> Db.id(o, "id") == id)
+            .findFirst()
+            .orElseThrow()
+            .get("reviewed"));
     assertTrue(
         orders.stream()
             .filter(o -> Db.id(o, "id") != id)
@@ -1487,12 +1497,309 @@ class PlatformIntegrationTest {
     }
   }
 
+  @Test
+  void checkoutUsesOneShanghaiSnapshotAcrossMidnightAndRetriesOldKey() {
+    Instant before = Instant.parse("2026-10-15T15:59:59Z");
+    Instant after = before.plusSeconds(2);
+    clock.value.set(before);
+    db.update("UPDATE store SET hours='[\"23:00-24:00\"]'");
+    db.update(
+        "INSERT INTO promotion(store_id,item_type,item_id,price_cents,starts_at,ends_at,enabled)"
+            + " VALUES(1,'DISH',2,1000,'2026-10-15 23:00:00','2026-10-16 00:00:00',true)");
+    long template =
+        db.insert(
+            "INSERT INTO"
+                + " coupon(store_id,name,kind,threshold_cents,value,total,per_user,starts_at,ends_at)"
+                + " VALUES(1,'午夜券','REDUCTION',0,100,1,1,'2026-10-15 23:00:00','2026-10-16"
+                + " 00:00:00')");
+    long owned = marketing.claim(template);
+    add(1, 2, 2);
+    add(3, dish3, 1);
+    var selections = input().stores();
+    var source =
+        new PlatformCommands.Checkout(
+            List.of(
+                new PlatformCommands.Selection(
+                    1, selections.getFirst().cartVersion(), "PICKUP", null, owned),
+                selections.getLast()),
+            null,
+            null,
+            "跨日");
+    clock.advanceAfterRead.set(after);
+    var quote = checkout.preview(source);
+    assertEquals("2026-10-15", quote.businessDate());
+    assertEquals(1000, quote.stores().getFirst().items().getFirst().activityCents());
+    var request =
+        new PlatformCommands.Checkout(source.stores(), null, quote.quoteHash(), source.remark());
+    clock.value.set(before);
+    clock.advanceAfterRead.set(after);
+    String key = UUID.randomUUID().toString();
+    var result = checkout.submit(key, request);
+    long id = Db.id(result, "id");
+    assertEquals(
+        2,
+        db.count(
+            "SELECT COUNT(*) FROM orders WHERE checkout_id=? AND business_date='2026-10-15'"
+                + " AND order_time='2026-10-15 23:59:59' AND pay_expires_at='2026-10-16 00:14:59'",
+            id));
+    assertEquals(
+        2, db.count("SELECT COUNT(*) FROM order_reservation WHERE business_date='2026-10-15'"));
+    assertEquals(0, db.count("SELECT COUNT(*) FROM daily_quota WHERE business_date='2026-10-16'"));
+    assertEquals(id, Db.id(checkout.submit(key, request), "id"));
+    assertEquals(id, Db.id(checkout.byKey(key), "id"));
+  }
+
+  @Test
+  void previousDayQuoteIsRejectedBeforeAnyReservation() {
+    add(1, 2, 2);
+    add(3, dish3, 1);
+    clock.value.set(Instant.parse("2026-10-15T15:59:59Z"));
+    var request = quoted(input());
+    clock.value.set(Instant.parse("2026-10-15T16:00:01Z"));
+    assertEquals(
+        "QUOTE_CHANGED",
+        assertThrows(
+                BusinessException.class,
+                () -> checkout.submit(UUID.randomUUID().toString(), request))
+            .code());
+    assertEquals(0, db.count("SELECT COUNT(*) FROM checkout"));
+    assertEquals(0, db.count("SELECT COUNT(*) FROM order_reservation"));
+    assertEquals(2, db.count("SELECT COUNT(*) FROM store_cart_item"));
+  }
+
+  @Test
+  void historyPagesFilterOldRecordsWithoutLeakingScopesAndBindHttpParameters() throws Exception {
+    long order = completed();
+    String number = db.one("SELECT number FROM orders WHERE id=?", order).get("number").toString();
+    long detail = db.count("SELECT MIN(id) FROM order_detail WHERE order_id=?", order);
+    db.update("DELETE FROM outbox_event");
+    var requests = new ArrayList<Long>();
+    var refunds = new ArrayList<Long>();
+    var events = new ArrayList<Long>();
+    for (int i = 0; i < 103; i++) {
+      LocalDateTime at = LocalDateTime.of(2026, 10, 15, 0, 0).plusHours(i == 0 ? 0 : 12);
+      String state = i == 0 ? "FAILED" : "SUCCEEDED";
+      long request =
+          db.insert(
+              "INSERT INTO"
+                  + " aftersale(order_id,user_id,store_id,kind,state,reason,amount_cents,created_at)"
+                  + " VALUES(?,?,1,'FULL','REJECTED','历史',0,?)",
+              order,
+              user,
+              at);
+      requests.add(request);
+      db.update(
+          "INSERT INTO aftersale_item(request_id,detail_id,quantity,amount_cents) VALUES(?,?,1,0)",
+          request,
+          detail);
+      db.update(
+          "INSERT INTO evidence(id,user_id,order_id,request_id,path,created_at)"
+              + " VALUES(?,?,?,?,?,?)",
+          UUID.randomUUID().toString(),
+          user,
+          order,
+          request,
+          "fixture",
+          at);
+      refunds.add(
+          db.insert(
+              "INSERT INTO"
+                  + " refund_request(order_id,aftersale_id,store_id,amount_cents,state,next_attempt_at,created_at)"
+                  + " VALUES(?,?,1,0,?,?,?)",
+              order,
+              request,
+              state,
+              at,
+              at));
+      events.add(
+          db.insert(
+              "INSERT INTO"
+                  + " outbox_event(event_type,aggregate_id,payload,state,next_attempt_at,created_at,store_id)"
+                  + " VALUES('ORDER_REFUNDED',?,'{}',?,?,?,1)",
+              order,
+              state,
+              at,
+              at));
+    }
+    Collections.reverse(requests);
+    Collections.reverse(refunds);
+    Collections.reverse(events);
+    assertCursorPages(
+        requests,
+        before ->
+            aftersale.list(
+                null,
+                false,
+                new HistoryQuery(
+                    before,
+                    "REJECTED",
+                    number,
+                    LocalDate.of(2026, 10, 15),
+                    LocalDate.of(2026, 10, 15),
+                    null)));
+    assertEquals(1, ((List<?>) aftersale.list(null, false).getFirst().get("items")).size());
+    assertEquals(1, ((List<?>) aftersale.list(null, false).getFirst().get("evidence")).size());
+    act(platform);
+    assertCursorPages(
+        refunds,
+        before -> jobs.refunds(null, new HistoryQuery(before, null, number, null, null, null)));
+    assertCursorPages(
+        events,
+        before -> jobs.events(null, new HistoryQuery(before, null, number, null, null, null)));
+    var failed =
+        new HistoryQuery(
+            null, "FAILED", number, LocalDate.of(2026, 10, 15), LocalDate.of(2026, 10, 15), null);
+    assertEquals(refunds.getLast(), jobs.refunds(null, failed).getFirst().get("id"));
+    assertEquals(events.getLast(), jobs.events(null, failed).getFirst().get("id"));
+    db.insert(
+        "INSERT INTO"
+            + " refund_request(order_id,store_id,amount_cents,state,next_attempt_at,created_at)"
+            + " VALUES(?,1,0,'FAILED','2026-10-16 00:00:00','2026-10-16 00:00:00')",
+        order);
+    db.insert(
+        "INSERT INTO"
+            + " outbox_event(event_type,aggregate_id,payload,state,next_attempt_at,created_at,store_id)"
+            + " VALUES('ORDER_REFUNDED',?,'{}','FAILED','2026-10-16 00:00:00','2026-10-16"
+            + " 00:00:00',1)",
+        order);
+    assertEquals(1, jobs.refunds(null, failed).size());
+    assertEquals(1, jobs.events(null, failed).size());
+    db.insert(
+        "INSERT INTO"
+            + " outbox_event(event_type,aggregate_id,payload,state,next_attempt_at,created_at,store_id)"
+            + " VALUES('CACHE_INVALIDATE',?,'{}','FAILED','2026-10-15 00:00:00','2026-10-15"
+            + " 00:00:00',1)",
+        order);
+    assertEquals(1, jobs.events(null, failed).size());
+    assertEquals(
+        1,
+        jobs.refunds(null, new HistoryQuery(null, null, null, null, null, refunds.getLast()))
+            .size());
+    assertTrue(jobs.refunds(3L, failed).isEmpty());
+    assertTrue(aftersale.list(3L, false, HistoryQuery.EMPTY).isEmpty());
+    act(staff("manager1"));
+    assertThrows(BusinessException.class, () -> jobs.refunds(3L, HistoryQuery.EMPTY));
+    long otherUser = Long.parseLong(auth.demo(new Commands.DemoLogin(2)).get("id").toString());
+    act(user(otherUser));
+    assertTrue(aftersale.list(null, false).isEmpty());
+    String token =
+        auth.login(new Commands.Login("admin", "TestAdmin!2026")).get("token").toString();
+    mvc.perform(
+            get("/api/v1/platform/events")
+                .header("Authorization", "Bearer " + token)
+                .param("taskId", events.getLast().toString())
+                .param("state", "FAILED")
+                .param("orderNumber", number)
+                .param("begin", "2026-10-15")
+                .param("end", "2026-10-15"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data.length()").value(1));
+    for (var invalid :
+        List.of(
+            Map.of("beforeId", "0"),
+            Map.of("taskId", "-1"),
+            Map.of("state", "BOGUS"),
+            Map.of("begin", "2026-10-15"),
+            Map.of("begin", "2026-10-16", "end", "2026-10-15"),
+            Map.of("begin", "2024-01-01", "end", "2026-01-01"),
+            Map.of("begin", "bad", "end", "2026-10-15"))) {
+      var http = get("/api/v1/platform/refunds").header("Authorization", "Bearer " + token);
+      invalid.forEach((key, value) -> http.param(key, value));
+      mvc.perform(http).andExpect(status().isBadRequest());
+    }
+  }
+
+  @Test
+  void discoveryKeepsLiteralCaseSensitiveSubstringStoreMatchesAndDynamicDetails() {
+    String dishName = db.one("SELECT name FROM dish WHERE id=2").get("name").toString();
+    String storeName = db.one("SELECT name FROM store WHERE id=1").get("name").toString();
+    try {
+      db.update("UPDATE dish SET name='Rice%_Exact' WHERE id=2");
+      db.update("UPDATE store SET name='ExactStore' WHERE id=1");
+      assertEquals(1, discovery.search(1, "Rice%_", null, null).size());
+      assertTrue(discovery.search(1, "rice%_", null, null).isEmpty());
+      assertTrue(discovery.search(1, "RICE", null, null).isEmpty());
+      long category = db.count("SELECT category_id FROM dish WHERE id=2");
+      var expected = catalog.products(1, false, null, category);
+      var found = discovery.search(1, "ExactStore", category, null);
+      assertEquals(expected.size(), found.size());
+      var rice =
+          found.stream()
+              .filter(r -> r.get("item_type").equals("DISH") && Db.id(r, "id") == 2)
+              .findFirst()
+              .orElseThrow();
+      assertEquals(100, rice.get("remaining"));
+      assertTrue(rice.containsKey("flavors"));
+      db.update("UPDATE dish SET default_quota=7 WHERE id=2");
+      assertEquals(7, discovery.search(1, "Rice%_", null, null).getFirst().get("remaining"));
+      db.update("UPDATE store SET open=false WHERE id=1");
+      assertTrue(discovery.search(1, "Rice%_", null, true).isEmpty());
+      assertEquals(1, discovery.search(1, "Rice%_", null, false).size());
+      db.update("UPDATE category SET status=0 WHERE id=?", category);
+      assertTrue(discovery.search(1, "Rice%_", null, null).isEmpty());
+    } finally {
+      db.update("UPDATE dish SET name=? WHERE id=2", dishName);
+      db.update("UPDATE store SET name=? WHERE id=1", storeName);
+    }
+  }
+
+  @Test
+  void discoveryPreservesFirstTwoHundredStoresAndTwoHundredResults() {
+    long campus =
+        db.insert("INSERT INTO campus(name) VALUES(?)", "search-bound-" + UUID.randomUUID());
+    long firstStore = 0;
+    long category = 0;
+    try {
+      for (int i = 0; i < 201; i++) {
+        long store =
+            db.insert("INSERT INTO store(campus_id,name,open) VALUES(?,?,true)", campus, "店" + i);
+        if (i == 0) {
+          firstStore = store;
+          category =
+              db.insert(
+                  "INSERT INTO category(store_id,name,type,sort,status) VALUES(?,'分类',1,1,1)",
+                  store);
+        }
+        if (i == 200) {
+          long hiddenCategory =
+              db.insert(
+                  "INSERT INTO category(store_id,name,type,sort,status) VALUES(?,'分类',1,1,1)",
+                  store);
+          db.insert(
+              "INSERT INTO dish(store_id,category_id,name,price,status) VALUES(?,?,'最后店独有',1,1)",
+              store,
+              hiddenCategory);
+        }
+      }
+      assertTrue(discovery.search(campus, "最后店独有", null, null).isEmpty());
+      for (int i = 0; i < 201; i++)
+        db.insert(
+            "INSERT INTO dish(store_id,category_id,name,price,status) VALUES(?,?,?,1,1)",
+            firstStore,
+            category,
+            "商品" + i);
+      var found = discovery.search(campus, "商品", null, null);
+      assertEquals(200, found.size());
+      assertEquals("商品0", found.getFirst().get("name"));
+      assertEquals("商品199", found.getLast().get("name"));
+    } finally {
+      db.update(
+          "DELETE FROM dish WHERE store_id IN (SELECT id FROM store WHERE campus_id=?)", campus);
+      db.update(
+          "DELETE FROM category WHERE store_id IN (SELECT id FROM store WHERE campus_id=?)",
+          campus);
+      db.update("DELETE FROM store WHERE campus_id=?", campus);
+      db.update("DELETE FROM campus WHERE id=?", campus);
+    }
+  }
+
   private void assertCursorPages(
       List<Long> expected, java.util.function.Function<Long, List<Map<String, Object>>> load) {
     var first = load.apply(null);
     assertEquals(expected.subList(0, 100), first.stream().map(r -> Db.id(r, "id")).toList());
     var second = load.apply(Db.id(first.getLast(), "id"));
-    assertEquals(expected.subList(100, 105), second.stream().map(r -> Db.id(r, "id")).toList());
+    assertEquals(
+        expected.subList(100, expected.size()), second.stream().map(r -> Db.id(r, "id")).toList());
     assertTrue(load.apply(Db.id(second.getLast(), "id")).isEmpty());
   }
 }

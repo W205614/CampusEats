@@ -28,24 +28,20 @@ public class DiscoveryService {
 
   public List<Map<String, Object>> search(long campus, String query, Long category, Boolean open) {
     require(query == null || query.length() <= 80, 400, "INVALID_QUERY", "搜索关键词过长");
-    var out = new ArrayList<Map<String, Object>>();
-    for (var s :
+    LocalDateTime at = LocalDateTime.now(clock.withZone(ZoneId.of("Asia/Shanghai")));
+    var stores =
         db.rows(
             "SELECT s.* FROM store s JOIN campus c ON c.id=s.campus_id WHERE s.campus_id=?"
                 + " AND s.enabled=true AND c.enabled=true"
                 + (Boolean.TRUE.equals(open) ? " AND s.open=true" : "")
                 + " ORDER BY s.id LIMIT 200",
-            campus)) {
-      if (open != null && directory.accepting(s) != open) continue;
-      String productQuery =
-          query != null && s.get("name").toString().contains(query.strip()) ? null : query;
-      for (var item : catalog.products(Db.id(s, "id"), false, productQuery, category)) {
-        item.put("store_name", s.get("name"));
-        out.add(item);
-        if (out.size() >= 200) return out;
-      }
-    }
-    return out;
+            campus);
+    var ids =
+        stores.stream()
+            .filter(s -> open == null || directory.accepting(s, at) == open)
+            .map(s -> Db.id(s, "id"))
+            .toList();
+    return catalog.search(ids, query, category, at);
   }
 
   public List<Map<String, Object>> favorites() {

@@ -13,6 +13,83 @@ import org.junit.jupiter.api.Test;
 
 class StoreCatalogQueryTest {
   @Test
+  void discoveryBatchQueryCountDoesNotGrowWithStoreCount() {
+    for (int size : List.of(1, 10, 200)) {
+      var calls = new AtomicInteger();
+      var jdbc =
+          mock(
+              org.springframework.jdbc.core.JdbcTemplate.class,
+              invocation -> {
+                if (!invocation.getMethod().getName().equals("query"))
+                  return org.mockito.Answers.RETURNS_DEFAULTS.answer(invocation);
+                calls.incrementAndGet();
+                String sql =
+                    ((org.springframework.jdbc.core.SqlProvider) invocation.getArgument(0))
+                        .getSql();
+                var rows = new ArrayList<Map<String, Object>>();
+                if (sql.contains("UNION ALL")) {
+                  rows.add(
+                      new LinkedHashMap<>(
+                          Map.of(
+                              "id", 1L, "store_id", 1L, "item_type", "DISH", "store_name", "店")));
+                  rows.add(
+                      new LinkedHashMap<>(
+                          Map.of(
+                              "id",
+                              500L,
+                              "store_id",
+                              1L,
+                              "item_type",
+                              "SETMEAL",
+                              "store_name",
+                              "店")));
+                } else if (sql.contains("SELECT p.*")) {
+                  long id = sql.contains("FROM dish p") ? 1L : 500L;
+                  rows.add(
+                      new LinkedHashMap<>(
+                          Map.of(
+                              "id",
+                              id,
+                              "store_id",
+                              1L,
+                              "name",
+                              "菜",
+                              "price",
+                              12,
+                              "status",
+                              1,
+                              "category_status",
+                              1,
+                              "category_id",
+                              1L)));
+                } else if (sql.contains("SELECT sd.*")) {
+                  rows.add(
+                      new LinkedHashMap<>(Map.of("setmeal_id", 500L, "dish_id", 1L, "copies", 2)));
+                } else if (sql.contains(" remaining FROM dish")) {
+                  rows.add(new LinkedHashMap<>(Map.of("id", 1L, "remaining", 10)));
+                }
+                return rows;
+              });
+      var catalog =
+          new StoreCatalog(
+              new Db(jdbc),
+              mock(PlatformScope.class),
+              mock(MenuCache.class),
+              new Json(new tools.jackson.databind.ObjectMapper()),
+              Clock.systemUTC());
+      var results =
+          catalog.search(
+              java.util.stream.LongStream.rangeClosed(1, size).boxed().toList(),
+              "菜",
+              null,
+              LocalDateTime.of(2026, 10, 20, 12, 0));
+      assertEquals(2, results.size());
+      assertEquals(5, results.getLast().get("remaining"));
+      assertEquals(7, calls.get());
+    }
+  }
+
+  @Test
   void coldAndWarmMenusUseBoundedQueriesAndKeepDynamicStockOutOfCache() {
     for (int size : List.of(10, 100)) {
       var calls = new AtomicInteger();
