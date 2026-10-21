@@ -8,9 +8,9 @@ export async function api<T>(
   options: RequestInit = {},
 ): Promise<T> {
   const store = useSession();
+  const token = store.session?.token;
   const headers = new Headers(options.headers);
-  if (store.session)
-    headers.set("Authorization", "Bearer " + store.session.token);
+  if (token) headers.set("Authorization", "Bearer " + token);
   if (options.body && !(options.body instanceof FormData))
     headers.set("Content-Type", "application/json");
   let response: Response;
@@ -34,8 +34,8 @@ export async function api<T>(
     );
   }
   if (!response.ok) {
-    if (response.status === 401) store.set(null);
-    if (result.code === "PASSWORD_CHANGE_REQUIRED")
+    if (response.status === 401 && token && store.session?.token === token) store.set(null);
+    if (result.code === "PASSWORD_CHANGE_REQUIRED" && token && store.session?.token === token)
       window.location.href = "/admin/password";
     throw new ApiError(
       result.code,

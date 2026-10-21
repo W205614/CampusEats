@@ -2590,6 +2590,7 @@ export interface operations {
         parameters: {
             query?: {
                 beforeId?: string;
+                limit?: number;
             };
             header?: never;
             path?: never;
@@ -4259,6 +4260,7 @@ export interface operations {
         parameters: {
             query?: {
                 beforeId?: string;
+                limit?: number;
             };
             header?: never;
             path?: never;
@@ -4488,6 +4490,7 @@ export interface operations {
                 begin?: string;
                 end?: string;
                 taskId?: string;
+                limit?: number;
             };
             header?: never;
             path?: never;
@@ -4522,6 +4525,7 @@ export interface operations {
                 begin?: string;
                 end?: string;
                 taskId?: string;
+                limit?: number;
             };
             header?: never;
             path?: never;
@@ -4556,6 +4560,7 @@ export interface operations {
                 begin?: string;
                 end?: string;
                 taskId?: string;
+                limit?: number;
             };
             header?: never;
             path?: never;
@@ -4617,6 +4622,7 @@ export interface operations {
                 begin?: string;
                 end?: string;
                 taskId?: string;
+                limit?: number;
             };
             header?: never;
             path?: never;
@@ -4736,6 +4742,7 @@ export interface operations {
                 begin?: string;
                 end?: string;
                 taskId?: string;
+                limit?: number;
             };
             header?: never;
             path: {
@@ -4796,6 +4803,7 @@ export interface operations {
         parameters: {
             query?: {
                 beforeId?: string;
+                limit?: number;
             };
             header?: never;
             path: {
@@ -4832,6 +4840,7 @@ export interface operations {
                 begin?: string;
                 end?: string;
                 taskId?: string;
+                limit?: number;
             };
             header?: never;
             path: {
@@ -4926,6 +4935,7 @@ export interface operations {
                 begin?: string;
                 end?: string;
                 taskId?: string;
+                limit?: number;
             };
             header?: never;
             path: {
@@ -5207,6 +5217,7 @@ export interface operations {
         parameters: {
             query?: {
                 beforeId?: string;
+                limit?: number;
             };
             header?: never;
             path?: never;

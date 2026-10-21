@@ -34,7 +34,7 @@ const requestStateLabels = ['全部状态', ...aftersaleStates.map(state => stat
 const requestFilters = ref(emptyFilters()), appliedRequestFilters = ref(emptyFilters());
 const requestsLoading = ref(false), requestsHaveMore = ref(false);
 let requestPages = 1, requestSequence = 0;
-let sessionVersion = 0, loadSequence = 0;
+let sessionVersion = 0, loadSequence = 0, visible = false;
 watch(() => session.session?.token, () => {
   sessionVersion++;
   loadSequence++;
@@ -58,35 +58,39 @@ watch(() => session.session?.token, () => {
   requestsHaveMore.value = false;
 }, { flush: 'sync' });
 let timer: ReturnType<typeof setInterval> | undefined;
-async function load(pages = loadedPages) {
-  if (!loggedIn() || loading.value) return;
+async function load(pages = loadedPages, afterAction = false) {
+  if (!visible || !loggedIn() || loading.value || (busy.value && !afterAction)) return;
   const owner = sessionVersion, sequence = ++loadSequence;
   loading.value = true;
   try {
-    const [orderPages, checkoutPages] = await Promise.all([
-      readPages((before) => api<Order[]>('/orders' + (before ? '?beforeId=' + before : '')), pages),
-      readPages((before) => api<Checkout[]>('/checkouts' + (before ? '?beforeId=' + before : '')), pages),
-      loadRequests(),
+    const [orderResult, checkoutResult] = await Promise.allSettled([
+      readPages((before, limit) => api<Order[]>('/orders?limit=' + limit + (before ? '&beforeId=' + before : '')), pages, () => visible && owner === sessionVersion && sequence === loadSequence),
+      readPages((before, limit) => api<Checkout[]>('/checkouts?limit=' + limit + (before ? '&beforeId=' + before : '')), pages, () => visible && owner === sessionVersion && sequence === loadSequence),
+      loadRequests(requestPages, afterAction),
     ]);
+    if (orderResult.status === 'rejected') throw orderResult.reason;
+    if (checkoutResult.status === 'rejected') throw checkoutResult.reason;
     if (owner !== sessionVersion || sequence !== loadSequence) return;
+    const orderPages = orderResult.value, checkoutPages = checkoutResult.value;
     orders.value = orderPages.items;
     checkouts.value = checkoutPages.items;
     hasMore.value = orderPages.hasMore || checkoutPages.hasMore;
     loadedPages = pages;
     if (chosen.value) chosen.value = orders.value.find((o) => o.id === chosen.value?.id);
   } catch (e) {
-    if (owner === sessionVersion || !session.session) toast(e);
+    if (visible && ((owner === sessionVersion && sequence === loadSequence)
+      || (!session.session && e instanceof ApiError && e.status === 401))) toast(e);
   } finally {
     if (owner === sessionVersion && sequence === loadSequence) loading.value = false;
   }
 }
-async function loadRequests(pages = requestPages) {
-  if (!session.session || requestsLoading.value) return;
+async function loadRequests(pages = requestPages, afterAction = false) {
+  if (!visible || !session.session || requestsLoading.value || (busy.value && !afterAction)) return;
   const owner = sessionVersion, sequence = ++requestSequence;
   const filters = { ...appliedRequestFilters.value };
   requestsLoading.value = true;
   try {
-    const result = await readPages((before) => api<Aftersale[]>('/aftersales' + historyQuery(filters, before)), pages);
+    const result = await readPages((before, limit) => api<Aftersale[]>('/aftersales' + historyQuery(filters, before, limit)), pages, () => visible && owner === sessionVersion && sequence === requestSequence);
     if (owner !== sessionVersion || sequence !== requestSequence) return;
     requests.value = result.items;
     requestsHaveMore.value = result.hasMore;
@@ -98,6 +102,7 @@ async function loadRequests(pages = requestPages) {
   }
 }
 async function searchRequests(clear = false) {
+  if (busy.value) return;
   try {
     if (clear) requestFilters.value = emptyFilters();
     validateHistoryFilters(requestFilters.value);
@@ -113,7 +118,7 @@ async function searchRequests(clear = false) {
 const loadMore = () => load(loadedPages + 1);
 const refresh = () => load(1);
 async function pay(c: Checkout) {
-  if (busy.value) return;
+  if (!visible || busy.value || loading.value || requestsLoading.value) return;
   const owner = sessionVersion;
   busy.value = true;
   try {
@@ -123,12 +128,25 @@ async function pay(c: Checkout) {
     if (owner !== sessionVersion) return;
     if (result.state !== 'PAID') throw new Error('结算单已过期或取消');
     uni.showToast({ title: '模拟支付成功', icon: 'success' });
-    await load();
+    await load(loadedPages, true);
   } catch (e) {
     if (owner === sessionVersion) {
       toast(e);
-      await load();
+      await load(loadedPages, true);
     }
+  } finally {
+    if (owner === sessionVersion) busy.value = false;
+  }
+}
+async function mutateOrder(operation: () => Promise<unknown>) {
+  if (!visible || busy.value || loading.value || requestsLoading.value) return;
+  const owner = sessionVersion;
+  busy.value = true;
+  try {
+    await operation();
+    if (owner === sessionVersion) await load(loadedPages, true);
+  } catch (e) {
+    if (owner === sessionVersion) toast(e);
   } finally {
     if (owner === sessionVersion) busy.value = false;
   }
@@ -137,12 +155,7 @@ async function cancelCheckout(c: Checkout) {
   const owner = sessionVersion;
   if (!(await confirm('取消该结算单的全部未支付订单？'))) return;
   if (owner !== sessionVersion) return;
-  try {
-    await api('/checkouts/' + c.id + '/cancel', 'POST', { version: c.version });
-    if (owner === sessionVersion) await load();
-  } catch (e) {
-    if (owner === sessionVersion) toast(e);
-  }
+  await mutateOrder(() => api('/checkouts/' + c.id + '/cancel', 'POST', { version: c.version }));
 }
 function show(o: Order, m: string) {
   chosen.value = o;
@@ -153,7 +166,7 @@ function show(o: Order, m: string) {
   images.value = [];
 }
 async function submit() {
-  if (!chosen.value || busy.value) return;
+  if (!visible || !chosen.value || busy.value || loading.value || requestsLoading.value) return;
   const owner = sessionVersion;
   busy.value = true;
   try {
@@ -182,13 +195,13 @@ async function submit() {
       });
     if (owner !== sessionVersion) return;
     chosen.value = undefined;
-    await load();
+    await load(loadedPages, true);
     if (owner === sessionVersion) uni.showToast({ title: '已提交', icon: 'success' });
   } catch (e) {
     if (owner === sessionVersion) {
       if (e instanceof ApiError && e.code === 'REVIEW_EXISTS') {
         chosen.value = undefined;
-        await load();
+        await load(loadedPages, true);
       }
       toast(e);
     }
@@ -197,7 +210,8 @@ async function submit() {
   }
 }
 async function upload() {
-  if (!chosen.value || images.value.length >= 3) return;
+  if (!visible || !chosen.value || images.value.length >= 3 || busy.value || loading.value || requestsLoading.value) return;
+  busy.value = true;
   const owner = sessionVersion, orderId = chosen.value.id, token = session.session?.token;
   try {
     const result = await new Promise<UniApp.ChooseImageSuccessCallbackResult>((resolve, reject) =>
@@ -228,6 +242,8 @@ async function upload() {
     }
   } catch (e) {
     if (owner === sessionVersion) toast(e);
+  } finally {
+    if (owner === sessionVersion) busy.value = false;
   }
 }
 function canAppeal(a: Aftersale) {
@@ -240,28 +256,18 @@ function canAppeal(a: Aftersale) {
   return Date.now() - Date.parse(createdAt) >= 48 * 60 * 60 * 1000;
 }
 async function appeal(a: Aftersale) {
-  const owner = sessionVersion;
-  try {
-    await api('/aftersales/' + a.id + '/appeal', 'POST', { version: a.version });
-    if (owner === sessionVersion) await load();
-  } catch (e) {
-    if (owner === sessionVersion) toast(e);
-  }
+  await mutateOrder(() => api('/aftersales/' + a.id + '/appeal', 'POST', { version: a.version }));
 }
 async function withdraw(a: Aftersale) {
-  const owner = sessionVersion;
-  try {
-    await api('/aftersales/' + a.id + '/withdraw', 'POST', { version: a.version });
-    if (owner === sessionVersion) await load();
-  } catch (e) {
-    if (owner === sessionVersion) toast(e);
-  }
+  await mutateOrder(() => api('/aftersales/' + a.id + '/withdraw', 'POST', { version: a.version }));
 }
 function quantityChanged(id: string, event: { detail: unknown }) {
   const d = event.detail;
   quantities.value[id] = Number(d && typeof d === 'object' && 'value' in d ? d.value : d) || 0;
 }
 async function reorder(o: Order) {
+  if (!visible || busy.value || loading.value || requestsLoading.value) return;
+  busy.value = true;
   const owner = sessionVersion;
   try {
     const cart = await api<{ cartVersion: string }>('/stores/' + o.storeId + '/cart');
@@ -279,24 +285,34 @@ async function reorder(o: Order) {
     else uni.showToast({ title: '已加入原店购物车', icon: 'none' });
   } catch (e) {
     if (owner === sessionVersion) toast(e);
+  } finally {
+    if (owner === sessionVersion) busy.value = false;
   }
 }
 async function remind(o: Order) {
+  if (!visible || busy.value || loading.value || requestsLoading.value) return;
+  busy.value = true;
   const owner = sessionVersion;
   try {
     await api('/orders/' + o.id + '/reminder', 'POST');
     if (owner === sessionVersion) uni.showToast({ title: '已通知店铺', icon: 'success' });
   } catch (e) {
     if (owner === sessionVersion) toast(e);
+  } finally {
+    if (owner === sessionVersion) busy.value = false;
   }
 }
 function stop() {
+  visible = false;
+  sessionVersion++; loadSequence++; requestSequence++;
+  loading.value = false; requestsLoading.value = false; busy.value = false;
   if (timer) clearInterval(timer);
   timer = undefined;
 }
 onShow(() => {
-  load();
   stop();
+  visible = true;
+  void load();
   timer = setInterval(() => void load(), 15000);
 });
 onHide(stop);

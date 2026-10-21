@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, computed } from 'vue';
+import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
 import { ElAlert, ElCheckbox } from 'element-plus';
 import { request } from '../platform-api';
 import { notifyError } from '../api';
@@ -29,52 +29,78 @@ const session = useSession(),
   timer = ref<ReturnType<typeof setInterval>>(),
   loading = ref(false),
   hasMore = ref(false);
-let loadedPages = 1;
+let loadedPages = 1, sequence = 0, initialization = 0, mounted = false;
+watch([() => session.session?.token, selectedStore], () => {
+  sequence++;
+  loadedPages = 1;
+  orders.value = []; pool.value = []; couriers.value = [];
+  selected.value = undefined; exceptionOrder.value = undefined;
+  reason.value = ''; code.value = ''; courierId.value = '';
+  hasMore.value = false; loading.value = false; busy.value = false; needsRefresh.value = false;
+  socket.value?.close();
+  if (mounted) void initialize();
+}, { flush: 'sync' });
 async function load(pages = loadedPages) {
-  if (loading.value || busy.value) return;
+  if (!mounted || !session.session || loading.value || busy.value) return;
+  const current = ++sequence;
+  const isCurrent = () => mounted && current === sequence;
+  const isCourier = courier.value, store = selectedStore.value;
   loading.value = true;
   try {
-    const path = courier.value ? '/courier/orders' : '/merchant/stores/' + selectedStore.value + '/orders';
-    const result = await readPages((before) => request<Order[]>(path + (before ? '?beforeId=' + before : '')), pages);
+    const path = isCourier ? '/courier/orders' : '/merchant/stores/' + store + '/orders';
+    const [orderResult, relatedResult] = await Promise.allSettled([
+      readPages((before, limit) => request<Order[]>(path + '?limit=' + limit + (before ? '&beforeId=' + before : '')), pages, isCurrent),
+      isCourier ? request<typeof pool.value>('/courier/pool')
+        : request<typeof couriers.value>('/merchant/stores/' + store + '/couriers'),
+    ]);
+    if (!isCurrent()) return;
+    if (orderResult.status === 'rejected') throw orderResult.reason;
+    if (relatedResult.status === 'rejected') throw relatedResult.reason;
+    const result = orderResult.value, related = relatedResult.value;
     orders.value = result.items;
     hasMore.value = result.hasMore;
     loadedPages = pages;
-    if (courier.value) pool.value = await request<typeof pool.value>('/courier/pool');
-    else
-      couriers.value = await request<typeof couriers.value>(
-        '/merchant/stores/' + selectedStore.value + '/couriers',
-      );
+    if (isCourier) pool.value = related as typeof pool.value;
+    else couriers.value = related as typeof couriers.value;
     if (selected.value) selected.value = orders.value.find((o) => o.id === selected.value?.id);
     needsRefresh.value = false;
   } catch (e) {
-    notifyError(e);
+    if (isCurrent()) notifyError(e);
   } finally {
-    loading.value = false;
+    if (isCurrent()) loading.value = false;
   }
 }
 const loadMore = () => load(loadedPages + 1);
 const refresh = () => load(1);
 async function perform(o: Order, operation: () => Promise<void>) {
-  if (busy.value || loading.value || needsRefresh.value) return;
+  if (!mounted || busy.value || loading.value || needsRefresh.value) return;
+  const current = sequence;
+  const isCurrent = () => mounted && current === sequence;
+  const path = courier.value ? '/courier' : '/merchant';
   busy.value = true;
   needsRefresh.value = true;
   try {
     await operation();
   } catch (e) {
-    notifyError(e);
+    if (isCurrent()) notifyError(e);
   } finally {
-    try {
-      const current = await request<Order>((courier.value ? '/courier' : '/merchant') + '/orders/' + o.id);
-      orders.value = orders.value.map((row) => row.id === current.id ? current : row);
-      if (selected.value?.id === current.id) selected.value = current;
-      needsRefresh.value = false;
-    } catch {
-      notifyError(new Error('未能确认订单最新状态，请刷新成功后再操作'));
+    if (isCurrent()) {
+      try {
+        const row = await request<Order>(path + '/orders/' + o.id);
+        if (isCurrent()) {
+          orders.value = orders.value.map((item) => item.id === row.id ? row : item);
+          if (selected.value?.id === row.id) selected.value = row;
+          needsRefresh.value = false;
+        }
+      } catch {
+        if (isCurrent()) notifyError(new Error('未能确认订单最新状态，请刷新成功后再操作'));
+      }
+      if (isCurrent()) busy.value = false;
     }
-    busy.value = false;
   }
 }
 async function action(o: Order, name: string) {
+  const current = sequence;
   await perform(o, async () => {
     const result = await request<{ verified?: boolean }>(
       (courier.value ? '/courier' : '/merchant') + '/orders/' + o.id + '/actions/' + name,
@@ -87,21 +113,23 @@ async function action(o: Order, name: string) {
       },
     );
     if (result?.verified === false) throw new Error('核销码不正确，错误次数已记录');
-    reason.value = '';
-    code.value = '';
+    if (mounted && current === sequence) { reason.value = ''; code.value = ''; }
   });
 }
 async function claim(t: (typeof pool.value)[number]) {
-  if (busy.value || loading.value || needsRefresh.value) return;
+  if (!mounted || busy.value || loading.value || needsRefresh.value) return;
+  const current = sequence;
   busy.value = true;
   needsRefresh.value = true;
   try {
     await request('/courier/tasks/' + t.id + '/claim', 'POST', { version: t.version });
   } catch (e) {
-    notifyError(e);
+    if (mounted && current === sequence) notifyError(e);
   } finally {
-    busy.value = false;
-    await load();
+    if (mounted && current === sequence) {
+      busy.value = false;
+      await load();
+    }
   }
 }
 async function unassign(o: Order) {
@@ -123,7 +151,7 @@ function openException(o: Order, kind: 'reassign' | 'exception-cancel') {
   handoverConfirmed.value = false;
 }
 async function submitException() {
-  const o = exceptionOrder.value;
+  const o = exceptionOrder.value, current = sequence;
   if (!o || !exceptionReason.value.trim() || exceptionReason.value.length > 200) return;
   if (exceptionKind.value === 'reassign' && (!exceptionCourier.value || (o.status === 4 && !handoverConfirmed.value))) return;
   await perform(o, async () => {
@@ -133,26 +161,34 @@ async function submitException() {
       ...(exceptionKind.value === 'reassign' ? { courierId: exceptionCourier.value } : {}),
     });
   });
-  exceptionOrder.value = undefined;
+  if (mounted && current === sequence) exceptionOrder.value = undefined;
 }
-onMounted(async () => {
+async function initialize() {
+  const owner = ++initialization;
   await load();
-  timer.value = setInterval(load, 15000);
-  if (!courier.value)
+  if (!mounted || owner !== initialization) return;
+  const current = sequence;
+  if (mounted && session.session && !courier.value)
     try {
       const result = await request<{ ticket: string }>('/admin/ws-ticket', 'POST');
+      if (!mounted || current !== sequence) return;
       socket.value = new WebSocket(
         (location.protocol === 'https:' ? 'wss://' : 'ws://') +
-          location.host +
-          '/ws/orders?ticket=' +
-          result.ticket,
+          location.host + '/ws/orders?ticket=' + result.ticket,
       );
-      socket.value.onmessage = () => load();
+      socket.value.onmessage = () => void load();
     } catch {
       /* Polling remains active. */
     }
+}
+onMounted(async () => {
+  mounted = true;
+  await initialize();
+  if (mounted) timer.value = setInterval(() => void load(), 15000);
 });
 onUnmounted(() => {
+  mounted = false;
+  sequence++;
   if (timer.value) clearInterval(timer.value);
   socket.value?.close();
 });

@@ -380,15 +380,21 @@ public class CheckoutService {
   }
 
   public List<Map<String, Object>> list(Long beforeId) {
+    return list(beforeId, null);
+  }
+
+  public List<Map<String, Object>> list(Long beforeId, Integer limit) {
+    int pageLimit = ListLimit.resolve(limit);
     require(beforeId == null || beforeId > 0, 400, "INVALID_CURSOR", "分页游标须为正整数");
     var args = new ArrayList<Object>();
     args.add(Actor.user().id());
     if (beforeId != null) args.add(beforeId);
+    args.add(pageLimit);
     return db.rows(
         "SELECT id,state,total_cents,paid_at,created_at,expires_at,version FROM checkout WHERE"
             + " user_id=?"
             + (beforeId == null ? "" : " AND id<?")
-            + " ORDER BY id DESC LIMIT 100",
+            + " ORDER BY id DESC LIMIT ?",
         args.toArray());
   }
 

@@ -90,3 +90,53 @@ for (const [name, file, fn] of [
     });
   }
 }
+
+for (const [name, file, fn] of [
+  ['admin', 'src/api.ts', 'api'],
+  ['platform', 'src/platform-api.ts', 'request'],
+  ['client', '../client/src/api.ts', 'api'],
+] as const) {
+  test(`${name} delayed 401 preserves a newer session and current 401 still signs out without replay`, async () => {
+    const session = {
+      session: { token: 'old-session' } as { token: string } | null,
+      set(value: { token: string } | null) { this.session = value; },
+    };
+    let finish!: () => void, calls = 0;
+    const exports: Record<string, any> = {};
+    const source = readFileSync(resolve(file), 'utf8').replaceAll('import.meta.env', '({})');
+    class ApiError extends Error {
+      constructor(public code: string, message: string, public requestId: string, public status: number) { super(message); }
+    }
+    runInNewContext(ts.transpileModule(source, {
+      compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
+    }).outputText, {
+      exports, Headers, FormData, AbortSignal,
+      require(module: string) {
+        if (module.includes('api-error')) return { ApiError };
+        if (module.includes('session')) return { useSession: () => session };
+        if (module === 'element-plus') return { ElMessage: { error() {} } };
+        throw new Error('Unexpected module ' + module);
+      },
+      fetch() {
+        calls++;
+        return new Promise(resolve => { finish = () => resolve({ ok: false, status: 401,
+          json: async () => ({ code: 'UNAUTHORIZED', message: 'expired' }) }); });
+      },
+      uni: { request(options: { success(value: unknown): void }) {
+        calls++;
+        finish = () => options.success({ statusCode: 401, data: { code: 'UNAUTHORIZED', message: 'expired' } });
+      } },
+    });
+    const oldRequest = exports[fn]('/orders').catch((error: unknown) => error);
+    session.session = { token: 'new-session' };
+    finish();
+    expect(await oldRequest).toMatchObject({ code: 'UNAUTHORIZED', status: 401 });
+    expect(session.session?.token).toBe('new-session');
+    expect(calls).toBe(1);
+    const currentRequest = exports[fn]('/orders').catch((error: unknown) => error);
+    finish();
+    expect(await currentRequest).toMatchObject({ code: 'UNAUTHORIZED', status: 401 });
+    expect(session.session).toBeNull();
+    expect(calls).toBe(2);
+  });
+}

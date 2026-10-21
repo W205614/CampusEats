@@ -163,11 +163,13 @@ for (const user of [true, false]) {
     let olderReads = 0;
     const listPath = user ? '/user/orders' : '/merchant/stores/1/orders';
     await page.route('**/api/v1' + listPath + '*', route => {
-      const before = new URL(route.request().url()).searchParams.get('beforeId');
-      if (before) olderReads++;
-      return route.fulfill({ json: { code: 'OK', data: before ? records.slice(100) : records.slice(0, 100) } });
+      const query = new URL(route.request().url()).searchParams;
+      const before = Number(query.get('beforeId') || Number.MAX_SAFE_INTEGER);
+      const limit = Number(query.get('limit') || 100);
+      if (limit > 100) olderReads++;
+      return route.fulfill({ json: { code: 'OK', data: records.filter(row => Number(row.id) < before).slice(0, limit) } });
     });
-    if (user) await page.route('**/api/v1/user/checkouts', route => route.fulfill({ json: { code: 'OK', data: [] } }));
+    if (user) await page.route('**/api/v1/user/checkouts*', route => route.fulfill({ json: { code: 'OK', data: [] } }));
     await page.goto(user ? '/app/pages/orders/index' : '/admin/orders');
     const older = page.getByText(user ? 'UX-HISTORY-100 · 自取' : 'UX-HISTORY-100', { exact: true });
     await expect(older).toHaveCount(0);

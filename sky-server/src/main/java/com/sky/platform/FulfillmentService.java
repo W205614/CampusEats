@@ -39,6 +39,11 @@ public class FulfillmentService {
   }
 
   public List<Map<String, Object>> orders(Long store, Long beforeId) {
+    return orders(store, beforeId, null);
+  }
+
+  public List<Map<String, Object>> orders(Long store, Long beforeId, Integer limit) {
+    int pageLimit = ListLimit.resolve(limit);
     require(beforeId == null || beforeId > 0, 400, "INVALID_CURSOR", "分页游标须为正整数");
     Actor a = Actor.current();
     String where;
@@ -61,12 +66,13 @@ public class FulfillmentService {
       where += " AND o.id<?";
       args.add(beforeId);
     }
+    args.add(pageLimit);
     var rows =
         db.rows(
             "SELECT o.*,s.name store_name,c.name campus_name FROM orders o JOIN store s ON"
                 + " s.id=o.store_id JOIN campus c ON c.id=o.campus_id WHERE "
                 + where
-                + " ORDER BY o.id DESC LIMIT 100",
+                + " ORDER BY o.id DESC LIMIT ?",
             args.toArray());
     decorateAll(rows, a);
     return rows;

@@ -172,11 +172,12 @@ public class AftersaleService {
       filter += " AND o.number=?";
       args.add(query.orderNumber());
     }
+    args.add(query.pageLimit());
     var rows =
         db.rows(
             "SELECT a.*,o.number FROM aftersale a JOIN orders o ON o.id=a.order_id WHERE 1=1"
                 + filter
-                + " ORDER BY a.id DESC LIMIT 100",
+                + " ORDER BY a.id DESC LIMIT ?",
             args.toArray());
     if (rows.isEmpty()) return rows;
     var ids = rows.stream().map(r -> Db.id(r, "id")).toList();

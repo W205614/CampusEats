@@ -2,8 +2,9 @@ import { useSession } from './stores/session';
 import { ApiError } from '../../contracts/api-error';
 export async function request<T>(path: string, method = 'GET', data?: unknown): Promise<T> {
   const store = useSession();
+  const token = store.session?.token;
   const headers: Record<string, string> = {};
-  if (store.session) headers.Authorization = 'Bearer ' + store.session.token;
+  if (token) headers.Authorization = 'Bearer ' + token;
   const form = data instanceof FormData;
   if (data && !form) headers['Content-Type'] = 'application/json';
   let response: Response;
@@ -24,7 +25,7 @@ export async function request<T>(path: string, method = 'GET', data?: unknown): 
       ? '网络连接失败，请重试' : '操作结果尚未确认，请刷新查看', '', 0);
   }
   if (!response.ok) {
-    if (response.status === 401) store.set(null);
+    if (response.status === 401 && token && store.session?.token === token) store.set(null);
     throw new ApiError(result.code, result.message, result.requestId, response.status);
   }
   return result.data;

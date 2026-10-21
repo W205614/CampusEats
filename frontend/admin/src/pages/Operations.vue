@@ -45,7 +45,7 @@ const route = useRoute(),
   imageUrl = ref('');
 const history = ['aftersales', 'refunds', 'outbox'].includes(kind);
 const emptyFilters = (): HistoryFilters => ({ state: '', orderNumber: '', begin: '', end: '', ...(kind === 'aftersales' ? {} : { taskId: '' }) });
-const filters = ref(emptyFilters()), applied = ref(emptyFilters()), loading = ref(false), hasMore = ref(false);
+const filters = ref(emptyFilters()), applied = ref(emptyFilters()), loading = ref(false), busy = ref(false), hasMore = ref(false);
 const tasks = computed(() => kind === 'outbox' ? events.value : refunds.value);
 let loadedPages = 1, sequence = 0, mounted = false;
 let timer: ReturnType<typeof setInterval> | undefined;
@@ -57,6 +57,8 @@ watch([() => session.session?.token, selectedStore], () => {
   aftersales.value = []; refunds.value = []; events.value = [];
   hasMore.value = false;
   loading.value = false;
+  busy.value = false;
+  decision.value = '';
   if (mounted) void load();
 }, { flush: 'sync' });
 const form = ref({
@@ -79,7 +81,7 @@ const titles: Record<string, string> = {
 };
 const base = () => '/merchant/stores/' + selectedStore.value;
 async function load(pages = loadedPages) {
-  if (loading.value) return;
+  if (!mounted || !session.session || loading.value || busy.value) return;
   const current = ++sequence;
   loading.value = true;
   try {
@@ -93,7 +95,7 @@ async function load(pages = loadedPages) {
       const endpoint = kind === 'outbox' ? 'events' : kind;
       const path = (platform.value ? '/platform' : base()) + '/' + endpoint;
       const selectedFilters = { ...applied.value };
-      const result = await readPages((before) => request<(Aftersale | Refund | OutboxEvent)[]>(path + historyQuery(selectedFilters, before)), pages);
+      const result = await readPages((before, limit) => request<(Aftersale | Refund | OutboxEvent)[]>(path + historyQuery(selectedFilters, before, limit)), pages, () => mounted && current === sequence);
       if (current !== sequence) return;
       if (kind === 'aftersales') aftersales.value = result.items as Aftersale[];
       else if (kind === 'outbox') events.value = result.items as OutboxEvent[];
@@ -114,6 +116,7 @@ async function load(pages = loadedPages) {
   }
 }
 async function search(clear = false) {
+  if (busy.value) return;
   try {
     if (clear) filters.value = emptyFilters();
     validateHistoryFilters(filters.value);
@@ -182,33 +185,38 @@ async function toggleBuilding(b: (typeof buildings.value)[number]) {
     notifyError(e);
   }
 }
-async function decide(r: Aftersale, approve: boolean) {
+async function mutateHistory(operation: () => Promise<void>) {
+  if (!mounted || loading.value || busy.value) return;
+  const current = sequence;
+  busy.value = true;
   try {
+    await operation();
+    if (mounted && current === sequence) {
+      busy.value = false;
+      await load();
+    }
+  } catch (e) {
+    if (mounted && current === sequence) notifyError(e);
+  } finally {
+    if (mounted && current === sequence) busy.value = false;
+  }
+}
+async function decide(r: Aftersale, approve: boolean) {
+  const current = sequence;
+  await mutateHistory(async () => {
     if (!decision.value.trim()) throw new Error('请先填写处理说明');
     await request(
       (platform.value && r.state === 'ESCALATED' ? '/platform' : '/merchant') +
-        '/aftersales/' +
-        r.id +
-        '/decision',
-      'POST',
-      { version: r.version, approve, reason: decision.value },
+        '/aftersales/' + r.id + '/decision',
+      'POST', { version: r.version, approve, reason: decision.value },
     );
-    decision.value = '';
-    await load();
-  } catch (e) {
-    notifyError(e);
-  }
+    if (mounted && current === sequence) decision.value = '';
+  });
 }
 async function retry(r: Task) {
-  try {
-    await request(
-      '/merchant/' + (kind === 'outbox' ? 'events' : 'refunds') + '/' + r.id + '/retry',
-      'POST',
-    );
-    await load();
-  } catch (e) {
-    notifyError(e);
-  }
+  await mutateHistory(() => request(
+    '/merchant/' + (kind === 'outbox' ? 'events' : 'refunds') + '/' + r.id + '/retry', 'POST',
+  ));
 }
 async function replyReview(r: Review) {
   try {

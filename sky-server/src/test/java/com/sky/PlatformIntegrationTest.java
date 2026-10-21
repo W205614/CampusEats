@@ -1568,6 +1568,96 @@ class PlatformIntegrationTest {
   }
 
   @Test
+  void historyBatchLimitsPreserveCursorsAndScopesAndBindAllListEndpoints() throws Exception {
+    long order = completed();
+    Actor courier = staff("courier1");
+    var checkouts = new ArrayList<Object[]>();
+    var orders = new ArrayList<Object[]>();
+    var requests = new ArrayList<Object[]>();
+    var refunds = new ArrayList<Object[]>();
+    var events = new ArrayList<Object[]>();
+    for (int i = 0; i < 1103; i++) {
+      checkouts.add(new Object[] {user, "batch-" + i});
+      orders.add(new Object[] {"batch-" + i, user, courier.id()});
+      requests.add(new Object[] {order, user});
+      refunds.add(new Object[] {order});
+      events.add(new Object[] {order});
+    }
+    db.jdbc.batchUpdate("INSERT INTO checkout(user_id,request_id,request_hash,state,total_cents,"
+        + "expires_at,created_at,quote_json) VALUES(?,?,'fixture','PAID',0,NOW(),NOW(),'{}')", checkouts);
+    db.jdbc.batchUpdate("INSERT INTO orders(number,user_id,address_book_id,order_time,amount,"
+        + "courier_id,store_id,campus_id) VALUES(?,?,0,NOW(),0,?,1,1)", orders);
+    db.jdbc.batchUpdate("INSERT INTO aftersale(order_id,user_id,store_id,kind,state,reason,"
+        + "amount_cents,created_at) VALUES(?,?,1,'FULL','REJECTED','batch',0,NOW())", requests);
+    db.jdbc.batchUpdate("INSERT INTO refund_request(order_id,store_id,amount_cents,state,"
+        + "next_attempt_at,created_at) VALUES(?,1,0,'SUCCEEDED',NOW(),NOW())", refunds);
+    db.jdbc.batchUpdate("INSERT INTO outbox_event(event_type,aggregate_id,payload,state,"
+        + "next_attempt_at,created_at,store_id) VALUES('ORDER_REFUNDED',?,'{}','SUCCEEDED',NOW(),NOW(),1)", events);
+
+    assertBatchPages("checkout", (before, limit) -> checkout.list(before, limit));
+    assertBatchPages("orders", (before, limit) -> fulfillment.orders(null, before, limit));
+    assertBatchPages("aftersale", (before, limit) -> aftersale.list(null, false,
+        new HistoryQuery(before, null, null, null, null, null, limit)));
+    act(platform);
+    assertBatchPages("refund_request", (before, limit) -> jobs.refunds(null,
+        new HistoryQuery(before, null, null, null, null, null, limit)));
+    assertBatchPages("outbox_event", (before, limit) -> jobs.events(null,
+        new HistoryQuery(before, null, null, null, null, null, limit)));
+    assertEquals(100, fulfillment.orders(1L).size());
+    assertEquals(1000, fulfillment.orders(1L, null, 1000).size());
+    assertEquals(1, fulfillment.orders(3L, null, 1000).size());
+    assertTrue(fulfillment.orders(3L, null, 1000).stream().allMatch(row -> Db.id(row, "store_id") == 3));
+    assertTrue(jobs.events(3L, new HistoryQuery(null, null, null, null, null, null, 1000))
+        .stream().allMatch(row -> Db.id(row, "store_id") == 3));
+    assertTrue(jobs.refunds(3L, new HistoryQuery(null, null, null, null, null, null, 1000)).isEmpty());
+    assertTrue(aftersale.list(3L, false, new HistoryQuery(null, null, null, null, null, null, 1000)).isEmpty());
+    act(staff("manager1"));
+    assertEquals(403, assertThrows(BusinessException.class,
+        () -> fulfillment.orders(3L, null, 1000)).status());
+    assertEquals(403, assertThrows(BusinessException.class,
+        () -> jobs.refunds(3L, new HistoryQuery(null, null, null, null, null, null, 1000))).status());
+    act(courier);
+    assertEquals(1000, fulfillment.orders(null, null, 1000).size());
+    act(new Actor(courier.id(), "ADMIN", "DELIVERER", "", false, null, 2L));
+    assertTrue(fulfillment.orders(null, null, 1000).isEmpty());
+    var otherUser = auth.demo(new Commands.DemoLogin(2));
+    act(user(Long.parseLong(otherUser.get("id").toString())));
+    assertTrue(checkout.list(null, 1000).isEmpty());
+    assertTrue(fulfillment.orders(null, null, 1000).isEmpty());
+    assertTrue(aftersale.list(null, false, new HistoryQuery(null, null, null, null, null, null, 1000)).isEmpty());
+
+    String adminToken = auth.login(new Commands.Login("admin", "TestAdmin!2026")).get("token").toString();
+    String userToken = auth.demo(new Commands.DemoLogin(1)).get("token").toString();
+    for (String path : List.of("/user/orders", "/user/checkouts", "/user/aftersales",
+        "/merchant/stores/1/orders", "/merchant/stores/1/aftersales", "/platform/aftersales",
+        "/merchant/stores/1/refunds", "/platform/refunds", "/merchant/stores/1/events", "/platform/events")) {
+      String token = path.startsWith("/user/") ? userToken : adminToken;
+      mvc.perform(get("/api/v1" + path).header("Authorization", "Bearer " + token))
+          .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(100));
+      mvc.perform(get("/api/v1" + path).header("Authorization", "Bearer " + token).param("limit", "1000"))
+          .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(1000));
+      for (String invalid : List.of("0", "-1", "1001", "bad"))
+        mvc.perform(get("/api/v1" + path).header("Authorization", "Bearer " + token).param("limit", invalid))
+            .andExpect(status().isBadRequest());
+    }
+  }
+
+  private void assertBatchPages(String table,
+      java.util.function.BiFunction<Long, Integer, List<Map<String, Object>>> load) {
+    var expected = db.rows("SELECT id FROM " + table + " ORDER BY id DESC")
+        .stream().map(row -> Db.id(row, "id")).toList();
+    assertEquals(100, load.apply(null, null).size());
+    assertEquals(expected.subList(0, 1), load.apply(null, 1).stream().map(row -> Db.id(row, "id")).toList());
+    var first = load.apply(null, 1000);
+    assertEquals(expected.subList(0, 1000), first.stream().map(row -> Db.id(row, "id")).toList());
+    var second = load.apply(Db.id(first.getLast(), "id"), 1000);
+    assertEquals(expected.subList(1000, expected.size()), second.stream().map(row -> Db.id(row, "id")).toList());
+    assertTrue(load.apply(Db.id(second.getLast(), "id"), 1000).isEmpty());
+    for (int invalid : List.of(0, -1, 1001))
+      assertEquals(400, assertThrows(BusinessException.class, () -> load.apply(null, invalid)).status());
+  }
+
+  @Test
   void historyPagesFilterOldRecordsWithoutLeakingScopesAndBindHttpParameters() throws Exception {
     long order = completed();
     String number = db.one("SELECT number FROM orders WHERE id=?", order).get("number").toString();

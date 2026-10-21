@@ -316,8 +316,8 @@ public class PlatformController {
   }
 
   @GetMapping("/user/checkouts")
-  public Object checkouts(@RequestParam(required = false) Long beforeId) {
-    return checkout.list(beforeId);
+  public Object checkouts(@RequestParam(required = false) Long beforeId, @RequestParam(required = false) Integer limit) {
+    return checkout.list(beforeId, limit);
   }
 
   @GetMapping("/user/checkouts/by-request/{key}")
@@ -341,19 +341,19 @@ public class PlatformController {
   }
 
   @GetMapping("/user/orders")
-  public Object userOrders(@RequestParam(required = false) Long beforeId) {
-    return fulfillment.orders(null, beforeId);
+  public Object userOrders(@RequestParam(required = false) Long beforeId, @RequestParam(required = false) Integer limit) {
+    return fulfillment.orders(null, beforeId, limit);
   }
 
   @GetMapping("/merchant/stores/{storeId}/orders")
   public Object storeOrders(
-      @PathVariable long storeId, @RequestParam(required = false) Long beforeId) {
-    return fulfillment.orders(storeId, beforeId);
+      @PathVariable long storeId, @RequestParam(required = false) Long beforeId, @RequestParam(required = false) Integer limit) {
+    return fulfillment.orders(storeId, beforeId, limit);
   }
 
   @GetMapping("/courier/orders")
-  public Object courierOrders(@RequestParam(required = false) Long beforeId) {
-    return fulfillment.orders(null, beforeId);
+  public Object courierOrders(@RequestParam(required = false) Long beforeId, @RequestParam(required = false) Integer limit) {
+    return fulfillment.orders(null, beforeId, limit);
   }
 
   @GetMapping({"/user/orders/{id}", "/merchant/orders/{id}", "/courier/orders/{id}"})

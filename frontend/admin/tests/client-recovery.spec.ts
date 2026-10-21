@@ -126,10 +126,10 @@ test('a delayed previous-account order load cannot overwrite a new account or ke
   await expect(page.getByText('登录已失效', { exact: true })).toBeVisible();
   await page.locator('.uni-tabbar__item').filter({ hasText: '订单' }).click();
   await page.getByText('进入演示用户 2', { exact: true }).click();
-  const newLoad = page.waitForResponse(r => r.url().endsWith('/orders') && r.request().headers().authorization === 'Bearer client-2');
+  const newLoad = page.waitForResponse(r => new URL(r.url()).pathname.endsWith('/orders') && r.request().headers().authorization === 'Bearer client-2');
   await page.locator('.uni-tabbar__item').filter({ hasText: '订单' }).click();
   await newLoad;
-  const oldLoad = page.waitForResponse(r => r.url().endsWith('/orders') && r.request().headers().authorization === 'Bearer client-1');
+  const oldLoad = page.waitForResponse(r => new URL(r.url()).pathname.endsWith('/orders') && r.request().headers().authorization === 'Bearer client-1');
   state.release!();
   await oldLoad;
   // Let the released transport callback and Vue's next render both finish.

@@ -1236,6 +1236,15 @@
               "type": "string",
               "pattern": "^[0-9]+$"
             }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
           }
         ],
         "responses": {
@@ -4327,6 +4336,15 @@
               "type": "string",
               "pattern": "^[0-9]+$"
             }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
           }
         ],
         "responses": {
@@ -4779,6 +4797,15 @@
               "type": "string",
               "pattern": "^[0-9]+$"
             }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
           }
         ],
         "responses": {
@@ -4880,6 +4907,15 @@
               "type": "string",
               "pattern": "^[0-9]+$"
             }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
           }
         ],
         "responses": {
@@ -4980,6 +5016,15 @@
             "schema": {
               "type": "string",
               "pattern": "^[0-9]+$"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
             }
           }
         ],
@@ -5128,6 +5173,15 @@
             "schema": {
               "type": "string",
               "pattern": "^[0-9]+$"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
             }
           }
         ],
@@ -5402,6 +5456,15 @@
               "type": "string",
               "pattern": "^[0-9]+$"
             }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
           }
         ],
         "responses": {
@@ -5527,6 +5590,15 @@
               "type": "string",
               "pattern": "^[0-9]+$"
             }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
+            }
           }
         ],
         "responses": {
@@ -5636,6 +5708,15 @@
             "schema": {
               "type": "string",
               "pattern": "^[0-9]+$"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
             }
           }
         ],
@@ -5862,6 +5943,15 @@
             "schema": {
               "type": "string",
               "pattern": "^[0-9]+$"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
             }
           }
         ],
@@ -6475,6 +6565,15 @@
             "schema": {
               "type": "string",
               "pattern": "^[0-9]+$"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "format": "int32"
             }
           }
         ],

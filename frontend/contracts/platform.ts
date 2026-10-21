@@ -171,8 +171,8 @@ export interface HistoryFilters {
 }
 export const aftersaleStates = ['PENDING', 'ESCALATED', 'APPROVED', 'REJECTED', 'WITHDRAWN', 'REFUNDED'];
 export const taskStates = ['REQUESTED', 'PROCESSING', 'FAILED', 'SUCCEEDED'];
-export function historyQuery(filters: HistoryFilters, beforeId?: string) {
-  const entries = Object.entries({ ...filters, beforeId }).filter(([, value]) => value?.trim());
+export function historyQuery(filters: HistoryFilters, beforeId?: string, limit?: number) {
+  const entries = Object.entries({ ...filters, beforeId, ...(limit === undefined ? {} : { limit: String(limit) }) }).filter(([, value]) => value?.trim());
   return entries.length ? '?' + entries.map(([key, value]) =>
     encodeURIComponent(key) + '=' + encodeURIComponent(value!.trim())).join('&') : '';
 }

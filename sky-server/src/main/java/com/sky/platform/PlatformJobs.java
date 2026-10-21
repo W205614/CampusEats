@@ -222,9 +222,10 @@ public class PlatformJobs {
       filter += " AND EXISTS (SELECT 1 FROM orders o WHERE o.id=r.order_id AND o.number=?)";
       args.add(query.orderNumber());
     }
+    args.add(query.pageLimit());
     var rows =
         db.rows(
-            "SELECT r.* FROM refund_request r WHERE 1=1" + filter + " ORDER BY r.id DESC LIMIT 100",
+            "SELECT r.* FROM refund_request r WHERE 1=1" + filter + " ORDER BY r.id DESC LIMIT ?",
             args.toArray());
     rows.forEach(r -> r.remove("lease_token"));
     return rows;
@@ -273,11 +274,12 @@ public class PlatformJobs {
               + " (SELECT 1 FROM orders o WHERE o.id=e.aggregate_id AND o.number=?)";
       args.add(query.orderNumber());
     }
+    args.add(query.pageLimit());
     return db.rows(
         "SELECT e.id,e.event_type,e.aggregate_id,e.state,e.attempts,e.last_error,"
             + "e.next_attempt_at,e.store_id,e.created_at FROM outbox_event e WHERE 1=1"
             + filter
-            + " ORDER BY e.id DESC LIMIT 100",
+            + " ORDER BY e.id DESC LIMIT ?",
         args.toArray());
   }
 
