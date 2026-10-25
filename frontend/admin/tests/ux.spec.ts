@@ -139,7 +139,7 @@ test('menu exposes category and campus opening filters and names search result s
   await page.goto('/app/');
   await expect(page.getByText('分类：本店全部分类 ▾', { exact: true })).toBeVisible();
   await page.getByText('校区筛选：本校区全部店铺 ▾', { exact: true }).click();
-  const search = page.waitForResponse(r => r.url().includes('/user/search?') && r.url().includes('open=true'));
+  const search = page.waitForResponse(r => r.url().includes('/user/search/page?') && r.url().includes('open=true'));
   await page.locator('.uni-picker-item:visible').filter({ hasText: '仅营业中' }).click();
   expect((await search).ok()).toBeTruthy();
   await expect(page.getByText('校区筛选：仅营业中 ▾', { exact: true })).toBeVisible();

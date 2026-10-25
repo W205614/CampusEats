@@ -105,6 +105,7 @@ class PlatformConcurrencyTest {
     clock.value.set(Instant.parse("2026-10-15T04:00:00Z"));
     for (String table :
         List.of(
+            "mock_refund_receipt",
             "evidence",
             "aftersale_item",
             "refund_request",

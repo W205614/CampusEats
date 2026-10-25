@@ -21,7 +21,7 @@ public class AuthController {
 
   @PostMapping("/api/v1/admin/auth/login")
   public Views.SessionView login(@Valid @RequestBody Login input) {
-    limits.check("login-account:" + Hashes.sha256(input.username()), 10, 60);
+    limits.check("login-account:" + Hashes.sha256(input.username().strip().toLowerCase(Locale.ROOT)), 10, 60);
     return ViewFactory.session(service.login(input));
   }
 

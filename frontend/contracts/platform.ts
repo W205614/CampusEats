@@ -1,4 +1,14 @@
 export type Id = string;
+export interface CursorPage<T> {
+  records: T[];
+  nextCursor: string | null;
+  hasMore: boolean;
+}
+export function mergeRecords<T>(existing: T[], incoming: T[], key: (row: T) => string): T[] {
+  const rows = new Map(existing.map(row => [key(row), row]));
+  for (const row of incoming) rows.set(key(row), row);
+  return [...rows.values()];
+}
 export interface Campus {
   id: Id;
   name: string;

@@ -48,7 +48,7 @@ test('expired workbench login clears only that session and returns to its login 
     sessionStorage.setItem('campus-admin', JSON.stringify(admin));
     sessionStorage.setItem('campus-user', JSON.stringify(user));
   }, { admin: adminSession, user: userSession });
-  await page.route('**/api/v1/merchant/stores', route => route.fulfill({
+  await page.route('**/api/v1/merchant/stores/page?*', route => route.fulfill({
     status: 401,
     json: { code: 'UNAUTHORIZED', message: '登录已失效，请重新登录', data: null },
   }));

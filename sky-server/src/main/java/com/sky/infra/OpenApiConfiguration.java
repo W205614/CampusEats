@@ -68,7 +68,10 @@ public class OpenApiConfiguration {
                                 || path.equals("/api/v1/user/buildings")
                                 || path.equals("/api/v1/user/campuses")
                                 || path.equals("/api/v1/user/stores")
+                                || path.equals("/api/v1/user/stores/page")
+                                || path.matches("/api/v1/user/stores/\\{[^/]+\\}")
                                 || path.equals("/api/v1/user/search")
+                                || path.equals("/api/v1/user/search/page")
                                 || path.matches("/api/v1/user/campuses/[^/]+/buildings")
                                 || path.matches(
                                     "/api/v1/user/stores/[^/]+/(products|categories|reviews)")))

@@ -12,7 +12,7 @@ async function fixture(page: Page, role = 'PLATFORM_ADMIN') {
     localStorage.setItem('campus-store', '1');
   }, session(role));
   await page.route('**/api/v1/**', route => route.fulfill({ json: { code: 'OK', data: [] } }));
-  await page.route('**/api/v1/merchant/stores', route => route.fulfill({ json: { code: 'OK', data: stores } }));
+  await page.route('**/api/v1/merchant/stores/page?*', route => route.fulfill({ json: { code: 'OK', data: { records: stores, nextCursor: null, hasMore: false } } }));
 }
 const aftersale = (id: number) => ({ id: String(id), orderId: '8', storeId: '1', kind: 'FULL', state: 'PENDING', reason: '历史申请' + id, decision: '', amountCents: '100', createdAt: '2026-10-20T10:00:00', items: [], evidence: [], version: '0' });
 for (const kind of ['aftersales', 'refunds', 'outbox']) {

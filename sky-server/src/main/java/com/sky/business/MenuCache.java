@@ -17,7 +17,10 @@ public class MenuCache {
   private final Db db;
   private final Clock clock;
   private final TransactionTemplate retryTx;
-  private final Semaphore fallback = new Semaphore(20);
+  private final Semaphore fallback = new Semaphore(8, true);
+  private final ConcurrentHashMap<String, CompletableFuture<List<Map<String, Object>>>> loading =
+      new ConcurrentHashMap<>();
+  private static final long WAIT_NANOS = TimeUnit.MILLISECONDS.toNanos(1500);
   private final ReentrantReadWriteLock[] stripes = new ReentrantReadWriteLock[256];
 
   public MenuCache(
@@ -38,17 +41,67 @@ public class MenuCache {
 
   public List<Map<String, Object>> load(String key, Supplier<List<Map<String, Object>>> loader) {
     var lock = stripe(key).readLock();
-    lock.lock();
+    long deadline = System.nanoTime() + WAIT_NANOS;
     try {
-      return readAndFill(key, loader);
+      if (!lock.tryLock(WAIT_NANOS, TimeUnit.NANOSECONDS)) throw busy();
+    } catch (InterruptedException ex) {
+      Thread.currentThread().interrupt();
+      throw busy();
+    }
+    try {
+      var hit = cached(key);
+      if (hit != null) return hit;
+      var own = new CompletableFuture<List<Map<String, Object>>>();
+      var current = loading.putIfAbsent(key, own);
+      if (current != null) {
+        try {
+          return copy(current.get(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS));
+        } catch (InterruptedException ex) {
+          Thread.currentThread().interrupt();
+          throw busy();
+        } catch (TimeoutException ex) {
+          throw busy();
+        } catch (ExecutionException ex) {
+          if (ex.getCause() instanceof RuntimeException cause) throw cause;
+          if (ex.getCause() instanceof Error cause) throw cause;
+          throw new IllegalStateException(ex.getCause());
+        }
+      }
+      boolean admitted = false;
+      try {
+        admitted = fallback.tryAcquire(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
+        if (!admitted) throw busy();
+        // Recheck after admission: another fill can finish between the initial GET and registration.
+        var rows = cached(key);
+        if (rows == null) {
+          rows = copy(loader.get());
+          try {
+            redis.opsForValue().set("campus:" + key, json.write(rows),
+                Duration.ofSeconds(rows.isEmpty() ? 30 : 240 + ThreadLocalRandom.current().nextInt(121)));
+          } catch (Exception ignored) {
+          }
+        }
+        own.complete(rows);
+        return copy(rows);
+      } catch (InterruptedException ex) {
+        Thread.currentThread().interrupt();
+        var failure = busy();
+        own.completeExceptionally(failure);
+        throw failure;
+      } catch (RuntimeException | Error ex) {
+        own.completeExceptionally(ex);
+        throw ex;
+      } finally {
+        loading.remove(key, own);
+        if (admitted) fallback.release();
+      }
     } finally {
       lock.unlock();
     }
   }
 
   @SuppressWarnings("unchecked")
-  private List<Map<String, Object>> readAndFill(
-      String key, Supplier<List<Map<String, Object>>> loader) {
+  private List<Map<String, Object>> cached(String key) {
     try {
       String hit = redis.opsForValue().get("campus:" + key);
       if (hit != null) {
@@ -60,23 +113,33 @@ public class MenuCache {
       }
     } catch (Exception ignored) {
     }
-    com.sky.common.BusinessException.require(fallback.tryAcquire(), 503, "MENU_BUSY", "菜单繁忙，请稍后重试");
-    try {
-      var rows = loader.get();
-      try {
-        redis
-            .opsForValue()
-            .set(
-                "campus:" + key,
-                json.write(rows),
-                Duration.ofSeconds(
-                    rows.isEmpty() ? 30 : 240 + ThreadLocalRandom.current().nextInt(121)));
-      } catch (Exception ignored) {
-      }
-      return rows;
-    } finally {
-      fallback.release();
+    return null;
+  }
+
+  private static com.sky.common.BusinessException busy() {
+    return new com.sky.common.BusinessException(503, "MENU_BUSY", "菜单繁忙，请稍后重试");
+  }
+
+  @SuppressWarnings("unchecked")
+  private static List<Map<String, Object>> copy(List<Map<String, Object>> rows) {
+    return (List<Map<String, Object>>) copyValue(rows);
+  }
+
+  private static Object copyValue(Object value) {
+    if (value instanceof Map<?, ?> map) {
+      var result = new LinkedHashMap<String, Object>();
+      map.forEach((key, item) -> result.put(String.valueOf(key), copyValue(item)));
+      return result;
     }
+    if (value instanceof Collection<?> values) {
+      var result = new ArrayList<Object>();
+      values.forEach(item -> result.add(copyValue(item)));
+      return result;
+    }
+    if (value instanceof byte[] bytes) return bytes.clone();
+    if (value instanceof java.sql.Timestamp timestamp) return timestamp.clone();
+    if (value instanceof java.util.Date date) return date.clone();
+    return value;
   }
 
   /** Persist invalidation with the catalog write; Redis is an after-commit optimization. */

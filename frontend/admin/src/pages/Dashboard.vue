@@ -4,16 +4,28 @@ import { request } from '../platform-api';
 import { notifyError } from '../api';
 import { useSession } from '../stores/session';
 import { selectedStore } from '../context';
+import { useStorePages } from '../store-pages';
 import type { Campus, Store } from '../../../contracts/platform';
 const emit = defineEmits(['stores-changed']),
   session = useSession(),
   campuses = ref<Campus[]>([]),
-  stores = ref<Store[]>([]),
   platform = computed(() => session.session?.role === 'PLATFORM_ADMIN'),
   dialog = ref(false),
   editing = ref(''),
   busy = ref(false),
   campusName = ref('');
+const { stores, storeHasMore, storeLoading, loadStores } = useStorePages();
+const storeQuery = ref(''), storeCampus = ref('');
+async function searchStores() {
+  const params = new URLSearchParams();
+  if (storeQuery.value.trim()) params.set('query', storeQuery.value.trim());
+  if (storeCampus.value) params.set('campusId', storeCampus.value);
+  try { await loadStores(true, params.toString()); } catch (e) { notifyError(e); }
+}
+async function moreStores() {
+  try { await loadStores(); } catch (e) { notifyError(e); }
+}
+function enterStore(s: Store) { selectedStore.value = s.id; emit('stores-changed'); }
 const form = ref({
     campusId: '',
     name: '',
@@ -27,7 +39,7 @@ const form = ref({
   hours = ref('08:00-22:00');
 async function load() {
   try {
-    stores.value = await request<Store[]>('/merchant/stores');
+    await searchStores();
     campuses.value = await request<Campus[]>(
       platform.value ? '/platform/campuses' : '/user/campuses',
     );
@@ -121,6 +133,11 @@ onMounted(load);
   </section>
   <section class="panel">
     <h2>店铺列表</h2>
+    <el-form inline @submit.prevent="searchStores">
+      <el-form-item label="店铺名称"><el-input v-model="storeQuery" maxlength="80" placeholder="搜索店铺" clearable /></el-form-item>
+      <el-form-item label="校区"><el-select v-model="storeCampus" placeholder="全部校区" clearable style="width: 200px"><el-option v-for="c in campuses" :key="c.id" :value="c.id" :label="c.name" /></el-select></el-form-item>
+      <el-form-item><el-button native-type="submit" :loading="storeLoading">筛选店铺</el-button></el-form-item>
+    </el-form>
     <el-table :data="stores"
       ><el-table-column prop="campusName" label="校区" /><el-table-column
         prop="name"
@@ -132,13 +149,14 @@ onMounted(load);
         ></el-table-column
       ><el-table-column label="操作" width="210"
         ><template #default="{ row }"
-          ><el-button text @click="selectedStore = row.id">进入店铺</el-button
+          ><el-button text @click="enterStore(row)">进入店铺</el-button
           ><el-button v-if="session.session?.role !== 'OPERATOR'" text @click="edit(row)"
             >营业配置</el-button
           ></template
         ></el-table-column
       ></el-table
     >
+    <el-button v-if="storeHasMore" :loading="storeLoading" @click="moreStores">加载更多列表店铺</el-button>
   </section>
   <el-dialog v-model="dialog" :title="editing ? '店铺与营业规则' : '新增店铺'" width="560px"
     ><el-form label-position="top"

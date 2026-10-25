@@ -4,6 +4,7 @@ import { useRoute } from 'vue-router';
 import { request } from '../platform-api';
 import { notifyError } from '../api';
 import { selectedStore } from '../context';
+import { useStorePages } from '../store-pages';
 import { useSession } from '../stores/session';
 import { roles } from '../../../contracts/models';
 import { readPages } from '../../../contracts/paging';
@@ -27,7 +28,6 @@ const route = useRoute(),
   platform = computed(() => session.session?.role === 'PLATFORM_ADMIN'),
   staff = ref<Staff[]>([]),
   campuses = ref<Campus[]>([]),
-  stores = ref<Store[]>([]),
   campus = ref(''),
   buildings = ref<{ id: string; name: string; enabled: boolean }[]>([]),
   aftersales = ref<Aftersale[]>([]),
@@ -43,6 +43,10 @@ const route = useRoute(),
   decision = ref(''),
   reply = ref(''),
   imageUrl = ref('');
+const { stores, storeHasMore, storeLoading, loadStores } = useStorePages();
+async function moreStores() {
+  try { await loadStores(); } catch (e) { notifyError(e); }
+}
 const history = ['aftersales', 'refunds', 'outbox'].includes(kind);
 const emptyFilters = (): HistoryFilters => ({ state: '', orderNumber: '', begin: '', end: '', ...(kind === 'aftersales' ? {} : { taskId: '' }) });
 const filters = ref(emptyFilters()), applied = ref(emptyFilters()), loading = ref(false), busy = ref(false), hasMore = ref(false);
@@ -141,6 +145,12 @@ function edit(s?: Staff) {
     password: '',
   };
   dialog.value = true;
+  if (platform.value && form.value.storeId && !stores.value.some(row => row.id === form.value.storeId))
+    void (async () => {
+      try { while (mounted && dialog.value && storeHasMore.value && !stores.value.some(row => row.id === form.value.storeId)) {
+        if (!await loadStores()) break;
+      } } catch (e) { if (mounted) notifyError(e); }
+    })();
 }
 async function saveStaff() {
   try {
@@ -251,10 +261,11 @@ async function viewEvidence(id: string) {
 onMounted(async () => {
   mounted = true;
   if (platform.value) {
-    [campuses.value, stores.value] = await Promise.all([
-      request<Campus[]>('/platform/campuses'),
-      request<Store[]>('/merchant/stores'),
-    ]);
+    try {
+      const [campusRows] = await Promise.all([request<Campus[]>('/platform/campuses'), loadStores(true)]);
+      if (!mounted) return;
+      campuses.value = campusRows;
+    } catch (e) { if (mounted) notifyError(e); }
     if (!mounted) return;
     campus.value = campuses.value[0]?.id || '';
   }
@@ -431,7 +442,7 @@ onUnmounted(() => {
             v-for="s in stores"
             :key="s.id"
             :value="s.id"
-            :label="s.campusName + ' / ' + s.name" /></el-select></el-form-item
+            :label="s.campusName + ' / ' + s.name" /></el-select><el-button v-if="storeHasMore" :loading="storeLoading" @click="moreStores">加载更多归属店铺</el-button></el-form-item
       ><el-form-item v-if="form.role === 'DELIVERER'" label="配送校区"
         ><el-select v-model="form.campusId"
           ><el-option

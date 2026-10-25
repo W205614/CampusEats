@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { ref } from 'vue';
-import { onShow } from '@dcloudio/uni-app';
-import { api, toast, loggedIn, image } from '../../api';
+import { ref, watch } from 'vue';
+import { onShow, onHide } from '@dcloudio/uni-app';
+import { api, toast, loggedIn, image, ApiError } from '../../api';
 import { useSession } from '../../stores/session';
 import {
   cents,
@@ -9,6 +9,8 @@ import {
   type Store,
   type Product,
   type Cart,
+  type CursorPage,
+  mergeRecords,
 } from '../../../../contracts/platform';
 const session = useSession(),
   campuses = ref<Campus[]>([]),
@@ -27,35 +29,86 @@ const session = useSession(),
   cart = ref<Cart>(),
   busy = ref(false),
   reviews = ref<{ rating: number; content: string; reply?: string }[]>([]),
-  showReviews = ref(false);
-let menuSequence = 0;
+  showReviews = ref(false),
+  storesMore = ref(false), storesLoading = ref(false),
+  searchMore = ref(false), matchedMore = ref(false), searchLoading = ref(false), matchedLoading = ref(false);
+let menuSequence = 0, storeSequence = 0, searchSequence = 0, loadSequence = 0, active = true;
+let storeCursor: string | null = null, searchCursor: string | null = null, matchedCursor: string | null = null;
+let loadedCampus = '', appliedSearch = '';
+let loadingCampuses = false;
+const currentSession = () => session.session?.token || '';
+function invalidate() {
+  menuSequence++; storeSequence++; searchSequence++; loadSequence++;
+  storesLoading.value = false; searchLoading.value = false; matchedLoading.value = false;
+}
+watch(currentSession, token => {
+  if (!token && loadingCampuses) {
+    menuSequence++; storeSequence++; searchSequence++;
+    storesLoading.value = false; searchLoading.value = matchedLoading.value = false;
+  } else invalidate();
+  stores.value = []; matchedStores.value = []; products.value = []; cart.value = undefined;
+  store.value = undefined; chosen.value = undefined;
+  storeCursor = searchCursor = matchedCursor = null;
+  storesMore.value = searchMore.value = matchedMore.value = false;
+  if (active && (token || !loadingCampuses)) void load();
+}, { flush: 'sync' });
 async function load() {
+  const sequence = ++loadSequence, token = currentSession();
+  loadingCampuses = true;
   try {
-    campuses.value = await api<Campus[]>('/campuses');
+    const rows = await api<Campus[]>('/campuses');
+    if (!active || sequence !== loadSequence || (token !== currentSession() && currentSession())) return;
+    loadingCampuses = false;
+    campuses.value = rows;
     campus.value = String(uni.getStorageSync('campus-choice') || campus.value || campuses.value[0]?.id || '');
     if (!campuses.value.some((c) => c.id === campus.value))
       campus.value = campuses.value[0]?.id || '';
     await loadStores();
   } catch (e) {
-    toast(e);
+    if (active && sequence === loadSequence && token === currentSession()) toast(e);
+  } finally {
+    if (sequence === loadSequence) loadingCampuses = false;
   }
 }
-async function loadStores() {
+async function loadStores(reset = true) {
+  if (!reset && (storesLoading.value || !storesMore.value)) return;
+  const sequence = ++storeSequence, token = currentSession(), targetCampus = campus.value;
+  storesLoading.value = true;
+  if (loadedCampus !== targetCampus) {
+    stores.value = []; store.value = undefined; storeCursor = null; storesMore.value = false;
+    loadedCampus = targetCampus;
+  }
   try {
     uni.setStorageSync('campus-choice', campus.value);
-    const targetCampus = campus.value;
-    const result = await api<Store[]>('/stores?campusId=' + targetCampus);
-    if (campus.value !== targetCampus) return;
-    stores.value = result;
-    const previous = String(uni.getStorageSync('store-choice') || '');
-    store.value =
-      stores.value.find((s) => s.id === (previous || store.value?.id)) || stores.value[0];
-    await menu();
+    const params = 'campusId=' + encodeURIComponent(targetCampus) + '&limit=50'
+      + (!reset && storeCursor ? '&cursor=' + encodeURIComponent(storeCursor) : '');
+    const result = await api<CursorPage<Store>>('/stores/page?' + params);
+    if (!active || sequence !== storeSequence || campus.value !== targetCampus || token !== currentSession()) return;
+    let rows = mergeRecords(reset ? [] : stores.value, result.records, row => row.id);
+    if (reset) {
+      const previous = String(uni.getStorageSync('store-choice') || store.value?.id || '');
+      let selected = rows.find(s => s.id === previous);
+      if (previous && !selected) {
+        try {
+          const detail = await api<Store>('/stores/' + previous);
+          if (detail.campusId === targetCampus) { selected = detail; rows = mergeRecords(rows, [detail], row => row.id); }
+        } catch (e) { if (!(e instanceof ApiError && e.status === 404)) throw e; }
+      }
+      if (!active || sequence !== storeSequence || token !== currentSession() || campus.value !== targetCampus) return;
+      store.value = selected || rows[0];
+    }
+    stores.value = rows; storeCursor = result.nextCursor; storesMore.value = result.hasMore;
+    if (reset) await menu();
   } catch (e) {
-    toast(e);
+    if (active && sequence === storeSequence && token === currentSession()) toast(e);
+  } finally {
+    if (active && sequence === storeSequence && token === currentSession()) storesLoading.value = false;
   }
 }
 async function menu() {
+  searchSequence++;
+  searchLoading.value = false; matchedLoading.value = false;
+  if (campusSearch.value) { products.value = []; cart.value = undefined; }
   campusSearch.value = false;
   matchedStores.value = [];
   const target = store.value;
@@ -64,9 +117,7 @@ async function menu() {
     cart.value = undefined;
     return;
   }
-  const sequence = ++menuSequence;
-  products.value = [];
-  cart.value = undefined;
+  const sequence = ++menuSequence, token = currentSession();
   chosen.value = undefined;
   uni.setStorageSync('store-choice', target.id);
   try {
@@ -81,26 +132,29 @@ async function menu() {
       session.session ? api<Cart>('/stores/' + target.id + '/cart') : Promise.resolve(undefined),
       api<typeof categories.value>('/stores/' + target.id + '/categories'),
     ]);
-    if (sequence !== menuSequence || store.value?.id !== target.id) return;
+    if (!active || sequence !== menuSequence || store.value?.id !== target.id || token !== currentSession()) return;
     products.value = items;
     cart.value = currentCart;
     categories.value = groups;
   } catch (e) {
-    if (sequence === menuSequence) toast(e);
+    if (active && sequence === menuSequence && token === currentSession()) toast(e);
   }
 }
 
 function campusChanged(e: { detail: { value: unknown } }) {
+  invalidate();
   campus.value = campuses.value[Number(e.detail.value)]!.id;
   store.value = undefined;
   query.value = '';
   category.value = '';
+  products.value = []; matchedStores.value = []; cart.value = undefined;
   loadStores();
 }
 function storeChanged(e: { detail: { value: unknown } }) {
   store.value = stores.value[Number(e.detail.value)];
   query.value = '';
   category.value = '';
+  products.value = []; cart.value = undefined;
   menu();
 }
 function pick(p: Product) {
@@ -142,21 +196,63 @@ async function favorite(type: string, id: string, storeId = store.value?.id) {
     toast(e);
   }
 }
+function searchParams() {
+  return 'campusId=' + encodeURIComponent(campus.value) + '&query=' + encodeURIComponent(query.value.trim()) + '&limit=50'
+    + (openFilter.value ? '&open=' + String(openFilter.value === 1) : '');
+}
 async function searchCampus() {
-  const sequence = ++menuSequence;
+  menuSequence++;
+  const sequence = ++searchSequence, token = currentSession(), scope = searchParams();
+  if (scope !== appliedSearch) {
+    products.value = []; matchedStores.value = [];
+    searchCursor = matchedCursor = null; searchMore.value = matchedMore.value = false;
+  }
+  appliedSearch = scope;
   campusSearch.value = true;
+  chosen.value = undefined;
+  searchLoading.value = matchedLoading.value = true;
   try {
-    const params = 'campusId=' + campus.value + '&query=' + encodeURIComponent(query.value) + (openFilter.value ? '&open=' + (openFilter.value === 1) : '');
     const [results, shops] = await Promise.all([
-      api<typeof products.value>('/search?' + params),
-      api<Store[]>('/stores?campusId=' + campus.value + '&query=' + encodeURIComponent(query.value)),
+      api<CursorPage<Product & { storeName?: string }>>('/search/page?' + scope),
+      api<CursorPage<Store>>('/stores/page?' + scope),
     ]);
-    if (sequence === menuSequence) {
-      products.value = results;
-      matchedStores.value = shops.filter(s => !openFilter.value || s.accepting === (openFilter.value === 1));
+    if (active && sequence === searchSequence && token === currentSession() && scope === searchParams()) {
+      products.value = mergeRecords([], results.records, row => row.storeId + ':' + row.itemType + ':' + row.id);
+      matchedStores.value = mergeRecords([], shops.records, row => row.id);
+      searchCursor = results.nextCursor; searchMore.value = results.hasMore;
+      matchedCursor = shops.nextCursor; matchedMore.value = shops.hasMore;
     }
   } catch (e) {
-    if (sequence === menuSequence) toast(e);
+    if (active && sequence === searchSequence && token === currentSession()) toast(e);
+  } finally {
+    if (active && sequence === searchSequence && token === currentSession()) searchLoading.value = matchedLoading.value = false;
+  }
+}
+async function moreSearch(shops = false) {
+  if (!campusSearch.value) return;
+  if (searchParams() !== appliedSearch) { await searchCampus(); return; }
+  const loading = shops ? matchedLoading : searchLoading, more = shops ? matchedMore : searchMore;
+  const cursor = shops ? matchedCursor : searchCursor;
+  if (loading.value || !more.value || !cursor) return;
+  const sequence = searchSequence, token = currentSession(), scope = appliedSearch;
+  loading.value = true;
+  try {
+    const path = (shops ? '/stores/page?' : '/search/page?') + scope + '&cursor=' + encodeURIComponent(cursor);
+    if (shops) {
+      const page = await api<CursorPage<Store>>(path);
+      if (!active || sequence !== searchSequence || token !== currentSession() || scope !== searchParams()) return;
+      matchedStores.value = mergeRecords(matchedStores.value, page.records, row => row.id);
+      matchedCursor = page.nextCursor; matchedMore.value = page.hasMore;
+    } else {
+      const page = await api<CursorPage<Product & { storeName?: string }>>(path);
+      if (!active || sequence !== searchSequence || token !== currentSession() || scope !== searchParams()) return;
+      products.value = mergeRecords(products.value, page.records, row => row.storeId + ':' + row.itemType + ':' + row.id);
+      searchCursor = page.nextCursor; searchMore.value = page.hasMore;
+    }
+  } catch (e) {
+    if (active && sequence === searchSequence && token === currentSession()) toast(e);
+  } finally {
+    if (active && sequence === searchSequence && token === currentSession()) loading.value = false;
   }
 }
 async function openReviews() {
@@ -170,21 +266,29 @@ async function openReviews() {
     toast(e);
   }
 }
-function searchPick(p: Product) {
+async function searchPick(p: Product) {
   if (p.storeId !== store.value?.id) {
-    store.value = stores.value.find((s) => s.id === p.storeId);
-    category.value = '';
-    menu().then(() => pick(p));
+    const sequence = searchSequence, token = currentSession(), targetCampus = campus.value;
+    try {
+      const selected = stores.value.find(s => s.id === p.storeId) || await api<Store>('/stores/' + p.storeId);
+      if (!active || sequence !== searchSequence || token !== currentSession() || selected.campusId !== targetCampus) return;
+      stores.value = mergeRecords(stores.value, [selected], row => row.id);
+      store.value = selected; category.value = ''; query.value = '';
+      await menu();
+      if (store.value?.id === selected.id && token === currentSession()) pick(p);
+    } catch (e) { if (active && sequence === searchSequence && token === currentSession()) toast(e); }
   } else pick(p);
 }
 function visitStore(s: Store) {
+  stores.value = mergeRecords(stores.value, [s], row => row.id);
   store.value = s;
   category.value = '';
   query.value = '';
   menu();
 }
 const nav = (url: string) => uni.navigateTo({ url });
-onShow(load);
+onShow(() => { active = true; void load(); });
+onHide(() => { active = false; invalidate(); });
 </script>
 <template>
   <view class="screen menu-screen">
@@ -222,7 +326,7 @@ onShow(load);
         ><view class="row"
           ><text>店铺</text><text class="tap">{{ store?.name || '暂无店铺' }} ▾</text></view
         ></picker
-      ></view
+      ><button v-if="storesMore" class="secondary small-button" :loading="storesLoading" :disabled="storesLoading" @click="loadStores(false)">加载更多店铺</button></view
     ><view class="card"
       ><input v-model="query" aria-label="搜索餐品或店铺名称" placeholder="搜索餐品或店铺名称" @confirm="menu" />
       <picker :range="['本店全部分类', ...categories.map((c) => c.name)]" :value="Math.max(0, categories.findIndex((c) => c.id === category) + 1)" @change="category = categories[Number($event.detail.value) - 1]?.id || ''; menu()"><view class="field-label tap">分类：{{ categories.find((c) => c.id === category)?.name || '本店全部分类' }} ▾</view></picker>
@@ -240,7 +344,7 @@ onShow(load);
     ><view class="row" v-if="store" style="margin-bottom: 24rpx"
       ><text class="tap" @click="nav('/pages/account/index')">领券与我的收藏</text
       ><text class="tap" @click="openReviews">店铺评价</text></view
-    ><template v-if="campusSearch"><view class="section-title">店铺搜索结果</view><view class="card row" v-for="s in matchedStores" :key="s.id"><view>{{ s.name }}<view class="muted">{{ s.accepting ? '营业中' : '休息中' }} · {{ s.hours.join(' / ') }}</view></view><text class="tap" @click="visitStore(s)">进入店铺</text></view><view v-if="!matchedStores.length" class="muted">没有匹配的店铺。</view><view class="section-title">餐品搜索结果</view></template
+    ><template v-if="campusSearch"><view class="section-title">店铺搜索结果</view><view class="card row" v-for="s in matchedStores" :key="s.id"><view>{{ s.name }}<view class="muted">{{ s.accepting ? '营业中' : '休息中' }} · {{ s.hours.join(' / ') }}</view></view><text class="tap" @click="visitStore(s)">进入店铺</text></view><view v-if="!matchedStores.length && !matchedLoading" class="muted">没有匹配的店铺。</view><button v-if="matchedMore" class="secondary small-button" :loading="matchedLoading" :disabled="matchedLoading" @click="moreSearch(true)">加载更多匹配店铺</button><view class="section-title">餐品搜索结果</view></template
     ><view class="card menu-product" v-for="p in products" :key="p.storeId + p.itemType + p.id"
       ><view class="row"
         ><image
@@ -266,7 +370,7 @@ onShow(load);
         @click="favorite(p.itemType, p.id, p.storeId)"
         >收藏餐品</text
       ></view
-    ><view v-if="!products.length" class="empty">暂无餐品，请切换店铺或搜索条件。</view
+    ><button v-if="campusSearch && searchMore" class="secondary small-button" :loading="searchLoading" :disabled="searchLoading" @click="moreSearch()">加载更多餐品</button><view v-if="!products.length && !searchLoading" class="empty">暂无餐品，请切换店铺或搜索条件。</view
     ><view class="modal" v-if="chosen" @click="chosen = undefined"
       ><view class="card" @click.stop
         ><view class="row"

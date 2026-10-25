@@ -99,6 +99,7 @@ class PlatformIntegrationTest {
   @Autowired DirectoryService directory;
   @Autowired StoreCatalog catalog;
   @Autowired DiscoveryService discovery;
+  @Autowired DiscoveryPages discoveryPages;
   @Autowired EvidenceService evidence;
   @Autowired MockPaymentGateway gateway;
   @Autowired MockMvc mvc;
@@ -139,6 +140,7 @@ class PlatformIntegrationTest {
     clock.value.set(Instant.parse("2026-10-15T04:00:00Z"));
     for (String table :
         List.of(
+            "mock_refund_receipt",
             "evidence",
             "aftersale_item",
             "refund_request",
@@ -1404,8 +1406,8 @@ class PlatformIntegrationTest {
           now,
           now.minusDays(40));
     maintenance.clean();
-    assertEquals(5, db.count("SELECT COUNT(*) FROM auth_session WHERE jti LIKE 'old-%'"));
-    assertEquals(5, db.count("SELECT COUNT(*) FROM outbox_event WHERE state='SUCCEEDED'"));
+    assertEquals(0, db.count("SELECT COUNT(*) FROM auth_session WHERE jti LIKE 'old-%'"));
+    assertEquals(0, db.count("SELECT COUNT(*) FROM outbox_event WHERE state='SUCCEEDED'"));
     assertEquals(1, db.count("SELECT COUNT(*) FROM outbox_event WHERE state='FAILED'"));
     assertEquals(
         2, db.count("SELECT COUNT(*) FROM outbox_event WHERE state IN('REQUESTED','PROCESSING')"));
@@ -1878,6 +1880,111 @@ class PlatformIntegrationTest {
       db.update(
           "DELETE FROM category WHERE store_id IN (SELECT id FROM store WHERE campus_id=?)",
           campus);
+      db.update("DELETE FROM store WHERE campus_id=?", campus);
+      db.update("DELETE FROM campus WHERE id=?", campus);
+    }
+  }
+
+  @Test
+  void discoveryPagesReachAllStoresAndProductsPastTwoHundredWithStableTypedCursors() throws Exception {
+    long campus = db.insert("INSERT INTO campus(name) VALUES(?)", "page-" + UUID.randomUUID());
+    var expectedStores = new ArrayList<Long>();
+    var expectedProducts = new ArrayList<String>();
+    try {
+      for (int i = 0; i < 205; i++) {
+        long store = db.insert("INSERT INTO store(campus_id,name,open) VALUES(?,?,true)", campus, "Page店" + i);
+        expectedStores.add(store);
+        long category = db.insert("INSERT INTO category(store_id,name,type,sort,status) VALUES(?,'菜品',1,0,1)", store);
+        long dish = db.insert("INSERT INTO dish(store_id,category_id,name,price,status) VALUES(?,?,'Rice%_Exact',10,1)", store, category);
+        expectedProducts.add(store + ":DISH:" + dish);
+        if (i == 0) {
+          long setCategory = db.insert("INSERT INTO category(store_id,name,type,sort,status) VALUES(?,'套餐',2,0,1)", store);
+          long setmeal = db.insert("INSERT INTO setmeal(store_id,category_id,name,price,status) VALUES(?,?,'Rice%_Exact',15,1)", store, setCategory);
+          expectedProducts.add(store + ":SETMEAL:" + setmeal);
+        }
+      }
+      var actualStores = new ArrayList<Long>();
+      String cursor = null;
+      do {
+        var page = discoveryPages.stores(campus, "Page店", null, cursor, null, false);
+        assertTrue(page.records().size() <= 50);
+        actualStores.addAll(page.records().stream().map(r -> Db.id(r, "id")).toList());
+        cursor = page.nextCursor();
+        assertEquals(page.hasMore(), cursor != null);
+      } while (cursor != null);
+      assertEquals(expectedStores, actualStores);
+      var actualProducts = new ArrayList<String>();
+      cursor = null;
+      do {
+        var page = discoveryPages.search(campus, "Rice%_", null, true, cursor, 31);
+        actualProducts.addAll(page.records().stream().map(r ->
+            Db.id(r, "store_id") + ":" + r.get("item_type") + ":" + Db.id(r, "id")).toList());
+        cursor = page.nextCursor();
+      } while (cursor != null);
+      assertEquals(expectedProducts, actualProducts);
+      assertTrue(discoveryPages.search(campus, "rice%_", null, true, null, null).records().isEmpty());
+      assertEquals(1, discoveryPages.stores(campus, "Page店204", null, null, 1, false).records().size());
+      assertEquals(expectedStores.getLast(), Db.id(discoveryPages.store(expectedStores.getLast()), "id"));
+      mvc.perform(get("/api/v1/user/stores/page").param("campusId", "" + campus).param("limit", "1"))
+          .andExpect(status().isOk()).andExpect(jsonPath("$.data.hasMore").value(true))
+          .andExpect(jsonPath("$.data.records[0].id").value("" + expectedStores.getFirst()));
+      mvc.perform(get("/api/v1/user/search/page").param("campusId", "" + campus).param("query", "Rice%_").param("limit", "1"))
+          .andExpect(status().isOk()).andExpect(jsonPath("$.data.nextCursor").isString());
+      mvc.perform(get("/api/v1/user/stores/" + expectedStores.getLast()))
+          .andExpect(status().isOk()).andExpect(jsonPath("$.data.id").value("" + expectedStores.getLast()));
+      // Legacy arrays deliberately keep their old bounded behavior for old clients.
+      assertEquals(200, directory.stores(campus, null, false).size());
+      assertEquals(200, discovery.search(campus, null, null, null).size());
+    } finally {
+      db.update("DELETE FROM dish WHERE store_id IN (SELECT id FROM store WHERE campus_id=?)", campus);
+      db.update("DELETE FROM setmeal WHERE store_id IN (SELECT id FROM store WHERE campus_id=?)", campus);
+      db.update("DELETE FROM category WHERE store_id IN (SELECT id FROM store WHERE campus_id=?)", campus);
+      db.update("DELETE FROM store WHERE campus_id=?", campus);
+      db.update("DELETE FROM campus WHERE id=?", campus);
+    }
+  }
+
+  @Test
+  void discoveryPagesApplyBusinessHoursBeforePagingAndRejectScopeAndRoleChanges() throws Exception {
+    long campus = db.insert("INSERT INTO campus(name) VALUES(?)", "hours-page-" + UUID.randomUUID());
+    try {
+      long closed = db.insert("INSERT INTO store(campus_id,name,open,hours) VALUES(?,'A休息店',true,'[\"00:00-01:00\"]')", campus);
+      long opened = db.insert("INSERT INTO store(campus_id,name,open,hours) VALUES(?,'B营业店',true,'[\"12:00-24:00\"]')", campus);
+      long category = db.insert("INSERT INTO category(store_id,name,type,sort,status) VALUES(?,'分类',1,0,1)", opened);
+      db.insert("INSERT INTO dish(store_id,category_id,name,price,status) VALUES(?,?,'时段商品',1,1)", opened, category);
+      var open = discoveryPages.stores(campus, null, true, null, 1, false);
+      assertEquals(List.of(opened), open.records().stream().map(r -> Db.id(r, "id")).toList());
+      assertFalse(open.hasMore());
+      assertEquals(List.of(closed), discoveryPages.stores(campus, null, false, null, 1, false).records().stream().map(r -> Db.id(r, "id")).toList());
+      assertEquals(1, discoveryPages.search(campus, "时段", null, true, null, 1).records().size());
+      assertTrue(discoveryPages.search(campus, "时段", null, false, null, 1).records().isEmpty());
+      clock.value.set(Instant.parse("2026-10-15T15:59:00Z"));
+      assertEquals(1, discoveryPages.search(campus, "时段", null, true, null, 1).records().size());
+      String cursor = discoveryPages.stores(campus, null, null, null, 1, false).nextCursor();
+      assertEquals("INVALID_CURSOR", assertThrows(BusinessException.class,
+          () -> discoveryPages.stores(campus, "B", null, cursor, 1, false)).code());
+      mvc.perform(get("/api/v1/user/stores/page").param("limit", "201"))
+          .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_LIMIT"));
+      mvc.perform(get("/api/v1/user/search/page").param("campusId", "" + campus).param("cursor", "tampered"))
+          .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_CURSOR"));
+      act(platform);
+      String adminCursor = discoveryPages.stores(null, null, null, null, 1, true).nextCursor();
+      act(staff("manager1"));
+      assertEquals(List.of(1L), discoveryPages.stores(null, null, null, null, 200, true).records().stream().map(r -> Db.id(r, "id")).toList());
+      assertEquals("INVALID_CURSOR", assertThrows(BusinessException.class,
+          () -> discoveryPages.stores(null, null, null, adminCursor, 1, true)).code());
+      act(staff("courier1"));
+      assertEquals("FORBIDDEN", assertThrows(BusinessException.class,
+          () -> discoveryPages.stores(null, null, null, null, 50, true)).code());
+      db.update("UPDATE store SET enabled=false WHERE id=?", opened);
+      assertEquals("NOT_FOUND", assertThrows(BusinessException.class, () -> discoveryPages.store(opened)).code());
+      assertTrue(discoveryPages.search(campus, "时段", null, null, null, null).records().isEmpty());
+      db.update("UPDATE campus SET enabled=false WHERE id=?", campus);
+      assertTrue(discoveryPages.stores(campus, null, null, null, 200, false).records().isEmpty());
+      assertEquals("NOT_FOUND", assertThrows(BusinessException.class, () -> discoveryPages.store(closed)).code());
+    } finally {
+      db.update("DELETE FROM dish WHERE store_id IN (SELECT id FROM store WHERE campus_id=?)", campus);
+      db.update("DELETE FROM category WHERE store_id IN (SELECT id FROM store WHERE campus_id=?)", campus);
       db.update("DELETE FROM store WHERE campus_id=?", campus);
       db.update("DELETE FROM campus WHERE id=?", campus);
     }

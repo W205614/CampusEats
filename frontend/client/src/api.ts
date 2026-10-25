@@ -34,6 +34,8 @@ export function api<T>(
   const publicRead =
     method === "GET" &&
     (/^\/(campuses|stores|search)$/.test(pathname) ||
+      /^\/(stores|search)\/page$/.test(pathname) ||
+      /^\/stores\/[1-9]\d*$/.test(pathname) ||
       /^\/campuses\/[^/]+\/buildings$/.test(pathname) ||
       /^\/stores\/[^/]+\/(products|categories|reviews)$/.test(pathname));
   const login = /^\/auth\/(demo|wechat)$/.test(pathname);

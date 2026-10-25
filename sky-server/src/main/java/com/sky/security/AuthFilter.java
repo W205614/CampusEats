@@ -21,6 +21,12 @@ public class AuthFilter extends OncePerRequestFilter {
   @org.springframework.beans.factory.annotation.Value("${campus.legacy-api:false}")
   private boolean legacyApi;
 
+  @org.springframework.beans.factory.annotation.Value("${campus.rate.search-per-minute:1200}")
+  private int searchPerMinute = 1200;
+
+  @org.springframework.beans.factory.annotation.Value("${campus.rate.catalog-per-minute:3000}")
+  private int catalogPerMinute = 3000;
+
   public AuthFilter(
       AuthService auth,
       ErrorWriter errors,
@@ -41,6 +47,16 @@ public class AuthFilter extends OncePerRequestFilter {
     res.setHeader("X-Request-Id", requestId);
     try {
       String path = req.getRequestURI();
+      if (req.getMethod().equals("GET")) {
+        if (path.equals("/api/v1/user/search") || path.equals("/api/v1/user/search/page"))
+          limits.check("search-ip:" + req.getRemoteAddr(), searchPerMinute, 60);
+        else if (path.equals("/api/v1/user/campuses")
+            || path.equals("/api/v1/user/stores")
+            || path.equals("/api/v1/user/stores/page")
+            || path.matches("/api/v1/user/stores/[0-9]+(?:/(products|categories|reviews))?")
+            || path.matches("/api/v1/user/campuses/[0-9]+/buildings"))
+          limits.check("catalog-ip:" + req.getRemoteAddr(), catalogPerMinute, 60);
+      }
       if (!legacyApi
           && ((path.startsWith("/api/v1/admin/")
                   && !path.startsWith("/api/v1/admin/auth/")

@@ -1,8 +1,10 @@
 <script setup lang="ts">
-import { ref } from 'vue';
-import { onShow } from '@dcloudio/uni-app';
-import { api, toast, loggedIn } from '../../api';
-import { cents, states, type Store, type Coupon } from '../../../../contracts/platform';
+import { ref, watch } from 'vue';
+import { onShow, onHide } from '@dcloudio/uni-app';
+import { api, toast, loggedIn, ApiError } from '../../api';
+import { useSession } from '../../stores/session';
+import { cents, states, mergeRecords, type CursorPage, type Store, type Coupon } from '../../../../contracts/platform';
+const session = useSession();
 const stores = ref<Store[]>([]),
   selected = ref(''),
   accountLoaded = ref(false),
@@ -11,37 +13,70 @@ const stores = ref<Store[]>([]),
   wallet = ref<Coupon[]>([]),
   favorites = ref<
     { targetType: string; targetId: string; storeId: string; storeName: string; name: string }[]
-  >([]);
+  >([]), storesMore = ref(false), storesLoading = ref(false);
+let cursor: string | null = null, sequence = 0, storeSequence = 0, couponSequence = 0, active = true;
+const currentSession = () => session.session?.token || '';
+watch(currentSession, () => {
+  sequence++; storeSequence++; couponSequence++;
+  stores.value = []; selected.value = ''; wallet.value = []; favorites.value = []; coupons.value = [];
+  cursor = null; storesMore.value = false; storesLoading.value = false;
+  accountLoaded.value = couponsLoaded.value = false;
+  if (active && session.session) void load();
+}, { flush: 'sync' });
+async function loadStores(reset = false) {
+  if (!reset && (storesLoading.value || !storesMore.value)) return;
+  const current = ++storeSequence, token = currentSession();
+  storesLoading.value = true;
+  try {
+    const params = 'limit=50' + (!reset && cursor ? '&cursor=' + encodeURIComponent(cursor) : '');
+    const page = await api<CursorPage<Store>>('/stores/page?' + params);
+    if (!active || current !== storeSequence || token !== currentSession()) return;
+    let rows = mergeRecords(reset ? [] : stores.value, page.records, row => row.id);
+    if (reset) {
+      const previous = selected.value || String(uni.getStorageSync('store-choice') || '');
+      if (previous && !rows.some(s => s.id === previous)) {
+        try { rows = mergeRecords(rows, [await api<Store>('/stores/' + previous)], row => row.id); }
+        catch (e) { if (!(e instanceof ApiError && e.status === 404)) throw e; }
+      }
+      if (!active || current !== storeSequence || token !== currentSession()) return;
+      if (!rows.some(s => s.id === selected.value)) selected.value = rows.find(s => s.id === previous)?.id || rows[0]?.id || '';
+    }
+    stores.value = rows; cursor = page.nextCursor; storesMore.value = page.hasMore;
+  } catch (e) { if (active && current === storeSequence && token === currentSession()) toast(e); }
+  finally { if (active && current === storeSequence && token === currentSession()) storesLoading.value = false; }
+}
 async function load() {
   if (!loggedIn()) return;
+  const current = ++sequence, token = currentSession();
   accountLoaded.value = false;
   try {
-    stores.value = await api<Store[]>('/stores');
-    if (!stores.value.some((s) => s.id === selected.value)) {
-      const previous = String(uni.getStorageSync('store-choice') || '');
-      selected.value = stores.value.find((s) => s.id === previous)?.id || stores.value[0]?.id || '';
-    }
-    [wallet.value, favorites.value] = await Promise.all([
+    await loadStores(true);
+    if (!active || current !== sequence || token !== currentSession()) return;
+    const [walletRows, favoriteRows] = await Promise.all([
       api<Coupon[]>('/wallet'),
       api<typeof favorites.value>('/favorites'),
     ]);
+    if (!active || current !== sequence || token !== currentSession()) return;
+    wallet.value = walletRows; favorites.value = favoriteRows;
     accountLoaded.value = true;
     await available();
   } catch (e) {
-    toast(e);
+    if (active && current === sequence && token === currentSession()) toast(e);
   }
 }
 async function available() {
+  const current = ++couponSequence, token = currentSession(), target = selected.value;
   couponsLoaded.value = false;
   try {
     const platform = await api<Coupon[]>('/coupons');
-    const local = selected.value
-      ? await api<Coupon[]>('/stores/' + selected.value + '/coupons')
+    const local = target
+      ? await api<Coupon[]>('/stores/' + target + '/coupons')
       : [];
+    if (!active || current !== couponSequence || token !== currentSession() || target !== selected.value) return;
     coupons.value = [...platform, ...local];
     couponsLoaded.value = true;
   } catch (e) {
-    toast(e);
+    if (active && current === couponSequence && token === currentSession()) toast(e);
   }
 }
 async function claim(c: Coupon) {
@@ -61,18 +96,19 @@ async function remove(f: (typeof favorites.value)[number]) {
     toast(e);
   }
 }
-function visit(f: (typeof favorites.value)[number]) {
-  const s = stores.value.find((s) => s.id === f.storeId);
-  if (!s) {
-    toast(new Error('店铺当前不可访问'));
-    return;
-  }
-  uni.setStorageSync('campus-choice', s.campusId);
-  uni.setStorageSync('store-choice', s.id);
-  uni.switchTab({ url: '/pages/menu/index' });
+async function visit(f: (typeof favorites.value)[number]) {
+  const current = sequence, token = currentSession();
+  try {
+    const s = stores.value.find(s => s.id === f.storeId) || await api<Store>('/stores/' + f.storeId);
+    if (!active || current !== sequence || token !== currentSession()) return;
+    uni.setStorageSync('campus-choice', s.campusId);
+    uni.setStorageSync('store-choice', s.id);
+    uni.switchTab({ url: '/pages/menu/index' });
+  } catch (e) { if (active && current === sequence && token === currentSession()) toast(e); }
 }
 const navTo = (url: string) => uni.navigateTo({ url });
-onShow(load);
+onShow(() => { active = true; void load(); });
+onHide(() => { active = false; sequence++; storeSequence++; couponSequence++; storesLoading.value = false; });
 </script>
 <template>
   <view class="screen"
@@ -90,7 +126,7 @@ onShow(load);
       "
       ><view class="card tap"
         >{{ stores.find((s) => s.id === selected)?.name || '选择店铺' }} ▾</view
-      ></picker
+      ></picker><button v-if="storesMore" class="secondary small-button" :loading="storesLoading" :disabled="storesLoading" @click="loadStores()">加载更多领券店铺</button
     ><view class="card row" v-for="c in coupons" :key="c.id"
       ><view
         ><view>{{ c.name }} · {{ c.storeId ? '店铺券' : '平台券' }}</view

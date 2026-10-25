@@ -100,7 +100,7 @@ class MigrationIntegrationTest {
     var before = businessRows(url);
     assertEquals(1, before.get("orders").size());
     assertEquals(1, before.get("refund_request").size());
-    var result = Flyway.configure().dataSource(url, "root", "test").load().migrate();
+    var result = Flyway.configure().dataSource(url, "root", "test").target("9").load().migrate();
     assertEquals(1, result.migrationsExecuted);
     assertEquals(before, businessRows(url));
     try (var c = DriverManager.getConnection(url, "root", "test");
@@ -113,6 +113,23 @@ class MigrationIntegrationTest {
       rows.next();
       assertEquals(4, rows.getInt(1));
     }
+  }
+
+  @Test
+  void v9ToV10AddsEmptyGatewayLedgerWithoutChangingHistoricalRows() throws Exception {
+    String url = create("v9_mock_gateway_upgrade");
+    Flyway.configure().dataSource(url, "root", "test").target("9").load().migrate();
+    try (var c = DriverManager.getConnection(url, "root", "test"); var s = c.createStatement()) {
+      s.execute("INSERT INTO user(id,openid,name) VALUES(1,'upgrade-mock-v9','历史用户')");
+      s.execute("INSERT INTO outbox_event(event_type,aggregate_id,payload,state,next_attempt_at,created_at)"
+          + " VALUES('TEST',0,'{}','SUCCEEDED','2026-10-15 12:00:00','2026-10-15 12:00:00')");
+    }
+    var before = businessRows(url);
+    var result = Flyway.configure().dataSource(url, "root", "test").target("10").load().migrate();
+    assertEquals(1, result.migrationsExecuted);
+    var after = businessRows(url);
+    assertEquals(List.of(), after.remove("mock_refund_receipt"));
+    assertEquals(before, after);
   }
 
   private Map<String, List<List<String>>> businessRows(String url) throws Exception {

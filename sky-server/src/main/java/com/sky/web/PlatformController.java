@@ -65,6 +65,7 @@ public class PlatformController {
   private final PlatformJobs jobs;
   private final AddressService addresses;
   private final UploadService uploads;
+  private final DiscoveryPages discoveryPages;
 
   public PlatformController(
       DirectoryService directory,
@@ -79,7 +80,8 @@ public class PlatformController {
       DiscoveryService discovery,
       PlatformJobs jobs,
       AddressService addresses,
-      UploadService uploads) {
+      UploadService uploads,
+      DiscoveryPages discoveryPages) {
     this.directory = directory;
     this.scope = scope;
     this.catalog = catalog;
@@ -93,6 +95,7 @@ public class PlatformController {
     this.jobs = jobs;
     this.addresses = addresses;
     this.uploads = uploads;
+    this.discoveryPages = discoveryPages;
   }
 
   @GetMapping("/user/campuses")
@@ -120,6 +123,42 @@ public class PlatformController {
   public Object stores(
       @RequestParam(required = false) Long campusId, @RequestParam(required = false) String query) {
     return directory.stores(campusId, query, false);
+  }
+
+  @GetMapping("/user/stores/page")
+  public DiscoveryPages.Page storePage(
+      @RequestParam(required = false) Long campusId,
+      @RequestParam(required = false) String query,
+      @RequestParam(required = false) Boolean open,
+      @RequestParam(required = false) String cursor,
+      @RequestParam(required = false) Integer limit) {
+    return discoveryPages.stores(campusId, query, open, cursor, limit, false);
+  }
+
+  @GetMapping("/merchant/stores/page")
+  public DiscoveryPages.Page merchantStorePage(
+      @RequestParam(required = false) Long campusId,
+      @RequestParam(required = false) String query,
+      @RequestParam(required = false) Boolean open,
+      @RequestParam(required = false) String cursor,
+      @RequestParam(required = false) Integer limit) {
+    return discoveryPages.stores(campusId, query, open, cursor, limit, true);
+  }
+
+  @GetMapping("/user/stores/{id}")
+  public Object storeDetail(@PathVariable long id) {
+    return discoveryPages.store(id);
+  }
+
+  @GetMapping("/user/search/page")
+  public DiscoveryPages.Page searchPage(
+      @RequestParam long campusId,
+      @RequestParam(required = false) String query,
+      @RequestParam(required = false) Long categoryId,
+      @RequestParam(required = false) Boolean open,
+      @RequestParam(required = false) String cursor,
+      @RequestParam(required = false) Integer limit) {
+    return discoveryPages.search(campusId, query, categoryId, open, cursor, limit);
   }
 
   @GetMapping("/merchant/stores")

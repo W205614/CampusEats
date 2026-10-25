@@ -82,6 +82,9 @@ campus:
   wechat-appid: ${WECHAT_APPID:}
   wechat-secret: ${WECHAT_SECRET:}
   tasks-enabled: ${TASKS_ENABLED:true}
+  rate:
+    search-per-minute: ${SEARCH_REQUESTS_PER_MINUTE:1200}
+    catalog-per-minute: ${CATALOG_REQUESTS_PER_MINUTE:3000}
 logging:
   level:
     com.sky: INFO

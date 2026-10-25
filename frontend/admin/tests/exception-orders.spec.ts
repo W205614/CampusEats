@@ -17,7 +17,7 @@ async function workspace(page: Page, role = 'PLATFORM_ADMIN') {
   await page.route('**/api/v1/**', async (route) => {
     const path = new URL(route.request().url()).pathname.replace('/api/v1', '');
     const ok = (data: unknown) => route.fulfill({ json: { code: 'OK', data } });
-    if (path === '/merchant/stores') return ok([{ id: '1', name: '测试店铺', campusName: '校区' }]);
+    if (path === '/merchant/stores/page') return ok({ records: [{ id: '1', name: '测试店铺', campusName: '校区' }], nextCursor: null, hasMore: false });
     if (path === '/merchant/stores/1/orders') return ok([order]);
     if (path === '/merchant/stores/1/couriers') return ok([{ id: '11', name: '原配送员' }, { id: '12', name: '接管配送员' }]);
     if (path === '/merchant/orders/501') return state.failDetails ? route.abort() : ok(order);

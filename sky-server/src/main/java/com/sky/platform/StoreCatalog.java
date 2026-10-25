@@ -299,7 +299,14 @@ public class StoreCatalog {
         db.named.queryForList(
             String.join(" UNION ALL ", branches) + " ORDER BY store_id,item_rank,id LIMIT 200",
             params);
+    return searchDetails(candidates, at);
+  }
+
+  /** Decorate only the selected page, with a bounded number of detail queries. */
+  public List<Map<String, Object>> searchDetails(
+      List<Map<String, Object>> candidates, LocalDateTime at) {
     if (candidates.isEmpty()) return List.of();
+    var stores = candidates.stream().map(row -> Db.id(row, "store_id")).distinct().toList();
     var dishIds = new ArrayList<Long>();
     var setmealIds = new ArrayList<Long>();
     for (var row : candidates)

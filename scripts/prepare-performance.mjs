@@ -18,7 +18,7 @@ const envFile = path.resolve(root, option('--config'));
 const output = path.resolve(root, option('--output'));
 const base = new URL(option('--base-url'));
 const local = path.join(root, '.local') + path.sep;
-if (!/^campuseats-(?:perf|improvement-acceptance|role-uat)(?:-[a-z0-9]+)*$/.test(project))
+if (!/^campuseats-(?:perf|improvement(?:-acceptance)?|role-uat)(?:-[a-z0-9]+)*$/.test(project))
   throw new FixtureError('Only explicitly isolated CampusEats performance/acceptance projects are allowed.');
 if (![envFile, output].every((value) => value.startsWith(local)))
   throw new FixtureError('Isolated configuration and token output must stay inside workspace .local.');
@@ -70,12 +70,29 @@ const actual = containers.server.Config.Env.find((value) => value.startsWith('JW
 if (actual !== `JWT_ADMIN_SECRET=${config.JWT_ADMIN_SECRET}`) throw new FixtureError('Isolated signing configuration does not match the running server.');
 const sql = (statement) => docker([...compose, 'exec', '-T', 'mysql', 'sh', '-c',
   'MYSQL_PWD="$MYSQL_PASSWORD" mysql --default-character-set=utf8mb4 -u campus sky_take_out -N'], statement);
+const userCount = args.includes('--users') ? Number(option('--users')) : 30;
+if (!Number.isInteger(userCount) || userCount < 1 || userCount > 30)
+  throw new FixtureError('Fixture users must be in 1..30.');
+const fixturePrefix = `perf-${randomUUID()}`;
+const statements = [`INSERT INTO campus(name) VALUES('${fixturePrefix}'); SET @perf_campus=LAST_INSERT_ID();`];
+for (let store = 0; store < 205; store++) {
+  statements.push(`INSERT INTO store(campus_id,name,open,delivery_fee,packaging_fee,hours) VALUES(@perf_campus,'${fixturePrefix}-${store}',true,0,0,'["00:00-24:00"]'); SET @perf_store=LAST_INSERT_ID();`);
+  statements.push("INSERT INTO category(store_id,name,type,sort,status) VALUES(@perf_store,'Performance',1,0,1); SET @perf_category=LAST_INSERT_ID();");
+  statements.push("INSERT INTO dish(store_id,name,category_id,price,status,default_quota,image) VALUES " +
+    Array.from({length: 5}, (_, dish) => `(@perf_store,'Performance dish ${dish}',@perf_category,10,1,10000,'/demo-images/dish.svg')`).join(',') + ';');
+}
+statements.push('SELECT @perf_campus,MIN(s.id),MIN(d.id),COUNT(DISTINCT s.id),COUNT(d.id) FROM store s JOIN dish d ON d.store_id=s.id WHERE s.campus_id=@perf_campus;');
+const fixtureValues = sql(statements.join('\n')).split('\t');
+if (fixtureValues.length !== 5 || fixtureValues.some(value => !/^\d+$/.test(value))
+    || Number(fixtureValues[3]) !== 205 || Number(fixtureValues[4]) !== 1025)
+  throw new FixtureError('Isolated dataset creation failed.');
+const fixture = {campusId: fixtureValues[0], storeId: fixtureValues[1], productId: fixtureValues[2], stores: 205, products: 1025};
 const sessions = [];
 const prefix = `perf-${randomUUID()}`;
 const issued = Math.floor(Date.now() / 1000);
 const expires = issued + 7200;
 const expiryShanghai = new Date((expires + 8 * 3600) * 1000).toISOString().slice(0, 19).replace('T', ' ');
-for (let index = 0; index < 10; index++) {
+for (let index = 0; index < userCount; index++) {
   const openid = `${prefix}-${index}`;
   const id = sql(`INSERT INTO user(openid,name,create_time) VALUES('${openid}','Performance fixture ${index}',NOW()); SELECT LAST_INSERT_ID();`);
   if (!/^\d+$/.test(id)) throw new FixtureError('Invalid fixture subject identifier.');
@@ -94,6 +111,7 @@ await fs.mkdir(path.dirname(output), { recursive: true });
 await fs.writeFile(output, JSON.stringify(sessions, null, 2) + '\n', { mode: 0o600, flag: 'wx' });
 await fs.writeFile(metadataOutput, JSON.stringify({
   baseUrl: base.origin, project, preparedAt: new Date().toISOString(), userIds: sessions.map((session) => session.id),
+  fixture,
 }, null, 2) + '\n', { mode: 0o600, flag: 'wx' });
 console.log(`Prepared ${sessions.length} isolated database-fixture identities; private sessions saved to ${path.relative(root, output)}.`);
 console.log('Identity setup bypasses login via an isolated database fixture; measurements do not measure login scalability.');

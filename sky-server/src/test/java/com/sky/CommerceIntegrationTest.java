@@ -122,6 +122,7 @@ class CommerceIntegrationTest {
     gateway.failNextRefunds(0);
     for (String table :
         List.of(
+            "mock_refund_receipt",
             "order_reservation",
             "payment_attempt",
             "refund_task",

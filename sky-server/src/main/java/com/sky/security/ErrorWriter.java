@@ -18,6 +18,7 @@ public class ErrorWriter {
       HttpServletRequest req, HttpServletResponse res, int status, String code, String message)
       throws IOException {
     res.setStatus(status);
+    if (status == 429) res.setHeader("Retry-After", "60");
     res.setContentType("application/json;charset=UTF-8");
     var out = new LinkedHashMap<String, Object>();
     out.put("code", code);

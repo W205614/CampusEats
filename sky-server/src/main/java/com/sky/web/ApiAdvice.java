@@ -114,6 +114,7 @@ public class ApiAdvice implements ResponseBodyAdvice<Object> {
 
   private ResponseEntity<?> error(int status, String code, String message) {
     return ResponseEntity.status(status)
+        .headers(headers -> { if (status == 429) headers.set("Retry-After", "60"); })
         .body(
             new ApiResponse<>(
                 code, message, null, String.valueOf(request.getAttribute("requestId"))));

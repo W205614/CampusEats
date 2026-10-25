@@ -3,32 +3,41 @@ import { computed, ref, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import { useSession } from './stores/session';
 import { api, body, notifyError } from './api';
-import { request } from './platform-api';
 import { selectedStore } from './context';
 import { homeFor } from './router';
+import { useStorePages } from './store-pages';
 import { roles, type Session } from '../../contracts/models';
-import type { Store } from '../../contracts/platform';
 const session = useSession(),
   router = useRouter(),
   username = ref(''),
   password = ref(''),
   busy = ref(false),
-  stores = ref<Store[]>([]),
   storesLoaded = ref(false);
+const { stores, storeHasMore, storeLoading, loadStores, clearStores } = useStorePages();
+let loadSequence = 0;
 const role = computed(() => session.session?.role || '');
 async function load() {
+  const current = ++loadSequence, token = session.session?.token;
   storesLoaded.value = false;
   if (!session.session || session.session.mustChangePassword || role.value === 'DELIVERER') return;
   try {
-    stores.value = await request<Store[]>('/merchant/stores');
+    if (!await loadStores(true)) return;
+    while (selectedStore.value && !stores.value.some(s => s.id === selectedStore.value) && storeHasMore.value) {
+      if (!await loadStores()) return;
+      if (current !== loadSequence || token !== session.session?.token) return;
+    }
+    if (current !== loadSequence || token !== session.session?.token) return;
     if (!stores.value.some((s) => s.id === selectedStore.value))
       selectedStore.value = stores.value[0]?.id || '';
     storesLoaded.value = true;
   } catch (e) {
-    notifyError(e);
+    if (current === loadSequence && token === session.session?.token) notifyError(e);
   }
 }
-watch(() => session.session?.token, load, { immediate: true });
+watch(() => session.session?.token, () => { clearStores(); void load(); }, { immediate: true });
+async function moreStores() {
+  try { await loadStores(); } catch (e) { notifyError(e); }
+}
 watch(selectedStore, (v) => localStorage.setItem('campus-store', v));
 async function login() {
   busy.value = true;
@@ -129,6 +138,7 @@ const links = computed(() => {
             :value="s.id"
             :label="s.campusName + ' / ' + s.name" /></el-select
         ><span v-else>校区配送工作台</span>
+        <el-button v-if="role !== 'DELIVERER' && storeHasMore" :loading="storeLoading" @click="moreStores">加载更多店铺</el-button>
         <div>
           {{ session.session.name }} · {{ roles[role] }}
           <a href="/app/" style="margin-left: 12px">去点餐</a>

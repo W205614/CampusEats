@@ -47,10 +47,13 @@ public class SecurityConfiguration {
                         "/api/v1/user/campuses",
                         "/api/v1/user/campuses/*/buildings",
                         "/api/v1/user/stores",
+                        "/api/v1/user/stores/page",
+                        "/api/v1/user/stores/{id:[0-9]+}",
                         "/api/v1/user/stores/*/products",
                         "/api/v1/user/stores/*/categories",
                         "/api/v1/user/stores/*/reviews",
-                        "/api/v1/user/search")
+                        "/api/v1/user/search",
+                        "/api/v1/user/search/page")
                     .permitAll()
                     .requestMatchers("/docs", "/swagger-ui/**", "/v3/api-docs/**", "/actuator/**")
                     .hasAnyRole("ADMIN", "PLATFORM_ADMIN")
@@ -84,7 +87,7 @@ public class SecurityConfiguration {
     c.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
     c.setAllowedHeaders(
         List.of("Authorization", "Content-Type", "Idempotency-Key", "X-Request-Id"));
-    c.setExposedHeaders(List.of("X-Request-Id"));
+    c.setExposedHeaders(List.of("X-Request-Id", "Retry-After"));
     c.setAllowCredentials(false);
     var source = new UrlBasedCorsConfigurationSource();
     source.registerCorsConfiguration("/**", c);
