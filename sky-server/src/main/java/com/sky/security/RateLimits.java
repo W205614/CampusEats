@@ -1,6 +1,7 @@
 package com.sky.security;
 
 import com.sky.common.BusinessException;
+import com.sky.infra.RedisAccess;
 import java.time.Clock;
 import java.util.*;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Component;
 public class RateLimits {
   private final StringRedisTemplate redis;
   private final Clock clock;
+  private final RedisAccess access;
   private static final int LOCAL_CAPACITY = 10000;
   private final Map<String, Window> local = new HashMap<>();
 
@@ -23,23 +25,32 @@ public class RateLimits {
           Long.class);
 
   public RateLimits(StringRedisTemplate redis, Clock clock) {
+    this(redis, clock, new RedisAccess());
+  }
+
+  @org.springframework.beans.factory.annotation.Autowired
+  public RateLimits(StringRedisTemplate redis, Clock clock, RedisAccess access) {
     this.redis = redis;
     this.clock = clock;
+    this.access = access;
   }
 
   public void check(String key, int max, int seconds) {
-    long count;
+    // Always enforce a process-local window: normal cache eviction must not reset admission.
+    long count = localCount(key, seconds);
+    BusinessException.require(count <= max, 429, "RATE_LIMITED", "操作过于频繁，请稍后重试");
     try {
       count =
           Objects.requireNonNull(
-              redis.execute(INCR, List.of("campus:rate:" + key), String.valueOf(seconds)));
+              access.call(() -> redis.execute(INCR, List.of("campus:rate:" + key), String.valueOf(seconds))));
     } catch (Exception ex) {
-      count = fallbackCount(key, seconds);
+      // Already counted above; a timeout/short-circuit must never count the same request twice.
+      return;
     }
     BusinessException.require(count <= max, 429, "RATE_LIMITED", "操作过于频繁，请稍后重试");
   }
 
-  private synchronized long fallbackCount(String key, int seconds) {
+  private synchronized long localCount(String key, int seconds) {
     long now = clock.millis();
     // Reclaim at the boundary before admission; each key keeps its own window lifetime.
     if (local.size() >= LOCAL_CAPACITY)

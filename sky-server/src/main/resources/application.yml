@@ -78,6 +78,9 @@ campus:
   jwt-secret: ${JWT_ADMIN_SECRET:}
   demo-admin-password: ${DEMO_ADMIN_PASSWORD:}
   uploads: ${UPLOADS_PATH:./.local/uploads}
+  evidence-read-concurrency: ${EVIDENCE_READ_CONCURRENCY:4}
+  evidence-read-account-concurrency: ${EVIDENCE_READ_ACCOUNT_CONCURRENCY:2}
+  evidence-read-per-minute: ${EVIDENCE_READS_PER_MINUTE:120}
   allowed-origins: ${ALLOWED_ORIGINS:http://localhost:18083,http://127.0.0.1:18083,http://localhost:5173,http://localhost:5174}
   wechat-appid: ${WECHAT_APPID:}
   wechat-secret: ${WECHAT_SECRET:}

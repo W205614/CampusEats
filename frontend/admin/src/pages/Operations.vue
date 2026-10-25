@@ -251,7 +251,12 @@ async function viewEvidence(id: string) {
     const response = await fetch('/api/v1/evidence/' + id, {
       headers: { Authorization: 'Bearer ' + session.session?.token },
     });
-    if (!response.ok) throw new Error('无权读取该图片');
+    if (!response.ok) {
+      const result = await response.json().catch(() => null);
+      const fallback = response.status === 429 || response.status === 503
+        ? '举证读取繁忙，请稍后重试' : '无法读取该图片，请确认权限或稍后重试';
+      throw new Error(typeof result?.message === 'string' && result.message ? result.message : fallback);
+    }
     if (imageUrl.value) URL.revokeObjectURL(imageUrl.value);
     imageUrl.value = URL.createObjectURL(await response.blob());
   } catch (e) {

@@ -12,6 +12,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class StoreCatalog {
+  /** Deliberate single-instance demo boundary, counting dishes and set meals, including disabled. */
+  public static final int MAX_PRODUCTS_PER_STORE = 500;
+  public static final int MAX_FLAVORS_PER_DISH = 20;
   private final Db db;
   private final PlatformScope scope;
   private final MenuCache cache;
@@ -99,6 +102,14 @@ public class StoreCatalog {
   public long save(long store, String type, Long id, Product input) {
     scope.merchant(store, true);
     String table = PlatformScope.table(type);
+    if (id == null) {
+      // A shared parent row serializes creation across both product tables. A count without this
+      // transaction lock would let concurrent requests both admit the final available slot.
+      require(db.one("SELECT id FROM store WHERE id=? FOR UPDATE", store) != null,
+          404, "NOT_FOUND", "店铺不存在");
+      require(catalogSize(store) < MAX_PRODUCTS_PER_STORE, 409, "CATALOG_LIMIT",
+          "每店最多500个菜品和套餐（含停售商品），请维护现有商品");
+    }
     var category =
         db.one(
             "SELECT * FROM category WHERE id=? AND store_id=? FOR SHARE",
@@ -138,6 +149,8 @@ public class StoreCatalog {
             "套餐包含停售菜品");
       }
     } else {
+      require(flavors.size() <= MAX_FLAVORS_PER_DISH, 400, "INVALID_FLAVOR",
+          "每个菜品最多20组口味");
       Set<String> names = new HashSet<>();
       for (var f : flavors)
         require(
@@ -209,6 +222,10 @@ public class StoreCatalog {
       long store, boolean admin, String query, Long category) {
     if (admin) scope.merchant(store, true);
     else scope.store(store, true);
+    // Imported historical data is preserved. Reject an oversized whole-menu response explicitly
+    // rather than allocating it or silently hiding the tail; existing items remain editable.
+    require(catalogSize(store) <= MAX_PRODUCTS_PER_STORE, 409, "CATALOG_LIMIT",
+        "店铺目录超过500个商品，请先联系维护者整理目录，原数据保留");
     var rows = admin ? load(store) : cache.load(key(store), () -> load(store));
     var out = new ArrayList<Map<String, Object>>();
     var stock = new HashMap<Long, Integer>();
@@ -279,7 +296,7 @@ public class StoreCatalog {
     var branches = new ArrayList<String>();
     for (String type : List.of("DISH", "SETMEAL")) {
       branches.add(
-          "SELECT p.id,p.store_id,'"
+          "(SELECT p.id,p.store_id,'"
               + type
               + "' item_type,"
               + (type.equals("DISH") ? "0" : "1")
@@ -293,7 +310,8 @@ public class StoreCatalog {
               // Binary substring matching preserves Java String.contains case and literal %/_
               // semantics.
               + " AND (LOCATE(CAST(:query AS BINARY),CAST(p.name AS BINARY))>0"
-              + " OR LOCATE(CAST(:query AS BINARY),CAST(s.name AS BINARY))>0)");
+              + " OR LOCATE(CAST(:query AS BINARY),CAST(s.name AS BINARY))>0)"
+              + " ORDER BY p.store_id,p.id LIMIT 200)");
     }
     var candidates =
         db.named.queryForList(
@@ -440,6 +458,11 @@ public class StoreCatalog {
       }
     }
     return out;
+  }
+
+  private long catalogSize(long store) {
+    return db.count("SELECT (SELECT COUNT(*) FROM dish WHERE store_id=?)"
+        + "+(SELECT COUNT(*) FROM setmeal WHERE store_id=?)", store, store);
   }
 
   private Map<Long, List<Map<String, Object>>> grouped(List<Map<String, Object>> rows, String key) {

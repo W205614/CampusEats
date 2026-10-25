@@ -14,6 +14,7 @@ public class OperationalMetrics {
       refundFailures = new AtomicLong(),
       outboxBacklog = new AtomicLong();
   private final AtomicLong valid = new AtomicLong();
+  private final AtomicLong evictedKeys = new AtomicLong(-1);
   private final MeterRegistry registry;
   private final RuntimeOperations operations;
 
@@ -27,6 +28,7 @@ public class OperationalMetrics {
     registry.gauge("campus.refund.failed", refundFailures);
     registry.gauge("campus.outbox.backlog", outboxBacklog);
     registry.gauge("campus.metrics.valid", valid);
+    registry.gauge("campus.redis.evicted.keys", evictedKeys);
   }
 
   @Scheduled(fixedDelay = 10000)
@@ -38,10 +40,17 @@ public class OperationalMetrics {
     try {
       try (var connection = redis.getConnectionFactory().getConnection()) {
         connection.ping();
+        try {
+          var stats = connection.serverCommands().info("stats");
+          evictedKeys.set(stats == null ? -1 : Long.parseLong(stats.getProperty("evicted_keys", "-1")));
+        } catch (Exception unavailableStats) {
+          evictedKeys.set(-1);
+        }
       }
       degraded.set(0);
     } catch (Exception ex) {
       degraded.set(1);
+      evictedKeys.set(-1);
     }
     try {
       refundFailures.set(db.count("SELECT COUNT(*) FROM refund_request WHERE state='FAILED'"));

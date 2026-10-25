@@ -4,7 +4,7 @@ import com.sky.infra.*;
 import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.concurrent.atomic.AtomicLongArray;
 import java.util.function.Supplier;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Service;
@@ -17,11 +17,14 @@ public class MenuCache {
   private final Db db;
   private final Clock clock;
   private final TransactionTemplate retryTx;
+  private final RedisAccess access;
   private final Semaphore fallback = new Semaphore(8, true);
-  private final ConcurrentHashMap<String, CompletableFuture<List<Map<String, Object>>>> loading =
+  private record Loading(long generation, CompletableFuture<List<Map<String, Object>>> result) {}
+  private final ConcurrentHashMap<String, Loading> loading =
       new ConcurrentHashMap<>();
   private static final long WAIT_NANOS = TimeUnit.MILLISECONDS.toNanos(1500);
-  private final ReentrantReadWriteLock[] stripes = new ReentrantReadWriteLock[256];
+  private final AtomicLongArray generations = new AtomicLongArray(256);
+  private final String epoch = UUID.randomUUID().toString();
 
   public MenuCache(
       StringRedisTemplate redis,
@@ -29,6 +32,13 @@ public class MenuCache {
       Db db,
       Clock clock,
       org.springframework.transaction.PlatformTransactionManager manager) {
+    this(redis, json, db, clock, manager, new RedisAccess());
+  }
+
+  @org.springframework.beans.factory.annotation.Autowired
+  public MenuCache(
+      StringRedisTemplate redis, Json json, Db db, Clock clock,
+      org.springframework.transaction.PlatformTransactionManager manager, RedisAccess access) {
     this.retryTx = new TransactionTemplate(manager);
     this.retryTx.setPropagationBehavior(
         org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
@@ -36,78 +46,79 @@ public class MenuCache {
     this.json = json;
     this.db = db;
     this.clock = clock;
-    for (int i = 0; i < stripes.length; i++) stripes[i] = new ReentrantReadWriteLock(true);
+    this.access = access;
   }
 
   public List<Map<String, Object>> load(String key, Supplier<List<Map<String, Object>>> loader) {
-    var lock = stripe(key).readLock();
+    long generation = generations.get(stripe(key));
     long deadline = System.nanoTime() + WAIT_NANOS;
-    try {
-      if (!lock.tryLock(WAIT_NANOS, TimeUnit.NANOSECONDS)) throw busy();
-    } catch (InterruptedException ex) {
-      Thread.currentThread().interrupt();
-      throw busy();
-    }
-    try {
-      var hit = cached(key);
-      if (hit != null) return hit;
-      var own = new CompletableFuture<List<Map<String, Object>>>();
-      var current = loading.putIfAbsent(key, own);
-      if (current != null) {
-        try {
-          return copy(current.get(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS));
-        } catch (InterruptedException ex) {
-          Thread.currentThread().interrupt();
-          throw busy();
-        } catch (TimeoutException ex) {
-          throw busy();
-        } catch (ExecutionException ex) {
-          if (ex.getCause() instanceof RuntimeException cause) throw cause;
-          if (ex.getCause() instanceof Error cause) throw cause;
-          throw new IllegalStateException(ex.getCause());
-        }
-      }
-      boolean admitted = false;
+    var hit = cached(key, generation);
+    if (hit != null) return hit;
+    var own = new Loading(generation, new CompletableFuture<>());
+    Loading current;
+    while ((current = loading.putIfAbsent(key, own)) != null && current.generation() < generation)
+      loading.remove(key, current);
+    if (current != null) {
       try {
-        admitted = fallback.tryAcquire(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
-        if (!admitted) throw busy();
-        // Recheck after admission: another fill can finish between the initial GET and registration.
-        var rows = cached(key);
-        if (rows == null) {
-          rows = copy(loader.get());
-          try {
-            redis.opsForValue().set("campus:" + key, json.write(rows),
-                Duration.ofSeconds(rows.isEmpty() ? 30 : 240 + ThreadLocalRandom.current().nextInt(121)));
-          } catch (Exception ignored) {
-          }
-        }
-        own.complete(rows);
-        return copy(rows);
+        return copy(current.result().get(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS));
       } catch (InterruptedException ex) {
         Thread.currentThread().interrupt();
-        var failure = busy();
-        own.completeExceptionally(failure);
-        throw failure;
-      } catch (RuntimeException | Error ex) {
-        own.completeExceptionally(ex);
-        throw ex;
-      } finally {
-        loading.remove(key, own);
-        if (admitted) fallback.release();
+        throw busy();
+      } catch (TimeoutException ex) {
+        throw busy();
+      } catch (ExecutionException ex) {
+        if (ex.getCause() instanceof RuntimeException cause) throw cause;
+        if (ex.getCause() instanceof Error cause) throw cause;
+        throw new IllegalStateException(ex.getCause());
       }
+    }
+    boolean admitted = false;
+    try {
+      admitted = fallback.tryAcquire(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
+      if (!admitted) throw busy();
+      // Recheck after admission: another fill can finish between the initial GET and registration.
+      var rows = cached(key, generation);
+      if (rows == null) {
+        rows = copy(loader.get());
+        try {
+          var snapshot = rows;
+          access.call(() -> {
+            redis.opsForValue().set("campus:" + key,
+                json.write(Map.of("epoch", epoch, "generation", generation, "items", snapshot)),
+                Duration.ofSeconds(snapshot.isEmpty() ? 30 : 240 + ThreadLocalRandom.current().nextInt(121)));
+            return true;
+          });
+        } catch (Exception ignored) {
+        }
+      }
+      own.result().complete(rows);
+      return copy(rows);
+    } catch (InterruptedException ex) {
+      Thread.currentThread().interrupt();
+      var failure = busy();
+      own.result().completeExceptionally(failure);
+      throw failure;
+    } catch (RuntimeException | Error ex) {
+      own.result().completeExceptionally(ex);
+      throw ex;
     } finally {
-      lock.unlock();
+      loading.remove(key, own);
+      if (admitted) fallback.release();
     }
   }
 
   @SuppressWarnings("unchecked")
-  private List<Map<String, Object>> cached(String key) {
+  private List<Map<String, Object>> cached(String key, long generation) {
     try {
-      String hit = redis.opsForValue().get("campus:" + key);
+      String hit = access.call(() -> redis.opsForValue().get("campus:" + key));
       if (hit != null) {
+        var envelope = json.map(hit);
+        if (!epoch.equals(envelope.get("epoch"))
+            || !(envelope.get("generation") instanceof Number value)
+            || value.longValue() != generation) return null;
         var out = new ArrayList<Map<String, Object>>();
         for (var item :
-            json.map("{\"items\":" + hit + "}").get("items") instanceof List<?> l ? l : List.of())
+            envelope.get("items") instanceof List<?> l ? l : List.of())
           out.add((Map<String, Object>) item);
         return out;
       }
@@ -142,7 +153,7 @@ public class MenuCache {
     return value;
   }
 
-  /** Persist invalidation with the catalog write; Redis is an after-commit optimization. */
+  /** Commit invalidation durably; the local generation changes without waiting on reads or Redis. */
   public void afterCommit(String key) {
     if (TransactionSynchronizationManager.isSynchronizationActive()) {
       LocalDateTime now = LocalDateTime.now(clock);
@@ -160,10 +171,9 @@ public class MenuCache {
           new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-              try {
-                retry(key);
-              } catch (Exception ignored) {
-              }
+              // No Redis I/O or reader lock on the committed write's response path.
+              // The durable event removes the entry later; generations make old fills unreadable now.
+              advance(key);
             }
           });
     } else invalidate(key);
@@ -187,17 +197,15 @@ public class MenuCache {
   }
 
   public void retry(String key) {
-    // In one instance, deletion must follow every older in-flight fill, including Outbox retries.
-    var lock = stripe(key).writeLock();
-    lock.lock();
-    try {
-      redis.delete("campus:" + key);
-    } finally {
-      lock.unlock();
-    }
+    advance(key);
+    access.call(() -> redis.delete("campus:" + key));
   }
 
-  private ReentrantReadWriteLock stripe(String key) {
-    return stripes[(key.hashCode() & Integer.MAX_VALUE) % stripes.length];
+  private void advance(String key) {
+    generations.incrementAndGet(stripe(key));
+  }
+
+  private int stripe(String key) {
+    return (key.hashCode() & Integer.MAX_VALUE) % generations.length();
   }
 }

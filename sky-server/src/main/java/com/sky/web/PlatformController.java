@@ -582,11 +582,19 @@ public class PlatformController {
   }
 
   @GetMapping(value = "/evidence/{id}", produces = MediaType.IMAGE_PNG_VALUE)
-  public ResponseEntity<byte[]> evidence(@PathVariable String id) throws java.io.IOException {
-    return ResponseEntity.ok()
-        .cacheControl(CacheControl.noStore())
-        .header("X-Content-Type-Options", "nosniff")
-        .body(evidence.read(id));
+  @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
+      description = "OK", content = @io.swagger.v3.oas.annotations.media.Content(
+          mediaType = MediaType.IMAGE_PNG_VALUE,
+          schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string", format = "binary")))
+  public void evidence(@PathVariable String id, jakarta.servlet.http.HttpServletResponse response)
+      throws java.io.IOException {
+    try (var read = evidence.open(id)) {
+      response.setContentType(MediaType.IMAGE_PNG_VALUE);
+      response.setContentLengthLong(read.size());
+      response.setHeader("Cache-Control", "no-store");
+      response.setHeader("X-Content-Type-Options", "nosniff");
+      read.transferTo(response.getOutputStream());
+    }
   }
 
   @GetMapping("/platform/refunds")

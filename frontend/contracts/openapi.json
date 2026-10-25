@@ -6816,7 +6816,7 @@
               "image/png": {
                 "schema": {
                   "type": "string",
-                  "format": "byte"
+                  "format": "binary"
                 }
               }
             }

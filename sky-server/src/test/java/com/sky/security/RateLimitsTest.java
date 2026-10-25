@@ -82,14 +82,39 @@ class RateLimitsTest {
 
   @Test
   @SuppressWarnings("unchecked")
-  void redisRecoveryBypassesFullFallbackAndOutageCanResume() {
+  void redisRecoveryCannotBypassFullLocalSafetyGateAndExpiryCanResume() {
     fill(10000);
     doReturn(1L).when(redis).execute(any(RedisScript.class), anyList(), any(Object[].class));
-    limits.check("recovered", 1, 60);
+    rejects("RATE_LIMIT_BUSY", () -> limits.check("recovered", 1, 60));
     offline();
     clock.advanceSeconds(60);
     limits.check("resumed", 1, 60);
     rejects("RATE_LIMITED", () -> limits.check("resumed", 1, 60));
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void evictedRedisCounterCannotReopenTheLocalWindow() {
+    // A successful INCR returning one models a counter evicted before every request.
+    doReturn(1L).when(redis).execute(any(RedisScript.class), anyList(), any(Object[].class));
+    for (int i = 0; i < 10; i++) limits.check("login:shared", 10, 60);
+    rejects("RATE_LIMITED", () -> limits.check("login:shared", 10, 60));
+    verify(redis, times(10)).execute(any(RedisScript.class), anyList(), any(Object[].class));
+    clock.advanceSeconds(60);
+    limits.check("login:shared", 10, 60);
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void outageContinuesTheOriginalWindowWithoutDoubleCounting() {
+    doReturn(1L).when(redis).execute(any(RedisScript.class), anyList(), any(Object[].class));
+    limits.check("mixed", 3, 60);
+    offline();
+    limits.check("mixed", 3, 60);
+    limits.check("mixed", 3, 60);
+    rejects("RATE_LIMITED", () -> limits.check("mixed", 3, 60));
+    // Only the first outage request contacts Redis; the following request uses the open circuit.
+    verify(redis, times(2)).execute(any(RedisScript.class), anyList(), any(Object[].class));
   }
 
   List<String> compete(java.util.function.IntFunction<String> key, int max) throws Exception {

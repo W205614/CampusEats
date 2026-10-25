@@ -112,11 +112,14 @@ class CommerceIntegrationTest {
   @Autowired TestClock clock;
   @Autowired MockMvc mvc;
   @Autowired BackgroundJobs jobs;
+  @Autowired RateLimits rateLimits;
+  @Autowired RedisAccess redisAccess;
   @Autowired org.springframework.transaction.PlatformTransactionManager manager;
   Actor admin = new Actor(1, "ADMIN", "ADMIN", "", false);
 
   @BeforeEach
   void reset() {
+    RuntimeTestState.reset(rateLimits, redisAccess);
     clock.value.set(Instant.parse("2026-10-07T04:00:00Z"));
     gateway.failNextPayments(0);
     gateway.failNextRefunds(0);

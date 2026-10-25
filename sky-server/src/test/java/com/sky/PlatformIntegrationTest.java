@@ -108,6 +108,8 @@ class PlatformIntegrationTest {
   @Autowired com.sky.infra.MaintenanceJobs maintenance;
   @Autowired com.sky.infra.RuntimeOperations operations;
   @Autowired com.sky.infra.OperationalMetrics operationalMetrics;
+  @Autowired RateLimits rateLimits;
+  @Autowired com.sky.infra.RedisAccess redisAccess;
   @Autowired org.springframework.transaction.PlatformTransactionManager transactionManager;
   @org.junit.jupiter.api.io.TempDir java.nio.file.Path evidenceRoot;
   long user, dish3;
@@ -136,6 +138,7 @@ class PlatformIntegrationTest {
 
   @BeforeEach
   void reset() {
+    RuntimeTestState.reset(rateLimits, redisAccess);
     clock.advanceAfterRead.set(null);
     clock.value.set(Instant.parse("2026-10-15T04:00:00Z"));
     for (String table :
@@ -1170,14 +1173,18 @@ class PlatformIntegrationTest {
             id,
             new org.springframework.mock.web.MockMultipartFile(
                 "file", "test.png", "image/png", out.toByteArray()));
-    assertTrue(evidence.read(image).length > 0);
+    try (var read = evidence.open(image)) {
+      var result = new java.io.ByteArrayOutputStream();
+      read.transferTo(result);
+      assertTrue(result.size() > 0);
+    }
     long other = Long.parseLong(auth.demo(new Commands.DemoLogin(2)).get("id").toString());
     act(user(other));
-    assertThrows(BusinessException.class, () -> evidence.read(image));
+    assertThrows(BusinessException.class, () -> evidence.open(image));
     act(staff("manager3"));
-    assertThrows(BusinessException.class, () -> evidence.read(image));
+    assertThrows(BusinessException.class, () -> evidence.open(image));
     act(staff("courier1"));
-    assertThrows(BusinessException.class, () -> evidence.read(image));
+    assertThrows(BusinessException.class, () -> evidence.open(image));
     mvc.perform(get("/uploads/.private/" + image + ".png")).andExpect(status().isUnauthorized());
   }
 

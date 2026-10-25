@@ -192,8 +192,10 @@ class MenuCacheTest {
         }
       });
       assertTrue(invalidating.await(5, TimeUnit.SECONDS));
-      assertThrows(TimeoutException.class, () -> invalidation.get(150, TimeUnit.MILLISECONDS),
-          "Invalidation must wait for the in-flight fill before removing it");
+      invalidation.get(1, TimeUnit.SECONDS);
+      // A new generation must neither wait for nor reuse an older in-flight load.
+      assertEquals("20.00", cache.load(key,
+          () -> List.<Map<String, Object>>of(Map.of("price", "20.00"))).getFirst().get("price"));
       finishRead.countDown();
       assertEquals("10.00", loading.get(5, TimeUnit.SECONDS).getFirst().get("price"));
       invalidation.get(5, TimeUnit.SECONDS);
@@ -204,5 +206,51 @@ class MenuCacheTest {
       pool.shutdownNow();
       assertTrue(pool.awaitTermination(5, TimeUnit.SECONDS));
     }
+  }
+
+  @Test
+  void afterCommitNeverPerformsRedisIoAndNewProcessRejectsAnOldEnvelope() {
+    var stored = new ConcurrentHashMap<String, String>();
+    var redis = mock(StringRedisTemplate.class);
+    @SuppressWarnings("unchecked") ValueOperations<String, String> values = mock(ValueOperations.class);
+    when(redis.opsForValue()).thenReturn(values);
+    when(values.get(anyString())).thenAnswer(call -> stored.get(call.getArgument(0)));
+    doAnswer(call -> { stored.put(call.getArgument(0), call.getArgument(1)); return null; })
+        .when(values).set(anyString(), anyString(), any(Duration.class));
+    var db = mock(Db.class);
+    var cache = new MenuCache(redis, new Json(new ObjectMapper()), db,
+        Clock.systemUTC(), mock(PlatformTransactionManager.class));
+    cache.load("process", () -> List.of(Map.of("value", "old")));
+    var restarted = new MenuCache(redis, new Json(new ObjectMapper()), db,
+        Clock.systemUTC(), mock(PlatformTransactionManager.class));
+    assertEquals("new", restarted.load("process", () -> List.of(Map.of("value", "new")))
+        .getFirst().get("value"));
+    clearInvocations(redis, values);
+    TransactionSynchronizationManager.initSynchronization();
+    try {
+      restarted.afterCommit("process");
+      for (var sync : TransactionSynchronizationManager.getSynchronizations()) sync.afterCommit();
+      verifyNoInteractions(redis, values);
+    } finally {
+      TransactionSynchronizationManager.clearSynchronization();
+    }
+    assertEquals("committed", restarted.load("process", () -> List.of(Map.of("value", "committed")))
+        .getFirst().get("value"));
+  }
+
+  @Test
+  @SuppressWarnings("unchecked")
+  void failedRateCommandAlsoShortCircuitsMenuRedisCalls() {
+    var redis = mock(StringRedisTemplate.class);
+    doThrow(new IllegalStateException("down")).when(redis).execute(
+        any(org.springframework.data.redis.core.script.RedisScript.class), anyList(), any(Object[].class));
+    var access = new com.sky.infra.RedisAccess();
+    var rate = new com.sky.security.RateLimits(redis, Clock.systemUTC(), access);
+    rate.check("public", 10, 60);
+    var cache = new MenuCache(redis, new Json(new ObjectMapper()), mock(Db.class),
+        Clock.systemUTC(), mock(PlatformTransactionManager.class), access);
+    assertEquals("available", cache.load("menu", () -> List.of(Map.of("value", "available")))
+        .getFirst().get("value"));
+    verify(redis, never()).opsForValue();
   }
 }

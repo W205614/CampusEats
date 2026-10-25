@@ -92,7 +92,9 @@ public class DiscoveryPages {
     var branches = new ArrayList<String>();
     for (int rank = 0; rank < 2; rank++) {
       String type = rank == 0 ? "DISH" : "SETMEAL";
-      branches.add("SELECT p.id,p.store_id,'" + type + "' item_type," + rank
+      // The first K global rows can only contain the first K rows of either ordered branch.
+      // Bound the UNION materialization to 2*K candidates without changing substring semantics.
+      branches.add("(SELECT p.id,p.store_id,'" + type + "' item_type," + rank
           + " item_rank,s.name store_name FROM " + PlatformScope.table(type)
           + " p JOIN category c ON c.id=p.category_id AND c.store_id=p.store_id"
           + " JOIN store s ON s.id=p.store_id JOIN campus campus ON campus.id=s.campus_id"
@@ -102,7 +104,8 @@ public class DiscoveryPages {
           + " AND (s.id>:afterStore OR (s.id=:afterStore AND (" + rank
           + ">:afterRank OR (" + rank + "=:afterRank AND p.id>:afterId))))"
           + " AND (LOCATE(CAST(:query AS BINARY),CAST(p.name AS BINARY))>0"
-          + " OR LOCATE(CAST(:query AS BINARY),CAST(s.name AS BINARY))>0)" + openFilter(open));
+          + " OR LOCATE(CAST(:query AS BINARY),CAST(s.name AS BINARY))>0)" + openFilter(open)
+          + " ORDER BY p.store_id,p.id LIMIT :fetchLimit)");
     }
     var rows = db.named.queryForList("SELECT * FROM (" + String.join(" UNION ALL ", branches)
         + ") candidates ORDER BY store_id,item_rank,id LIMIT :fetchLimit", params);
