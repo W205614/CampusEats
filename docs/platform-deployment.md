@@ -30,6 +30,12 @@
 
 备份和回滚材料保存在受保护的本机 `.local`。清理重复镜像前可先用 `docker image save` 导出匹配备份的镜像，并记录 SHA-256；需要回滚时先 `docker image load`。只清理明确归属 CampusEats 的冗余容器、镜像和本轮验收专用卷，禁止全局 prune。
 
+菜单缓存属于可重建数据，不包含在数据库／上传恢复集内。本轮缓存值增加epoch和代际封装；跨缓存格式回滚到旧镜像时，应在暂停Web／Java、恢复匹配数据库与上传文件后，仅清理本项目Redis中的菜单键，再启动应用。保留限流等其它Redis状态，不能用全库清空替代。以下命令只针对日常项目的派生菜单键，不能在仍接受业务写入时执行：
+
+```powershell
+docker compose -p campuseats-v1 exec -T redis sh -c 'export REDISCLI_AUTH="$REDIS_PASSWORD"; redis-cli --scan --pattern "campus:store:*:catalog" | while IFS= read -r key; do redis-cli UNLINK "$key" >/dev/null; done'
+```
+
 历史支付、退款或完成时间缺失时标记或保留为未知，不以订单／任务创建时间冒充实际发生时间；按日统计不计入没有可验证事件日期的历史金额。缺少完成时间的历史订单不能自动判定7天售后窗口。
 
 ## 构建与旧数据库注意事项

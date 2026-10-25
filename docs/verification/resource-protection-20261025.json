@@ -1,0 +1,604 @@
+{
+  "scope": "Personal single-instance demo, fixed 100-store/50k-product fixture; not maximum TPS, real users/funds or long-duration reliability",
+  "functionalRevision": "530fb8ba32a6936aa3c5ddf42f529cd0e142062f",
+  "localTests": {
+    "distinctBackendCasesPassed": 42,
+    "affectedOrderedSearchAndMigrationRetestPassed": 8,
+    "initialBrowserCasesPassed": 4,
+    "realDatabaseJourneys": 3,
+    "mockTransportBrowserCases": 1,
+    "finalFourRoleJourneyPassed": 1
+  },
+  "catalog": {
+    "totalRequests": 260,
+    "httpP95Ms": 54.16,
+    "acceptance": true,
+    "fixture": {
+      "stores": 100,
+      "products": 50000,
+      "perStore": 500,
+      "dishes": 25000,
+      "setmeals": 25000,
+      "flavorRows": 25000,
+      "componentRows": 25000
+    },
+    "checks": [
+      {
+        "name": "strict-existing-fixture-validation",
+        "passed": true
+      },
+      {
+        "name": "three-500-item-menus",
+        "passed": true
+      },
+      {
+        "name": "broad-complete-pages",
+        "passed": true,
+        "query": "",
+        "records": 50000,
+        "pages": 250,
+        "lastPage": {
+          "position": {
+            "store": 107,
+            "rank": 1,
+            "id": 24815
+          },
+          "count": 200
+        }
+      },
+      {
+        "name": "sparse-complete-pages",
+        "passed": true,
+        "query": "CatalogLarge%_SparseLAST",
+        "records": 100,
+        "pages": 4,
+        "lastPage": {
+          "position": {
+            "store": 100,
+            "rank": 1,
+            "id": 23265
+          },
+          "count": 7
+        }
+      },
+      {
+        "name": "case-sensitive-exact-subset",
+        "passed": true,
+        "query": "cataloglarge%_",
+        "records": 100,
+        "pages": 1,
+        "lastPage": {
+          "position": {
+            "store": 0,
+            "rank": 0,
+            "id": 0
+          },
+          "count": 100
+        }
+      },
+      {
+        "name": "literal-percent-underscore-lookalike",
+        "passed": true,
+        "query": "CatalogLargeXXSparseLAST",
+        "records": 100,
+        "pages": 1,
+        "lastPage": {
+          "position": {
+            "store": 0,
+            "rank": 0,
+            "id": 0
+          },
+          "count": 100
+        }
+      },
+      {
+        "name": "zero-match",
+        "passed": true,
+        "query": "absent-never-matches",
+        "records": 0,
+        "pages": 1,
+        "lastPage": {
+          "position": {
+            "store": 0,
+            "rank": 0,
+            "id": 0
+          },
+          "count": 0
+        }
+      },
+      {
+        "name": "old-new-candidates-broad-first",
+        "passed": true
+      },
+      {
+        "name": "old-new-candidates-broad-tail",
+        "passed": true
+      },
+      {
+        "name": "old-new-candidates-sparse-first",
+        "passed": true
+      },
+      {
+        "name": "old-new-candidates-sparse-tail",
+        "passed": true
+      },
+      {
+        "name": "old-new-candidates-zero-first",
+        "passed": true
+      }
+    ],
+    "explain": [
+      {
+        "scenario": "broad-first",
+        "query": "",
+        "position": {
+          "store": 0,
+          "rank": 0,
+          "id": 0
+        },
+        "version": "unbounded-previous-shape",
+        "fetchLimit": 201,
+        "unionCandidateUpperBound": null,
+        "materializedCandidateCount": 50000,
+        "samples": [
+          {
+            "rootFirstRowMs": 67.3,
+            "rootCompletionMs": 67.3,
+            "rootRows": 201,
+            "cliWallMs": 348.55
+          },
+          {
+            "rootFirstRowMs": 73.7,
+            "rootCompletionMs": 73.8,
+            "rootRows": 201,
+            "cliWallMs": 355.12
+          },
+          {
+            "rootFirstRowMs": 68.5,
+            "rootCompletionMs": 68.5,
+            "rootRows": 201,
+            "cliWallMs": 349.49
+          }
+        ]
+      },
+      {
+        "scenario": "broad-first",
+        "query": "",
+        "position": {
+          "store": 0,
+          "rank": 0,
+          "id": 0
+        },
+        "version": "bounded-current",
+        "fetchLimit": 201,
+        "unionCandidateUpperBound": 402,
+        "materializedCandidateCount": 402,
+        "samples": [
+          {
+            "rootFirstRowMs": 2.28,
+            "rootCompletionMs": 2.29,
+            "rootRows": 201,
+            "cliWallMs": 325.8
+          },
+          {
+            "rootFirstRowMs": 1.75,
+            "rootCompletionMs": 1.76,
+            "rootRows": 201,
+            "cliWallMs": 353.59
+          },
+          {
+            "rootFirstRowMs": 1.71,
+            "rootCompletionMs": 1.73,
+            "rootRows": 201,
+            "cliWallMs": 296.93
+          }
+        ]
+      },
+      {
+        "scenario": "broad-tail",
+        "query": "",
+        "position": {
+          "store": 107,
+          "rank": 1,
+          "id": 24815
+        },
+        "version": "unbounded-previous-shape",
+        "fetchLimit": 201,
+        "unionCandidateUpperBound": null,
+        "materializedCandidateCount": 200,
+        "samples": [
+          {
+            "rootFirstRowMs": 0.373,
+            "rootCompletionMs": 0.39,
+            "rootRows": 200,
+            "cliWallMs": 278.82
+          },
+          {
+            "rootFirstRowMs": 0.384,
+            "rootCompletionMs": 0.4,
+            "rootRows": 200,
+            "cliWallMs": 282.34
+          },
+          {
+            "rootFirstRowMs": 0.422,
+            "rootCompletionMs": 0.438,
+            "rootRows": 200,
+            "cliWallMs": 313.64
+          }
+        ]
+      },
+      {
+        "scenario": "broad-tail",
+        "query": "",
+        "position": {
+          "store": 107,
+          "rank": 1,
+          "id": 24815
+        },
+        "version": "bounded-current",
+        "fetchLimit": 201,
+        "unionCandidateUpperBound": 402,
+        "materializedCandidateCount": 200,
+        "samples": [
+          {
+            "rootFirstRowMs": 0.984,
+            "rootCompletionMs": 1,
+            "rootRows": 200,
+            "cliWallMs": 285.52
+          },
+          {
+            "rootFirstRowMs": 0.838,
+            "rootCompletionMs": 0.853,
+            "rootRows": 200,
+            "cliWallMs": 284.19
+          },
+          {
+            "rootFirstRowMs": 1.13,
+            "rootCompletionMs": 1.15,
+            "rootRows": 200,
+            "cliWallMs": 286.14
+          }
+        ]
+      },
+      {
+        "scenario": "sparse-first",
+        "query": "CatalogLarge%_SparseLAST",
+        "position": {
+          "store": 0,
+          "rank": 0,
+          "id": 0
+        },
+        "version": "unbounded-previous-shape",
+        "fetchLimit": 32,
+        "unionCandidateUpperBound": null,
+        "materializedCandidateCount": 100,
+        "samples": [
+          {
+            "rootFirstRowMs": 44.8,
+            "rootCompletionMs": 44.8,
+            "rootRows": 32,
+            "cliWallMs": 321.02
+          },
+          {
+            "rootFirstRowMs": 48.5,
+            "rootCompletionMs": 48.5,
+            "rootRows": 32,
+            "cliWallMs": 324.32
+          },
+          {
+            "rootFirstRowMs": 53.8,
+            "rootCompletionMs": 53.8,
+            "rootRows": 32,
+            "cliWallMs": 338.73
+          }
+        ]
+      },
+      {
+        "scenario": "sparse-first",
+        "query": "CatalogLarge%_SparseLAST",
+        "position": {
+          "store": 0,
+          "rank": 0,
+          "id": 0
+        },
+        "version": "bounded-current",
+        "fetchLimit": 32,
+        "unionCandidateUpperBound": 64,
+        "materializedCandidateCount": 32,
+        "samples": [
+          {
+            "rootFirstRowMs": 43.6,
+            "rootCompletionMs": 43.6,
+            "rootRows": 32,
+            "cliWallMs": 324.61
+          },
+          {
+            "rootFirstRowMs": 46.6,
+            "rootCompletionMs": 46.6,
+            "rootRows": 32,
+            "cliWallMs": 327.55
+          },
+          {
+            "rootFirstRowMs": 44.2,
+            "rootCompletionMs": 44.2,
+            "rootRows": 32,
+            "cliWallMs": 321.31
+          }
+        ]
+      },
+      {
+        "scenario": "sparse-tail",
+        "query": "CatalogLarge%_SparseLAST",
+        "position": {
+          "store": 100,
+          "rank": 1,
+          "id": 23265
+        },
+        "version": "unbounded-previous-shape",
+        "fetchLimit": 32,
+        "unionCandidateUpperBound": null,
+        "materializedCandidateCount": 7,
+        "samples": [
+          {
+            "rootFirstRowMs": 3.99,
+            "rootCompletionMs": 3.99,
+            "rootRows": 7,
+            "cliWallMs": 299.97
+          },
+          {
+            "rootFirstRowMs": 5.14,
+            "rootCompletionMs": 5.14,
+            "rootRows": 7,
+            "cliWallMs": 324.08
+          },
+          {
+            "rootFirstRowMs": 3.39,
+            "rootCompletionMs": 3.39,
+            "rootRows": 7,
+            "cliWallMs": 289.13
+          }
+        ]
+      },
+      {
+        "scenario": "sparse-tail",
+        "query": "CatalogLarge%_SparseLAST",
+        "position": {
+          "store": 100,
+          "rank": 1,
+          "id": 23265
+        },
+        "version": "bounded-current",
+        "fetchLimit": 32,
+        "unionCandidateUpperBound": 64,
+        "materializedCandidateCount": 7,
+        "samples": [
+          {
+            "rootFirstRowMs": 4.42,
+            "rootCompletionMs": 4.42,
+            "rootRows": 7,
+            "cliWallMs": 280.89
+          },
+          {
+            "rootFirstRowMs": 4.51,
+            "rootCompletionMs": 4.52,
+            "rootRows": 7,
+            "cliWallMs": 282.31
+          },
+          {
+            "rootFirstRowMs": 4.54,
+            "rootCompletionMs": 4.54,
+            "rootRows": 7,
+            "cliWallMs": 277.67
+          }
+        ]
+      },
+      {
+        "scenario": "zero-first",
+        "query": "absent-never-matches",
+        "position": {
+          "store": 0,
+          "rank": 0,
+          "id": 0
+        },
+        "version": "unbounded-previous-shape",
+        "fetchLimit": 201,
+        "unionCandidateUpperBound": null,
+        "materializedCandidateCount": 0,
+        "samples": [
+          {
+            "rootFirstRowMs": 48,
+            "rootCompletionMs": 48,
+            "rootRows": 0,
+            "cliWallMs": 320.43
+          },
+          {
+            "rootFirstRowMs": 45.5,
+            "rootCompletionMs": 45.5,
+            "rootRows": 0,
+            "cliWallMs": 317.25
+          },
+          {
+            "rootFirstRowMs": 46.8,
+            "rootCompletionMs": 46.8,
+            "rootRows": 0,
+            "cliWallMs": 320.97
+          }
+        ]
+      },
+      {
+        "scenario": "zero-first",
+        "query": "absent-never-matches",
+        "position": {
+          "store": 0,
+          "rank": 0,
+          "id": 0
+        },
+        "version": "bounded-current",
+        "fetchLimit": 201,
+        "unionCandidateUpperBound": 402,
+        "materializedCandidateCount": 0,
+        "samples": [
+          {
+            "rootFirstRowMs": 65.7,
+            "rootCompletionMs": 65.7,
+            "rootRows": 0,
+            "cliWallMs": 360.9
+          },
+          {
+            "rootFirstRowMs": 72,
+            "rootCompletionMs": 72,
+            "rootRows": 0,
+            "cliWallMs": 365.19
+          },
+          {
+            "rootFirstRowMs": 72.2,
+            "rootCompletionMs": 72.2,
+            "rootRows": 0,
+            "cliWallMs": 358.45
+          }
+        ]
+      }
+    ]
+  },
+  "failedReadLoad": {
+    "succeeded": 1696,
+    "httpP95Ms": 1288.38,
+    "maxMs": 3013.76,
+    "peakInFlight": 30,
+    "acceptance": false,
+    "failure": "READ_LOAD_ACCEPTANCE_FAILED"
+  },
+  "finalReadLoad": {
+    "clients": 30,
+    "seconds": 60,
+    "succeeded": 1800,
+    "requests": 1800,
+    "httpP95Ms": 359.55,
+    "maxMs": 672.08,
+    "peakInFlight": 30,
+    "byPath": {
+      "menu": {
+        "count": 900,
+        "p95Ms": 379.19,
+        "maxMs": 672.08
+      },
+      "search": {
+        "count": 900,
+        "p95Ms": 71.46,
+        "maxMs": 172.14
+      }
+    },
+    "responseBytes": 212505300,
+    "acceptance": true,
+    "unexpectedErrors": 0,
+    "containers": [
+      {
+        "service": "web",
+        "oomKilled": false,
+        "restarts": 0,
+        "healthy": true
+      },
+      {
+        "service": "server",
+        "oomKilled": false,
+        "restarts": 0,
+        "healthy": true
+      },
+      {
+        "service": "redis",
+        "oomKilled": false,
+        "restarts": 0,
+        "healthy": true
+      },
+      {
+        "service": "mysql",
+        "oomKilled": false,
+        "restarts": 0,
+        "healthy": true
+      }
+    ]
+  },
+  "redisFault": {
+    "clients": 30,
+    "steadySeconds": 3,
+    "successful": 600,
+    "unexpected": 0,
+    "http429": 0,
+    "steadyHttpP95Ms": 114.28,
+    "peakInFlightRequests": 30,
+    "firstRequest": {
+      "status": 200,
+      "code": "OK",
+      "retryAfter": null,
+      "milliseconds": 1066.0298000000003
+    },
+    "recovered": true,
+    "healthRecoveryMs": 6085,
+    "acceptance": true
+  },
+  "lostRedisCounter": {
+    "successful": 1200,
+    "expected429": 3,
+    "fillElapsedMs": 1549,
+    "localGatePreserved": true,
+    "acceptance": true
+  },
+  "imageSecurityGates": [
+    {
+      "service": "server",
+      "image": "campuseats-server:protection-20261025",
+      "imageId": "sha256:e7f58b1fe9112cdfbe4f8130f9d53bec226c690d92eac133e81f6ed6c2256bbc",
+      "scannerVersion": "0.76.0",
+      "osScanExit": 0,
+      "osSbomExit": 0,
+      "osGateExit": 0,
+      "javaScanExit": 0,
+      "javaGateExit": 0,
+      "status": "passed"
+    },
+    {
+      "service": "web",
+      "image": "campuseats-web:protection-20261025",
+      "imageId": "sha256:b5ba06ff354b097b6e458040dbf4708b90d7d23bf0464705f41b5546cd07d470",
+      "scannerVersion": "0.76.0",
+      "osScanExit": 0,
+      "osSbomExit": 0,
+      "osGateExit": 0,
+      "javaScanExit": null,
+      "javaGateExit": null,
+      "status": "passed"
+    }
+  ],
+  "deployment": {
+    "passed": true,
+    "tableCount": 39,
+    "schemaVersion": 11,
+    "historicalTablesVerified": 38,
+    "uploadFilesVerified": 10,
+    "readOnlyChecks": 95,
+    "runtimeSha256": [
+      "661a6f37355111ec1b24b558412c3c8ac462454b755fc8ed9332ab101b43a812  app.jar",
+      "8809dd1e8d85703fbddc314287f6fc374243cbca30d2b08c21454439ab6698f4  sbom.cdx.json"
+    ]
+  },
+  "cleanup": {
+    "containers": 4,
+    "dedicatedVolumes": 3,
+    "imageReferences": 4,
+    "networks": 1,
+    "originalOtherContainersPreserved": 48,
+    "originalVolumesPreserved": 89,
+    "unrelatedRunningStateChangesObserved": 14,
+    "note": "Original unrelated image identities and mounts are preserved; no start/stop commands were issued to those projects by this work."
+  },
+  "recovery": {
+    "currentBackup": ".local/backups/current-protection-20261025",
+    "acceptanceBackup": ".local/backups/acceptance-protection-20261025",
+    "preReleaseBackup": ".local/backups/rollback-20261025233522-70b55a72-before-release",
+    "retainedImageArchive": ".local\\protection-20261025\\retained-images.tar",
+    "imageArchiveSha256": "f9d955fa8864955852c39499520a88f1da66a0d9fc7c6820cf0e5e5b31834afd",
+    "imageReferencesVerified": 6,
+    "runtimeGraphBlobsVerified": 72
+  },
+  "finalCi": "See the exact final commit in GitHub Actions; full regression is delegated to CI."
+}
