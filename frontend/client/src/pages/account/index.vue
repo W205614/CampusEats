@@ -45,12 +45,12 @@ async function loadStores(reset = false) {
   } catch (e) { if (active && current === storeSequence && token === currentSession()) toast(e); }
   finally { if (active && current === storeSequence && token === currentSession()) storesLoading.value = false; }
 }
-async function load() {
+async function load(refreshStores = true) {
   if (!loggedIn()) return;
   const current = ++sequence, token = currentSession();
   accountLoaded.value = false;
   try {
-    await loadStores(true);
+    if (refreshStores || !stores.value.length) await loadStores(true);
     if (!active || current !== sequence || token !== currentSession()) return;
     const [walletRows, favoriteRows] = await Promise.all([
       api<Coupon[]>('/wallet'),
@@ -83,7 +83,7 @@ async function claim(c: Coupon) {
   try {
     await api('/coupons/' + c.id + '/claim', 'POST');
     uni.showToast({ title: '领取成功', icon: 'success' });
-    await load();
+    await load(false);
   } catch (e) {
     toast(e);
   }
@@ -91,7 +91,7 @@ async function claim(c: Coupon) {
 async function remove(f: (typeof favorites.value)[number]) {
   try {
     await api('/stores/' + f.storeId + '/favorites/' + f.targetType + '/' + f.targetId, 'DELETE');
-    await load();
+    await load(false);
   } catch (e) {
     toast(e);
   }

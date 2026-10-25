@@ -107,3 +107,35 @@ test('workbench list loads more and a new filter resets its cursor', async ({ pa
 test('page merge uses the complete product identity and keeps updated rows', () => {
   expect(mergeRecords([meal('1')], [meal('1'), { ...meal('1'), itemType: 'SETMEAL' }], row => row.storeId + ':' + row.itemType + ':' + row.id)).toHaveLength(2);
 });
+
+test('claiming a coupon preserves loaded store pages, selection and the next cursor', async ({ page }) => {
+  const reads: (string | null)[] = [];
+  let claimed = false;
+  const coupon = { id: '99', name: '保持分页券', storeId: null, kind: 'REDUCTION', thresholdCents: '0', value: '100', endsAt: '2099-12-31T23:59:59+08:00', state: 'AVAILABLE' };
+  await page.addInitScript(() => sessionStorage.setItem('campus-user', JSON.stringify({ id: '1', token: 'coupon-user', role: 'USER', name: '领券用户' })));
+  await page.route('**/api/v1/user/**', route => {
+    const url = new URL(route.request().url()), path = url.pathname.replace('/api/v1/user', '');
+    let data: unknown = [];
+    if (path === '/stores/page') {
+      const cursor = url.searchParams.get('cursor'); reads.push(cursor);
+      data = cursor === 'after2' ? envelope([shop('3')]) : cursor === 'after1' ? envelope([shop('2')], 'after2') : envelope([shop('1')], 'after1');
+    }
+    if (path === '/coupons') data = claimed ? [] : [coupon];
+    if (path === '/wallet') data = claimed ? [coupon] : [];
+    if (path === '/coupons/99/claim') { claimed = true; data = { id: '99' }; }
+    return route.fulfill({ json: { code: 'OK', data } });
+  });
+  await page.goto('/app/pages/account/index');
+  await expect(page.getByText('分页店铺1 ▾', { exact: true })).toBeVisible();
+  await page.getByText('加载更多领券店铺', { exact: true }).click();
+  await page.getByText('分页店铺1 ▾', { exact: true }).click();
+  await page.locator('.uni-picker-item:visible').filter({ hasText: '分页店铺2' }).click();
+  await expect(page.getByText('分页店铺2 ▾', { exact: true })).toBeVisible();
+  await page.getByText('领取', { exact: true }).click();
+  await expect(page.getByText('保持分页券', { exact: true })).toBeVisible();
+  await expect(page.getByText('分页店铺2 ▾', { exact: true })).toBeVisible();
+  expect(reads).toEqual([null, 'after1']);
+  await page.getByText('加载更多领券店铺', { exact: true }).click();
+  await expect(page.getByText('加载更多领券店铺', { exact: true })).toHaveCount(0);
+  expect(reads).toEqual([null, 'after1', 'after2']);
+});

@@ -78,6 +78,27 @@ test('browser cross-campus mixed fulfillment preserves coupon cents, repeated pa
     await page.screenshot({ path: file, fullPage: true });
     await testInfo.attach(name, { path: file, contentType: 'image/png' });
   }
+  async function loadCouponStores(page: Page) {
+    const more = page.getByText('加载更多领券店铺', { exact: true });
+    let pages = 0;
+    while (await more.count()) {
+      // uni-app renders the button as a custom element; wait for its real disabled class.
+      await expect(more).not.toHaveClass(/uni-button-disabled/);
+      const pending = page.waitForResponse(response => {
+        const url = new URL(response.url());
+        return url.pathname === '/api/v1/user/stores/page' && url.searchParams.has('cursor');
+      });
+      await more.click();
+      const response = await pending;
+      expect(response.ok()).toBe(true);
+      const result = await response.json();
+      expect(result.code).toBe('OK');
+      await response.finished();
+      if (result.data.hasMore) await expect(more).not.toHaveClass(/uni-button-disabled/);
+      else await expect(more).toHaveCount(0);
+      if (++pages > 20) throw new Error('Coupon store pagination did not terminate');
+    }
+  }
   async function staffPage(username: string, initial: string) {
     const page = await newPage();
     const login = async (secret: string) => {
@@ -204,13 +225,22 @@ test('browser cross-campus mixed fulfillment preserves coupon cents, repeated pa
     await postUI(customer, '/user/addresses', () => customer.getByText('保存地址', { exact: true }).click());
     await expect(customer.locator('uni-view.modal')).toHaveCount(0);
     await customer.goto('/app/pages/account/index');
+    await expect(customer.getByText(names.storeB + ' ▾', { exact: true })).toBeVisible();
     for (const coupon of coupons) {
+      await loadCouponStores(customer);
       if (coupon.storeId === storeA.id)
         await choose(customer, customer.getByText(names.storeB + ' ▾', { exact: true }), names.storeA);
       if (coupon.storeId === storeB.id)
         await choose(customer, customer.getByText(names.storeA + ' ▾', { exact: true }), names.storeB);
       const card = customer.locator('uni-view.card').filter({ has: customer.getByText(coupon.name + ' · ' + (coupon.storeId ? '店铺券' : '平台券'), { exact: true }) });
+      // Claim refreshes wallet and coupons while preserving the loaded store sequence.
+      const currentCouponStore = coupon.storeId === storeA.id ? storeA : storeB;
+      // Wait for the action's coupon refresh before selecting the next store.
+      const reloaded = customer.waitForResponse(response =>
+        new URL(response.url()).pathname === '/api/v1/user/stores/' + currentCouponStore.id + '/coupons');
       await postUI(customer, '/user/coupons/' + coupon.id + '/claim', () => card.getByText('领取', { exact: true }).click());
+      await (await reloaded).finished();
+      await expect(customer.getByText((currentCouponStore.id === storeA.id ? names.storeA : names.storeB) + ' ▾', { exact: true })).toBeVisible();
     }
     await customer.goto('/app/pages/cart/index');
     for (const [index, store] of stores.entries()) {
