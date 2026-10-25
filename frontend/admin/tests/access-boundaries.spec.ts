@@ -114,17 +114,39 @@ test('an unauthorized user mutation is surfaced once without anonymous replay', 
   expect(await page.evaluate(token => JSON.parse(sessionStorage.getItem('campus-admin')!).token === token, adminSession.token)).toBeTruthy();
 });
 
-test('a delayed unauthorized private read neither replays nor clears a newer user login', async ({ page, userSession }) => {
-  await page.addInitScript(user => sessionStorage.setItem('campus-user', JSON.stringify(user)), userSession);
+test('a delayed unauthorized private read neither replays nor clears a newer user login', async ({ page }) => {
+  const oldSession = { id: '901', token: 'delayed-old-user', name: '旧账号', role: 'USER' };
+  const newSession = { id: '902', token: 'delayed-new-user', name: '新账号', role: 'USER' };
+  const store = { id: '1', campusId: '1', campusName: '测试校区', name: '新账号店铺', enabled: true,
+    open: true, accepting: true, hours: ['00:00-24:00'], deliveryFee: '0.00', packagingFee: '0.00', phone: '', version: '0' };
+  await page.addInitScript(user => sessionStorage.setItem('campus-user', JSON.stringify(user)), oldSession);
   let unblock!: () => void, arrived!: () => void;
   const pending = new Promise<void>(resolve => { unblock = resolve; });
   const started = new Promise<void>(resolve => { arrived = resolve; });
-  let reads = 0;
-  await page.route('**/api/v1/user/wallet', async route => {
-    reads++;
-    arrived();
-    await pending;
-    await route.fulfill({ status: 401, json: { code: 'UNAUTHORIZED', message: '旧登录已失效', data: null } });
+  const reads = { old: 0, current: 0 }, unexpected: string[] = [];
+  // Every API request is intercepted: this test never creates a real demo session or business write.
+  await page.route('**/api/v1/**', async route => {
+    const request = route.request(), path = new URL(request.url()).pathname.replace('/api/v1', '');
+    const ok = (data: unknown) => route.fulfill({ json: { code: 'OK', data } });
+    if (path === '/user/auth/demo' && request.method() === 'POST') return ok(newSession);
+    if (request.method() !== 'GET') { unexpected.push(request.method() + ' ' + path); return route.abort(); }
+    if (path === '/user/wallet') {
+      if (request.headers().authorization === 'Bearer ' + oldSession.token) {
+        reads.old++; arrived(); await pending;
+        return route.fulfill({ status: 401, json: { code: 'UNAUTHORIZED', message: '旧登录已失效', data: null } });
+      }
+      reads.current++;
+      return ok([{ id: '71', name: '新账号专属券', state: 'AVAILABLE', endsAt: '2099-12-31T23:59:59+08:00' }]);
+    }
+    if (path === '/user/favorites') return ok([{ targetType: 'STORE', targetId: '1', storeId: '1', storeName: store.name, name: '新账号收藏' }]);
+    if (path === '/user/campuses') return ok([{ id: '1', name: '测试校区', enabled: true }]);
+    if (path === '/user/stores/page') return ok({ records: [store], nextCursor: null, hasMore: false });
+    if (path === '/user/stores/1') return ok(store);
+    if (path === '/user/stores/1/products') return ok([{ id: '1', storeId: '1', itemType: 'DISH', categoryId: '1', name: '新账号餐品', price: '10.00', remaining: 10, flavors: [] }]);
+    if (path === '/user/stores/1/cart') return ok({ storeId: '1', cartVersion: '0', items: [] });
+    if (['/user/stores/1/categories', '/user/stores/1/coupons', '/user/coupons'].includes(path)) return ok([]);
+    unexpected.push(request.method() + ' ' + path);
+    return route.abort();
   });
   await page.goto('/app/pages/account/index');
   await started;
@@ -133,11 +155,23 @@ test('a delayed unauthorized private read neither replays nor clears a newer use
   await page.getByText('进入演示用户 1', { exact: true }).click();
   const result = await (await login).json();
   await expect(page.getByText(result.data.name, { exact: true })).toBeVisible();
-  const oldFailure = page.waitForResponse(response => response.url().endsWith('/api/v1/user/wallet'));
+  await expect(page.getByText('新账号餐品', { exact: true })).toBeVisible();
+  await page.getByText('领券与我的收藏', { exact: true }).click();
+  await expect(page.getByText('新账号专属券', { exact: true })).toBeVisible();
+  await expect(page.getByText('新账号收藏 · 新账号店铺', { exact: true })).toBeVisible();
+  const oldFailure = page.waitForResponse(response => response.url().endsWith('/api/v1/user/wallet')
+    && response.request().headers().authorization === 'Bearer ' + oldSession.token);
   unblock();
-  expect((await oldFailure).status()).toBe(401);
-  await expect(page.getByText('旧登录已失效', { exact: true })).toBeVisible();
-  expect(reads).toBe(1);
+  const failed = await oldFailure;
+  expect(failed.status()).toBe(401);
+  await failed.finished();
+  // Let the browser handle the completed response before examining the newer account.
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  await expect(page.getByText('旧登录已失效', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('新账号专属券', { exact: true })).toBeVisible();
+  await expect(page.getByText('新账号收藏 · 新账号店铺', { exact: true })).toBeVisible();
+  expect(reads).toEqual({ old: 1, current: 1 });
+  expect(unexpected).toEqual([]);
   expect(await page.evaluate(token => JSON.parse(sessionStorage.getItem('campus-user')!).token === token, result.data.token)).toBeTruthy();
 });
 
