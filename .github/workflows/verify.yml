@@ -33,7 +33,7 @@ jobs:
           node scripts/check-client-audit.mjs
           node --test scripts/check-client-audit.test.mjs
       - name: Verify isolated performance fixture boundaries
-        run: node --test scripts/prepare-performance.test.mjs
+        run: node --test scripts/prepare-performance.test.mjs scripts/measure-performance.test.mjs
       - name: Start source-built demo
         shell: pwsh
         run: |

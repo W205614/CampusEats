@@ -16,7 +16,10 @@ RUN cd /workspace/sky-server/target && test -s bom.json && \
 FROM eclipse-temurin:21-jre
 ARG SOURCE_REVISION=unknown
 LABEL org.opencontainers.image.revision=$SOURCE_REVISION
-RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+RUN sed -i 's|http://archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g; s|http://security.ubuntu.com/ubuntu|https://security.ubuntu.com/ubuntu|g' /etc/apt/sources.list.d/ubuntu.sources && \
+    apt-get -o Acquire::Retries=3 update && \
+    apt-get -o Acquire::Retries=3 install -y --no-install-recommends curl && \
+    rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 RUN mkdir -p /app/uploads && chown -R 10001:10001 /app
 COPY --from=build --chown=10001:10001 /workspace/sky-server/target/sky-server-1.0-SNAPSHOT.jar /app/app.jar
