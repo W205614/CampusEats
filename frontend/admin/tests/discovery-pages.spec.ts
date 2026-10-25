@@ -60,11 +60,17 @@ test('new search discards an older pending page and starts without its cursor', 
   state.hold = true;
   await page.getByText('加载更多餐品', { exact: true }).click();
   await expect.poll(() => Boolean(state.release)).toBe(true);
-  await page.getByRole('textbox', { name: '搜索餐品或店铺名称' }).fill('新筛选');
+  // uni-app places aria-label on its wrapper; the editable native input is inside it.
+  await page.locator('[aria-label="搜索餐品或店铺名称"] input').fill('新筛选');
   await page.getByText('搜本校区', { exact: true }).click();
   await expect(page.locator('.menu-product').getByText('分页餐品9', { exact: true })).toBeVisible();
   expect(state.queries.at(-1)!.searchParams.has('cursor')).toBe(false);
+  const oldResponse = page.waitForResponse(response => {
+    const url = new URL(response.url());
+    return url.pathname === '/api/v1/user/search/page' && url.searchParams.has('cursor');
+  });
   state.release!();
+  await (await oldResponse).finished();
   await expect(page.locator('.menu-product')).toHaveCount(1);
   await expect(page.locator('.menu-product').getByText('分页餐品205', { exact: true })).toHaveCount(0);
 });

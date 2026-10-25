@@ -1119,6 +1119,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/user/stores/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["storeDetail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/user/stores/page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["storePage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/user/search": {
         parameters: {
             query?: never;
@@ -1127,6 +1159,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["search"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/user/search/page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["searchPage"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1495,6 +1543,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["merchantAftersales"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/merchant/stores/page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["merchantStorePage"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1926,6 +1990,13 @@ export interface components {
         Login: {
             username: string;
             password: string;
+        };
+        Page: {
+            records?: {
+                [key: string]: unknown;
+            }[];
+            nextCursor?: string;
+            hasMore?: boolean;
         };
         Actor: {
             id?: string;
@@ -4224,6 +4295,68 @@ export interface operations {
             };
         };
     };
+    storeDetail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: Record<string, never>;
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    storePage: {
+        parameters: {
+            query?: {
+                campusId?: string;
+                query?: string;
+                open?: boolean;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["Page"];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
     search: {
         parameters: {
             query: {
@@ -4249,6 +4382,40 @@ export interface operations {
                         code: string;
                         message: string;
                         data: Record<string, never>;
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    searchPage: {
+        parameters: {
+            query: {
+                campusId: string;
+                query?: string;
+                categoryId?: string;
+                open?: boolean;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["Page"];
                         /** Format: uuid */
                         requestId: string;
                     };
@@ -4956,6 +5123,39 @@ export interface operations {
                         code: string;
                         message: string;
                         data: Record<string, never>;
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    merchantStorePage: {
+        parameters: {
+            query?: {
+                campusId?: string;
+                query?: string;
+                open?: boolean;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["Page"];
                         /** Format: uuid */
                         requestId: string;
                     };
