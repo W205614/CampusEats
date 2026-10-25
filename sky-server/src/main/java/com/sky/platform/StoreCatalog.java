@@ -295,15 +295,16 @@ public class StoreCatalog {
     if (category != null) params.put("category", category);
     var branches = new ArrayList<String>();
     for (String type : List.of("DISH", "SETMEAL")) {
+      String table = PlatformScope.table(type);
       branches.add(
-          "(SELECT p.id,p.store_id,'"
+          "(SELECT STRAIGHT_JOIN p.id,p.store_id,'"
               + type
               + "' item_type,"
               + (type.equals("DISH") ? "0" : "1")
               + " item_rank,s.name store_name FROM "
-              + PlatformScope.table(type)
-              + " p JOIN category c ON c.id=p.category_id"
-              + " AND c.store_id=p.store_id JOIN store s ON s.id=p.store_id"
+              + table
+              + " p FORCE INDEX(ix_" + table + "_search_order) JOIN store s ON s.id=p.store_id"
+              + " JOIN category c ON c.id=p.category_id AND c.store_id=p.store_id"
               + " JOIN campus campus ON campus.id=s.campus_id WHERE p.store_id IN (:stores)"
               + " AND s.enabled=true AND campus.enabled=true AND p.status=1 AND c.status=1"
               + (category == null ? "" : " AND p.category_id=:category")

@@ -138,6 +138,11 @@ class CatalogBoundsIntegrationTest {
 
   @Test
   void boundedBranchesKeepCompleteTypedPagingAndSparseCaseSensitiveLiteralMatches() {
+    var indexes = db.rows("SELECT INDEX_NAME,GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) index_columns"
+        + " FROM information_schema.statistics WHERE TABLE_SCHEMA=DATABASE() AND INDEX_NAME IN"
+        + " ('ix_dish_search_order','ix_setmeal_search_order') GROUP BY INDEX_NAME");
+    assertEquals(2, indexes.size());
+    for (var index : indexes) assertEquals("store_id,status,id", index.get("index_columns"));
     seed("dish", dishes, 250, i -> (i < 240 ? "Needle%_Exact-" : "needle%_Exact-") + i);
     seed("setmeal", setmeals, 250, i -> (i < 240 ? "Needle%_Exact-" : "needle%_Exact-") + i);
     db.update("UPDATE dish SET status=1 WHERE store_id=?", store);

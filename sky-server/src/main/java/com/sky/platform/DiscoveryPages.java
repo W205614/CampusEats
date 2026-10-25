@@ -94,14 +94,18 @@ public class DiscoveryPages {
       String type = rank == 0 ? "DISH" : "SETMEAL";
       // The first K global rows can only contain the first K rows of either ordered branch.
       // Bound the UNION materialization to 2*K candidates without changing substring semantics.
-      branches.add("(SELECT p.id,p.store_id,'" + type + "' item_type," + rank
-          + " item_rank,s.name store_name FROM " + PlatformScope.table(type)
-          + " p JOIN category c ON c.id=p.category_id AND c.store_id=p.store_id"
-          + " JOIN store s ON s.id=p.store_id JOIN campus campus ON campus.id=s.campus_id"
+      String table = PlatformScope.table(type);
+      // Product-first index order lets broad matches stop at K instead of sorting every match.
+      // Literal substring searches with few/no matches can still scan the remaining index range.
+      branches.add("(SELECT STRAIGHT_JOIN p.id,p.store_id,'" + type + "' item_type," + rank
+          + " item_rank,s.name store_name FROM " + table
+          + " p FORCE INDEX(ix_" + table + "_search_order) JOIN store s ON s.id=p.store_id"
+          + " JOIN category c ON c.id=p.category_id AND c.store_id=p.store_id"
+          + " JOIN campus campus ON campus.id=s.campus_id"
           + " WHERE s.campus_id=:campus AND s.enabled=true AND campus.enabled=true"
           + " AND p.status=1 AND c.status=1"
           + (category == null ? "" : " AND p.category_id=:category")
-          + " AND (s.id>:afterStore OR (s.id=:afterStore AND (" + rank
+          + " AND (p.store_id>:afterStore OR (p.store_id=:afterStore AND (" + rank
           + ">:afterRank OR (" + rank + "=:afterRank AND p.id>:afterId))))"
           + " AND (LOCATE(CAST(:query AS BINARY),CAST(p.name AS BINARY))>0"
           + " OR LOCATE(CAST(:query AS BINARY),CAST(s.name AS BINARY))>0)" + openFilter(open)

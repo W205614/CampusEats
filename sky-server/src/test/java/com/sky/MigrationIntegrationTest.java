@@ -132,6 +132,40 @@ class MigrationIntegrationTest {
     assertEquals(before, after);
   }
 
+  @Test
+  void v10ToV11AddsOrderedSearchIndexesAndPreservesBusinessRows() throws Exception {
+    String url = create("v10_search_order_upgrade");
+    Flyway.configure().dataSource(url, "root", "test").target("10").load().migrate();
+    try (var c = DriverManager.getConnection(url, "root", "test"); var s = c.createStatement()) {
+      s.execute("INSERT INTO user(id,openid,name) VALUES(1,'upgrade-search-v10','历史用户')");
+      s.execute("INSERT INTO category(id,store_id,type,name,status) VALUES(1,1,1,'历史菜品',1),(2,1,2,'历史套餐',1)");
+      s.execute("INSERT INTO dish(id,store_id,category_id,name,price,status) VALUES(1,1,1,'原菜品',7,1)");
+      s.execute("INSERT INTO setmeal(id,store_id,category_id,name,price,status) VALUES(1,1,2,'原套餐',10,1)");
+      s.execute("INSERT INTO dish_flavor(dish_id,name,value) VALUES(1,'温度','[\"热\"]')");
+      s.execute("INSERT INTO setmeal_dish(setmeal_id,dish_id,name,price,copies) VALUES(1,1,'原菜品',7,1)");
+      s.execute("INSERT INTO daily_quota VALUES('2026-10-25',1,100,2,3)");
+      s.execute("INSERT INTO outbox_event(event_type,aggregate_id,payload,state,next_attempt_at,created_at)"
+          + " VALUES('TEST',0,'{}','SUCCEEDED','2026-10-25 12:00:00','2026-10-25 12:00:00')");
+    }
+    var before = businessRows(url);
+    assertEquals(1, before.get("dish").size());
+    assertEquals(1, before.get("setmeal").size());
+    var flyway = Flyway.configure().dataSource(url, "root", "test").target("11").load();
+    var result = flyway.migrate();
+    assertEquals(1, result.migrationsExecuted);
+    assertEquals("11", flyway.info().current().getVersion().toString());
+    assertEquals(before, businessRows(url));
+    var definitions = new TreeMap<String, String>();
+    try (var c = DriverManager.getConnection(url, "root", "test"); var s = c.createStatement();
+        var rows = s.executeQuery("SELECT INDEX_NAME,GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX)"
+            + " FROM information_schema.statistics WHERE TABLE_SCHEMA='v10_search_order_upgrade'"
+            + " AND INDEX_NAME IN ('ix_dish_search_order','ix_setmeal_search_order') GROUP BY INDEX_NAME")) {
+      while (rows.next()) definitions.put(rows.getString(1), rows.getString(2));
+    }
+    assertEquals(Map.of("ix_dish_search_order", "store_id,status,id",
+        "ix_setmeal_search_order", "store_id,status,id"), definitions);
+  }
+
   private Map<String, List<List<String>>> businessRows(String url) throws Exception {
     var result = new TreeMap<String, List<List<String>>>();
     try (var c = DriverManager.getConnection(url, "root", "test");
