@@ -10,4 +10,6 @@ Run `npm ci --include=optional` and `npm run test:toolchain` from `frontend/clie
 
 When upgrading DCloud, inspect the actual call sites and upstream changes first. Re-run the scan, watcher and real QR adapter tests; do not merely replace the expected hashes. Never add an audit exception to conceal a compatibility failure.
 
+The dependency overrides also pin `body-parser` to `1.20.9` for [GHSA-27r3-jxmh-p828](https://github.com/advisories/GHSA-27r3-jxmh-p828) and `zod` to `4.6.6` for [GHSA-mrhx-c7xc-m3w5](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5). The Zod advisory has no patched 3.x release. DCloud and Jimp remain at their existing versions; compatibility tests exercise both Jimp CommonJS and ESM imports, PNG decoding, resize/crop/cover/contain/rotate/flip, print callbacks and invalid option rejection. These checks cover the retained image-toolchain paths, not every Zod 3 API. No additional source patch or audit exception is used for these two overrides.
+
 `fixtures/qr.png` was generated for this repository using qrcode 8.2 and encodes `campuseats-toolchain-compatibility`. It contains no user or service data; the generator is not a project dependency.

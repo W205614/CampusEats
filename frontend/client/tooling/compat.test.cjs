@@ -143,3 +143,39 @@ test('actual WeChat automator decodes a QR image through Jimp v1', async () => {
   }, {});
   assert.deepEqual(result, { qrCode: 'campuseats-toolchain-compatibility' });
 });
+
+test('Jimp CommonJS and ESM image transforms retain validation with the patched Zod dependency', async () => {
+  for (const { Jimp, ResizeStrategy } of [require('jimp'), await import('jimp')]) {
+    const source = new Jimp({ width: 6, height: 4, color: 0x000000ff });
+    for (let y = 0; y < 4; y++) for (let x = 0; x < 6; x++)
+      source.setPixelColor((((x + 1) << 24) | ((y + 1) << 16) | 0xff) >>> 0, x, y);
+    const decoded = await Jimp.read(await source.getBuffer('image/png'));
+    assert.equal(decoded.getPixelColor(2, 1), source.getPixelColor(2, 1));
+    const resized = decoded.clone().resize({ w: 12, h: 8, mode: ResizeStrategy.NEAREST_NEIGHBOR });
+    assert.deepEqual([resized.bitmap.width, resized.bitmap.height], [12, 8]);
+    assert.equal(resized.getPixelColor(0, 0), source.getPixelColor(0, 0));
+    const cropped = decoded.clone().crop({ x: 1, y: 1, w: 3, h: 2 });
+    assert.deepEqual([cropped.bitmap.width, cropped.bitmap.height], [3, 2]);
+    assert.equal(cropped.getPixelColor(0, 0), source.getPixelColor(1, 1));
+    for (const method of ['cover', 'contain']) {
+      const result = decoded.clone()[method]({ w: 8, h: 8 });
+      assert.deepEqual([result.bitmap.width, result.bitmap.height], [8, 8]);
+    }
+    const rotated = decoded.clone().rotate(90);
+    assert.deepEqual([rotated.bitmap.width, rotated.bitmap.height], [4, 6]);
+    assert.equal(decoded.clone().flip({ horizontal: true }).getPixelColor(0, 0), source.getPixelColor(5, 0));
+    assert.equal(decoded.clone().flip({ vertical: true }).getPixelColor(0, 0), source.getPixelColor(0, 3));
+
+    // The print plugin exercises its optional function schema and callback binding.
+    const font = { chars: { A: { x: 0, y: 0, width: 1, height: 1, xoffset: 0, yoffset: 0, xadvance: 2, page: 0 } },
+      kernings: {}, common: { lineHeight: 2 }, pages: [new Jimp({ width: 1, height: 1, color: 0xffffffff })] };
+    const printed = decoded.clone();
+    let completed;
+    printed.print({ font, x: 1, y: 1, text: 'A', cb: function (point) { completed = { point, image: this }; } });
+    assert.deepEqual(completed.point, { x: 3, y: 3 });
+    assert.equal(completed.image, printed);
+    assert.equal(printed.getPixelColor(1, 1), 0xffffffff);
+    assert.throws(() => decoded.clone().resize({ w: '12' }), { name: 'ZodError' });
+    assert.throws(() => decoded.clone().print({ font, x: 0, y: 0, text: 'A', cb: 'invalid' }), { name: 'ZodError' });
+  }
+});
