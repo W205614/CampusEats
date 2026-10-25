@@ -45,3 +45,13 @@
 候选功能源码revision为 `f02fe9d1b9c4023867f73b47e095741fc007b6e9`。同次构建JAR与CycloneDX清单绑定核验，清单含146个Maven运行组件；系统包与Java运行依赖的可修复HIGH／CRITICAL门禁均为0项，完整报告保留其它发现，不代表零漏洞或安全认证。
 
 日志、角色截图、原始报告、候选清单及恢复材料位于受Git忽略且受访问保护的 `.local/improvement-20261025/` 和 `.local/backups/`。凭据、令牌、数据库及上传备份不提交Git。完整回归与最终安全门禁以[最终提交对应的GitHub Actions](https://github.com/W205614/CampusEats/actions/workflows/verify.yml)为准。
+
+## 日常发布与资源整理
+
+四角色与负载验收完成后，通过现有发布脚本重建日常Java／Web，运行镜像revision为 `0a27e2c7c04ca4e5ad8a8cca92e1e7b8bc92027b`。该提交相对候选仅增加文档、生成契约及测试修正；部署JAR、SBOM、全部Web文件及系统包清单与候选一致，配置及原三个数据卷保留。
+
+发布前暂停写入，备份 `rollback-20261025210638-b65fbe4d-before-release` 经独立恢复验证后执行V10迁移。发布后39张表、版本10、新模拟凭据表为空；37张原有非迁移元数据表的数量与校验和、10个上传文件的路径和哈希均与发布前一致。四服务健康，只读冒烟与内部运维检查通过，日常环境没有执行写入式角色验收。
+
+当前恢复集 `.local/backups/current-20261025` 及验收归档 `.local/backups/acceptance-improvement-20261025` 均已独立恢复验证。当前与上一版应用镜像、MySQL及Redis另归档至 `.local/improvement-20261025/retained-images.tar`，保留SHA-256；发布前镜像归档和原恢复集也保留。
+
+按事前清单删除本轮4个验收容器、3个专用卷、2个候选镜像引用和2个重复回滚标签，以及1个已无引用的验收网络。保留日常四服务及三个卷、当前应用镜像与 `rollback-20261025` 上一版镜像；清理前后其它容器均保留。未执行全局prune，归属不明的资源和共享构建缓存保留，未删除普通文件或清空回收站。清理清单、结果与数据核对摘要保存在 `.local/improvement-20261025/`。
