@@ -1,13 +1,16 @@
 <script setup lang="ts">
 import { ref, onMounted, computed, onUnmounted, watch } from 'vue';
-import { useRoute } from 'vue-router';
+import { useRoute, useRouter } from 'vue-router';
+import { ElMessageBox } from 'element-plus';
 import { request } from '../platform-api';
 import { notifyError } from '../api';
 import { selectedStore } from '../context';
 import { useStorePages } from '../store-pages';
 import { useSession } from '../stores/session';
+import { usePagedList } from '../paged-list';
 import { roles } from '../../../contracts/models';
 import { readPages } from '../../../contracts/paging';
+import { ApiError } from '../../../contracts/api-error';
 import {
   cents,
   states,
@@ -23,10 +26,10 @@ import {
   type Review,
 } from '../../../contracts/platform';
 const route = useRoute(),
+  router = useRouter(),
   session = useSession(),
   kind = String(route.params.kind),
   platform = computed(() => session.session?.role === 'PLATFORM_ADMIN'),
-  staff = ref<Staff[]>([]),
   campuses = ref<Campus[]>([]),
   campus = ref(''),
   buildings = ref<{ id: string; name: string; enabled: boolean }[]>([]),
@@ -66,6 +69,8 @@ watch([() => session.session?.token, selectedStore], () => {
   loading.value = false;
   busy.value = false;
   decision.value = '';
+  handoverOpen.value=false; handoverRequired.value=false;
+  form.value.password='';
   if (mounted) void load();
 }, { flush: 'sync' });
 const form = ref({
@@ -87,13 +92,56 @@ const titles: Record<string, string> = {
   audit: '操作记录',
 };
 const base = () => '/merchant/stores/' + selectedStore.value;
+type DispatchStaff = Staff & { acceptingTasks?: boolean };
+type ActiveDelivery = { id: string; number: string; status: number; version: string; storeId: string; campusId: string };
+const staffQuery = ref(''), staffState = ref(''), appliedStaffQuery = ref(''), appliedStaffState = ref('');
+const staffPage = usePagedList<DispatchStaff>(() => (platform.value ? '/platform/staff' : base() + '/staff') + '/page?'
+  + new URLSearchParams({ query: appliedStaffQuery.value, ...(appliedStaffState.value ? { state: appliedStaffState.value } : {}) }), row => row.id);
+const staff = staffPage.records, staffMore = staffPage.hasMore, staffLoading = staffPage.loading;
+const handoverOpen = ref(false), handoverStaff = ref(''), handoverName = ref(''), handoverRequired = ref(false);
+const deliveryPage = usePagedList<ActiveDelivery>(() => '/platform/staff/' + handoverStaff.value + '/active-deliveries/page', row => row.id);
+const activeDeliveries = deliveryPage.records, deliveryMore = deliveryPage.hasMore, deliveryLoading = deliveryPage.loading;
+async function searchStaff() { appliedStaffQuery.value=staffQuery.value; appliedStaffState.value=staffState.value; await staffPage.load(); }
+async function openHandover(id: string, name: string) {
+  handoverStaff.value=id; handoverName.value=name; handoverOpen.value=true; await deliveryPage.load();
+}
+function visitDelivery(row: ActiveDelivery) {
+  handoverOpen.value=false; dialog.value=false; selectedStore.value=row.storeId;
+  void router.push({path:'/orders',query:{orderId:row.id}});
+}
+async function dispatchAvailability(row: DispatchStaff) {
+  if (busy.value) return; busy.value=true;
+  try {
+    await request('/platform/staff/' + row.id + '/dispatch-availability','PUT',{enabled:row.acceptingTasks === false});
+    await staffPage.load();
+  } catch(error) {notifyError(error);}
+  finally {busy.value=false;}
+}
+async function emergencyDisable(row: DispatchStaff) {
+  if (busy.value) return;
+  const token = session.session?.token;
+  let reason: string;
+  try {
+    const result = await ElMessageBox.prompt('将立即撤销该配送员的会话并禁止新分配。在途任务保留并进入异常队列，请随后逐笔交接。','紧急停用配送员',{
+      inputType:'textarea',inputPlaceholder:'填写紧急停用原因',confirmButtonText:'确认紧急停用',cancelButtonText:'取消',
+      inputValidator: (value: string) => !!value?.trim() && value.trim().length<=200 || '请填写1至200字的原因',
+    });
+    reason=result.value.trim();
+  } catch {return;}
+  if(token !== session.session?.token) return;
+  busy.value=true;
+  try {
+    await request('/platform/staff/' + row.id + '/emergency-disable','POST',{reason});
+    await staffPage.load(); await openHandover(row.id,row.name);
+  } catch(error) {notifyError(error);}
+  finally {busy.value=false;}
+}
 async function load(pages = loadedPages) {
   if (!mounted || !session.session || loading.value || busy.value) return;
   const current = ++sequence;
   loading.value = true;
   try {
-    if (kind === 'staff')
-      staff.value = await request<Staff[]>(platform.value ? '/platform/staff' : base() + '/staff');
+    if (kind === 'staff') await staffPage.load();
     if (kind === 'buildings' && campus.value)
       buildings.value = await request<typeof buildings.value>(
         '/platform/campuses/' + campus.value + '/buildings',
@@ -154,6 +202,7 @@ async function search(clear = false) {
   } catch (e) { notifyError(e); }
 }
 function edit(s?: Staff) {
+  handoverRequired.value=false;
   editing.value = s?.id || '';
   form.value = {
     name: s?.name || '',
@@ -173,6 +222,8 @@ function edit(s?: Staff) {
     })();
 }
 async function saveStaff() {
+  if(busy.value) return;
+  busy.value=true;
   try {
     const f = form.value;
     await request(
@@ -187,10 +238,13 @@ async function saveStaff() {
       },
     );
     dialog.value = false;
+    form.value.password = '';
+    busy.value=false;
     await load();
   } catch (e) {
+    if(e instanceof ApiError && e.code === 'COURIER_HANDOVER_REQUIRED') handoverRequired.value=true;
     notifyError(e);
-  }
+  } finally {busy.value=false;}
 }
 async function addBuilding() {
   try {
@@ -214,6 +268,23 @@ async function toggleBuilding(b: (typeof buildings.value)[number]) {
   } catch (e) {
     notifyError(e);
   }
+}
+async function renameBuilding(b: (typeof buildings.value)[number]) {
+  if(busy.value) return;
+  const token=session.session?.token, target=campus.value;
+  let name: string;
+  try {
+    const result=await ElMessageBox.prompt('历史订单继续显示下单时的楼栋快照。','修改楼栋名称',{
+      inputValue:b.name,inputPlaceholder:'楼栋新名称',confirmButtonText:'保存楼栋名称',cancelButtonText:'取消',
+      inputValidator:(value:string)=>!!value?.trim() && value.trim().length<=80 || '请填写1至80字的名称',
+    }); name=result.value.trim();
+  } catch {return;}
+  if(token!==session.session?.token || target!==campus.value) return;
+  busy.value=true;
+  try {
+    await request('/platform/campuses/'+target+'/buildings/'+b.id,'PUT',{name,enabled:b.enabled});
+    busy.value=false; await load();
+  } catch(error) {notifyError(error);} finally {busy.value=false;}
 }
 async function mutateHistory(operation: () => Promise<void>) {
   if (!mounted || loading.value || busy.value) return;
@@ -299,6 +370,7 @@ onMounted(async () => {
 });
 onUnmounted(() => {
   mounted = false;
+  form.value.password = '';
   sequence++;
   if (timer) clearInterval(timer);
   if (imageUrl.value) URL.revokeObjectURL(imageUrl.value);
@@ -325,6 +397,7 @@ onUnmounted(() => {
     <p class="muted">每页最多100条，日期包含首尾（上海时间），最多366天。刷新保留已加载历史。</p>
   </section>
   <section class="panel" v-if="kind === 'staff'">
+    <el-form inline @submit.prevent="searchStaff"><el-form-item label="账号或姓名"><el-input v-model="staffQuery" maxlength="80"/></el-form-item><el-form-item label="员工状态"><el-select v-model="staffState" style="width:140px"><el-option value="" label="全部"/><el-option value="ENABLED" label="启用"/><el-option value="DISABLED" label="停用"/></el-select></el-form-item><el-button native-type="submit" :loading="staffLoading">查询员工</el-button></el-form>
     <el-button type="primary" @click="edit()">新增员工</el-button
     ><el-table :data="staff"
       ><el-table-column prop="username" label="账户" /><el-table-column
@@ -338,11 +411,12 @@ onUnmounted(() => {
         }}</template></el-table-column
       ><el-table-column label="操作"
         ><template #default="{ row }"
-          ><el-button text @click="edit(row)">编辑 / 重置密码</el-button></template
+          ><el-button text @click="edit(row)">编辑 / 重置密码</el-button><template v-if="platform && row.role === 'DELIVERER'"><el-button text :disabled="busy || row.status !== 1" @click="dispatchAvailability(row)">{{ row.acceptingTasks === false ? '开启接新单' : '停止接新单' }}</el-button><el-button text @click="openHandover(row.id,row.name)">未完成任务</el-button><el-button text type="danger" :disabled="busy || row.status !== 1" @click="emergencyDisable(row)">紧急停用</el-button></template></template
         ></el-table-column
       ></el-table
     >
   </section>
+  <section v-if="kind === 'staff' && staffMore" class="panel"><el-button :loading="staffLoading" @click="staffPage.load(false)">加载更多员工</el-button></section>
   <section class="panel" v-if="kind === 'buildings'">
     <div class="toolbar">
       <el-select v-model="campus" @change="load"
@@ -360,7 +434,7 @@ onUnmounted(() => {
         }}</template></el-table-column
       ><el-table-column label="操作"
         ><template #default="{ row }"
-          ><el-button text @click="toggleBuilding(row)">{{
+          ><el-button text :disabled="busy" @click="renameBuilding(row)">修改名称</el-button><el-button text @click="toggleBuilding(row)">{{
             row.enabled ? '停用' : '启用'
           }}</el-button></template
         ></el-table-column
@@ -448,7 +522,7 @@ onUnmounted(() => {
         label="说明"
     /></el-table>
   </section>
-  <el-dialog v-model="dialog" title="员工与权限" width="520px"
+  <el-dialog v-model="dialog" title="员工与权限" width="520px" @closed="form.password = ''"
     ><el-form label-position="top"
       ><el-form-item label="账户"><el-input v-model="form.username" maxlength="32" /></el-form-item
       ><el-form-item label="姓名"><el-input v-model="form.name" maxlength="32" /></el-form-item
@@ -480,11 +554,17 @@ onUnmounted(() => {
       ><el-form-item label="启用"><el-switch v-model="form.enabled" /></el-form-item
       ><el-form-item :label="editing ? '重置密码，留空不修改' : '初始密码，至少12个字符'"
         ><el-input v-model="form.password" type="password" show-password /></el-form-item></el-form
-    ><template #footer
+    ><p v-if="handoverRequired" class="muted">该配送员仍有未结束任务。请先完成交接，再保存人员变更；本次表单已保留。</p><el-button v-if="handoverRequired" @click="openHandover(editing,form.name)">查看未完成任务</el-button><template #footer
       ><el-button @click="dialog = false">取消</el-button
-      ><el-button type="primary" @click="saveStaff">保存</el-button></template
+      ><el-button type="primary" :loading="busy" @click="saveStaff">保存</el-button></template
     ></el-dialog
   ><el-dialog :model-value="!!imageUrl" title="售后举证" @close="imageUrl = ''"
     ><img :src="imageUrl" style="max-width: 100%"
   /></el-dialog>
+  <el-dialog v-model="handoverOpen" :title="'未完成配送任务 · ' + handoverName" width="720px" @closed="deliveryPage.cancel">
+    <p class="muted">逐笔打开订单，使用平台改派完成交接。不会直接取消或退款。</p>
+    <el-table :data="activeDeliveries" row-key="id"><el-table-column prop="number" label="订单号"/><el-table-column label="阶段"><template #default="{row}">{{ row.status === 4 ? '配送中' : '待取餐' }}</template></el-table-column><el-table-column label="操作"><template #default="{row}"><el-button text @click="visitDelivery(row)">查看订单并交接</el-button></template></el-table-column></el-table>
+    <p v-if="!deliveryLoading && !activeDeliveries.length" class="muted">当前没有未完成配送任务。</p>
+    <el-button v-if="deliveryMore" :loading="deliveryLoading" @click="deliveryPage.load(false)">加载更多配送任务</el-button>
+  </el-dialog>
 </template>

@@ -1,30 +1,28 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from 'vue';
+import { ref, onMounted, computed, onUnmounted, watch } from 'vue';
 import { request } from '../platform-api';
 import { notifyError } from '../api';
 import { selectedStore } from '../context';
 import { useSession } from '../stores/session';
+import { usePagedList } from '../paged-list';
 import { cents, type Coupon, type Product } from '../../../contracts/platform';
 const session = useSession(),
   platform = computed(() => session.session?.role === 'PLATFORM_ADMIN'),
   level = ref('STORE'),
-  coupons = ref<Coupon[]>([]),
   products = ref<Product[]>([]),
-  promotions = ref<
-    {
-      id: string;
-      itemType: string;
-      itemId: string;
-      priceCents: string;
-      startsAt: string;
-      endsAt: string;
-      enabled: boolean;
-    }[]
-  >([]),
   dialog = ref(false),
   mode = ref('coupon'),
   editing = ref(''),
   busy = ref(false);
+type Promotion = { id: string; itemType: string; itemId: string; priceCents: string; startsAt: string; endsAt: string; enabled: boolean };
+const couponQuery = ref(''), couponState = ref(''), appliedCouponQuery = ref(''), appliedCouponState = ref('');
+const promotionQuery = ref(''), promotionState = ref(''), appliedPromotionQuery = ref(''), appliedPromotionState = ref('');
+const filters = (query: string, state: string) => new URLSearchParams({ query, ...(state ? { state } : {}) }).toString();
+const couponPage = usePagedList<Coupon>(() => base() + '/page?' + filters(appliedCouponQuery.value, appliedCouponState.value), row => row.id);
+const promotionPage = usePagedList<Promotion>(() => '/merchant/stores/' + selectedStore.value + '/promotions/page?' + filters(appliedPromotionQuery.value, appliedPromotionState.value), row => row.id);
+const coupons = couponPage.records, promotions = promotionPage.records;
+const couponMore = couponPage.hasMore, couponLoading = couponPage.loading, promotionMore = promotionPage.hasMore, promotionLoading = promotionPage.loading;
+let loadSequence = 0, active = true;
 const now = new Date(),
   local = (d: Date) =>
     new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
@@ -54,22 +52,23 @@ const promotion = ref({
   endsAt: local(new Date(now.getTime() + 86400000)),
   enabled: true,
 });
-const base = () =>
-  level.value === 'PLATFORM'
+function base() { return level.value === 'PLATFORM'
     ? '/platform/coupons'
-    : '/merchant/stores/' + selectedStore.value + '/coupons';
+    : '/merchant/stores/' + selectedStore.value + '/coupons'; }
 async function load() {
+  const current = ++loadSequence, token = session.session?.token, store = selectedStore.value;
   try {
-    coupons.value = await request<Coupon[]>(base());
-    if (selectedStore.value)
-      [products.value, promotions.value] = await Promise.all([
-        request<Product[]>('/merchant/stores/' + selectedStore.value + '/products'),
-        request<typeof promotions.value>('/merchant/stores/' + selectedStore.value + '/promotions'),
-      ]);
+    await Promise.all([couponPage.load(), store ? promotionPage.load() : Promise.resolve(promotionPage.clear())]);
+    if (store) {
+      const loaded = await request<Product[]>('/merchant/stores/' + store + '/products');
+      if (active && current === loadSequence && token === session.session?.token && store === selectedStore.value) products.value = loaded;
+    }
   } catch (e) {
-    notifyError(e);
+    if (active && current === loadSequence && token === session.session?.token) notifyError(e);
   }
 }
+async function searchCoupons() { appliedCouponQuery.value=couponQuery.value; appliedCouponState.value=couponState.value; await couponPage.load(); }
+async function searchPromotions() { appliedPromotionQuery.value=promotionQuery.value; appliedPromotionState.value=promotionState.value; await promotionPage.load(); }
 function create(kind: string) {
   mode.value = kind;
   editing.value = '';
@@ -156,6 +155,8 @@ async function stop(c: Coupon) {
   }
 }
 onMounted(load);
+watch([() => session.session?.token, selectedStore], () => { ++loadSequence; products.value=[]; if(active) void load(); });
+onUnmounted(() => { active=false; ++loadSequence; });
 </script>
 <template>
   <section class="page-head">
@@ -168,10 +169,11 @@ onMounted(load);
   <section class="panel">
     <div class="toolbar">
       <h2>优惠券</h2>
-      <el-select v-if="platform" v-model="level" @change="load" style="width: 160px"
+      <el-select v-if="platform" v-model="level" @change="couponPage.load()" style="width: 160px"
         ><el-option value="STORE" label="当前店铺券" /><el-option value="PLATFORM" label="平台券"
       /></el-select>
     </div>
+    <el-form inline @submit.prevent="searchCoupons"><el-form-item label="券名称"><el-input v-model="couponQuery" maxlength="80"/></el-form-item><el-form-item label="发放状态"><el-select v-model="couponState" style="width:140px"><el-option value="" label="全部"/><el-option value="ENABLED" label="启用"/><el-option value="DISABLED" label="停发"/></el-select></el-form-item><el-button native-type="submit" :loading="couponLoading">查询优惠券</el-button></el-form>
     <el-table :data="coupons"
       ><el-table-column prop="name" label="名称" /><el-table-column label="规则"
         ><template #default="{ row }"
@@ -194,12 +196,14 @@ onMounted(load);
         ></el-table-column
       ></el-table
     >
+    <el-button v-if="couponMore" :loading="couponLoading" @click="couponPage.load(false)">加载更多优惠券</el-button>
   </section>
   <section class="panel">
     <div class="toolbar">
       <h2>商品活动价</h2>
       <el-button @click="create('promotion')">新增活动</el-button>
     </div>
+    <el-form inline @submit.prevent="searchPromotions"><el-form-item label="商品名称"><el-input v-model="promotionQuery" maxlength="80"/></el-form-item><el-form-item label="活动状态"><el-select v-model="promotionState" style="width:140px"><el-option value="" label="全部"/><el-option value="ENABLED" label="启用"/><el-option value="DISABLED" label="停用"/></el-select></el-form-item><el-button native-type="submit" :loading="promotionLoading">查询活动</el-button></el-form>
     <el-table :data="promotions"
       ><el-table-column label="商品"
         ><template #default="{ row }">{{
@@ -217,6 +221,7 @@ onMounted(load);
         ></el-table-column
       ></el-table
     >
+    <el-button v-if="promotionMore" :loading="promotionLoading" @click="promotionPage.load(false)">加载更多活动</el-button>
   </section>
   <el-dialog
     v-model="dialog"

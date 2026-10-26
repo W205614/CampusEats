@@ -15,6 +15,7 @@ public class PlatformJobs {
   private final Db db;
   private final Clock clock;
   private final PaymentGateway gateway;
+  private final com.sky.finance.LedgerService ledger;
   private final CheckoutService checkouts;
   private final PlatformScope scope;
   private final TransactionTemplate tx;
@@ -32,7 +33,8 @@ public class PlatformJobs {
       PlatformTransactionManager manager,
       @Value("${campus.tasks-enabled:true}") boolean enabled,
       RuntimeOperations operations,
-      com.sky.business.OrderCommandService orders) {
+      com.sky.business.OrderCommandService orders,
+      com.sky.finance.LedgerService ledger) {
     this.db = db;
     this.clock = clock;
     this.gateway = gateway;
@@ -42,6 +44,7 @@ public class PlatformJobs {
     this.enabled = enabled;
     this.operations = operations;
     this.orders = orders;
+    this.ledger = ledger;
   }
 
   @Scheduled(fixedDelay = 2000)
@@ -177,6 +180,7 @@ public class PlatformJobs {
                 now(),
                 current.get("id"));
             scope.event(Db.id(order, "id"), "ORDER_REFUNDED");
+            ledger.refund(Db.id(current, "id"));
             db.update(
                 "INSERT INTO"
                     + " audit_log(actor_type,actor_id,action,target_id,detail,created_at,store_id,campus_id)"

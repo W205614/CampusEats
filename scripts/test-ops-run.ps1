@@ -5,7 +5,7 @@ $root=Split-Path $PSScriptRoot -Parent
 $fixture=Join-Path $root ('.local/ops-run-test-'+[guid]::NewGuid().ToString('N'))
 $fixtureScripts=Join-Path $fixture 'scripts'
 [void][IO.Directory]::CreateDirectory($fixtureScripts)
-foreach($script in @('ops-run.ps1','operations-support.ps1','operations-lock.ps1','ops-check.ps1','docker-read.ps1')){Copy-Item -LiteralPath (Join-Path $PSScriptRoot $script) -Destination $fixtureScripts}
+foreach($script in @('ops-run.ps1','operations-support.ps1','secure-files.ps1','encrypted-backups.ps1','operations-lock.ps1','ops-check.ps1','docker-read.ps1')){Copy-Item -LiteralPath (Join-Path $PSScriptRoot $script) -Destination $fixtureScripts}
 $pwsh=(Get-Process -Id $PID).Path
 $dockerFixture=Join-Path $PSScriptRoot 'tests/ops-docker-fixture.ps1'
 $dockerConfig=Join-Path $fixture 'docker.json'
@@ -22,6 +22,7 @@ $httpProcess.StartInfo.UseShellExecute=$false;$httpProcess.StartInfo.CreateNoWin
 foreach($argument in @('-NoProfile','-File',(Join-Path $PSScriptRoot 'tests/alert-http-fixture.ps1'),'-ConfigFile',$httpConfig,'-ReadyFile',$ready,'-CaptureFile',$capture)){$httpProcess.StartInfo.ArgumentList.Add($argument)}
 . (Join-Path $PSScriptRoot 'operations-lock.ps1')
 . (Join-Path $PSScriptRoot 'operations-support.ps1')
+. (Join-Path $PSScriptRoot 'encrypted-backups.ps1')
 . (Join-Path $PSScriptRoot 'docker-read.ps1')
 function New-FixtureBackup([string]$Destination){
  [void][IO.Directory]::CreateDirectory((Join-Path $Destination 'uploads/.private'))
@@ -73,7 +74,14 @@ try {$lease=Enter-OperationsLock -Root $Root -ProjectName 'campuseats-v1';Exit-O
  if(!$rejected){throw 'Corrupt replica appeared verified.'}
  # Recreate a valid source/copy for runner state and HTTP tests.
  $source2=Join-Path $fixture '.local/backups/source2';New-FixtureBackup $source2
- Copy-VerifiedBackupReplica -Source $source2 -ReplicaDirectory $replicaRoot -ProjectName 'campuseats-v1' | Out-Null
+ $fixtureAge=Get-PinnedAge
+ $fixtureKeygen=Join-Path (Split-Path $fixtureAge -Parent) ('age-keygen'+$(if($IsWindows){'.exe'}else{''}))
+ $fixtureIdentity=Join-Path $fixture 'identity.txt'
+ $fixturePrivate=(& $fixtureKeygen 2>$null) -join "`n"
+ if($LASTEXITCODE -ne 0){throw 'Fixture identity failed.'}
+ Write-SecureTextFile -Path $fixtureIdentity -Content $fixturePrivate;$fixturePrivate=$null
+ $fixtureRecipient=(& $fixtureKeygen -y $fixtureIdentity) -join ''
+ Copy-EncryptedBackupReplica -Source $source2 -ReplicaDirectory $replicaRoot -ProjectName 'campuseats-v1' -Recipient $fixtureRecipient -AgeExecutable $fixtureAge | Out-Null
  $unconfigured=Invoke-Runner
  if($unconfigured.code -ne 1 -or $unconfigured.report.integrations.alert -ne 'not_configured' -or $unconfigured.report.integrations.replica -ne 'not_configured'){throw 'Missing integrations were hidden.'}
  [void]$httpProcess.Start()
@@ -81,7 +89,7 @@ try {$lease=Enter-OperationsLock -Root $Root -ProjectName 'campuseats-v1';Exit-O
  while(!(Test-Path -LiteralPath $ready) -and $timer.Elapsed.TotalSeconds -lt 10){Start-Sleep -Milliseconds 50}
  if(!(Test-Path -LiteralPath $ready)){throw 'Loopback HTTP fixture did not start.'}
  $port=[int](Get-Content -LiteralPath $ready)
- $config=@{schemaVersion=1;replicaDirectory=$replicaRoot;alertWebhookUrl="http://127.0.0.1:$port/hook?token-secret=never-echo";alertTimeoutSeconds=1;alertMaxAttempts=2}
+ $config=@{schemaVersion=1;replicaDirectory=$replicaRoot;replicaRecipient=$fixtureRecipient;alertWebhookUrl="http://127.0.0.1:$port/hook?token-secret=never-echo";alertTimeoutSeconds=1;alertMaxAttempts=2}
  Write-OperationsJson -Path $configPath -Value $config
  $healthy=Invoke-Runner
  if($healthy.code -ne 0 -or $healthy.report.notification -ne 'sent' -or (Payload-Count) -ne 1){throw 'Recovery after configuration did not notify once.'}
@@ -116,7 +124,7 @@ $lease=Enter-OperationsLock -Root (Split-Path $PSScriptRoot -Parent) -ProjectNam
 try {New-FixtureBackup $Destination} finally {Exit-OperationsLock $lease}
 '@ | Set-Content -LiteralPath (Join-Path $fixtureScripts 'safe-backup.ps1')
  $backupRun=Invoke-Runner 'Backup'
- if($backupRun.code -ne 0 -or $backupRun.report.integrations.replica -ne 'copied_verified' -or !(Test-Path -LiteralPath (Join-Path $backupRun.report.replica 'replica-complete.json')) -or (Payload-Count) -ne 6){throw 'Backup runner did not reuse the lock and publish a verified replica quietly.'}
+ if($backupRun.code -ne 0 -or $backupRun.report.integrations.replica -ne 'copied_verified' -or !(Test-Path -LiteralPath (Join-Path $backupRun.report.replica 'encrypted-replica.json')) -or (Payload-Count) -ne 6){throw 'Backup runner did not reuse the lock and publish a verified replica quietly.'}
  # Actual HTTP timeout is tested directly with a delayed local response, never an external endpoint.
  '{"status":204,"delayMilliseconds":2000}' | Set-Content -LiteralPath $httpConfig
  $timer=[Diagnostics.Stopwatch]::StartNew()

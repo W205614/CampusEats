@@ -4,7 +4,7 @@ $root=Split-Path $PSScriptRoot -Parent
 $fixture=Join-Path $root ('.local/release-script-test-'+[guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path (Join-Path $fixture 'scripts') -Force | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $fixture 'sky-server/src/main/resources/db/migration') -Force | Out-Null
-Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'start.ps1'),(Join-Path $PSScriptRoot 'safe-backup.ps1'),(Join-Path $PSScriptRoot 'ops-check.ps1'),(Join-Path $PSScriptRoot 'docker-read.ps1'),(Join-Path $PSScriptRoot 'operations-lock.ps1'),(Join-Path $PSScriptRoot 'operations-support.ps1') -Destination (Join-Path $fixture 'scripts')
+Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'start.ps1'),(Join-Path $PSScriptRoot 'safe-backup.ps1'),(Join-Path $PSScriptRoot 'ops-check.ps1'),(Join-Path $PSScriptRoot 'docker-read.ps1'),(Join-Path $PSScriptRoot 'operations-lock.ps1'),(Join-Path $PSScriptRoot 'operations-support.ps1'),(Join-Path $PSScriptRoot 'secure-files.ps1') -Destination (Join-Path $fixture 'scripts')
 '-- fixture' | Set-Content (Join-Path $fixture 'sky-server/src/main/resources/db/migration/V8__fixture.sql')
 'DEMO_ADMIN_PASSWORD=FixturePasswordOnly2026' | Set-Content (Join-Path $fixture '.env')
 @'

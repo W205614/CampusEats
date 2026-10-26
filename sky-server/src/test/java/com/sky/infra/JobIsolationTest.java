@@ -43,7 +43,8 @@ class JobIsolationTest {
             mock(PlatformTransactionManager.class),
             true,
             operations,
-            orders);
+            orders,
+            mock(com.sky.finance.LedgerService.class));
     when(db.rows(contains("FROM checkout"), any(Object[].class)))
         .thenReturn(List.of(Map.of("id", 1L), Map.of("id", 2L)));
     when(db.rows(contains("FROM orders"), any(Object[].class)))

@@ -25,25 +25,49 @@ public class DiscoveryCursor {
   }
 
   public String encode(String scope, Position position) {
-    String body = "1|" + scope + "|" + position.storeId() + "|" + position.rank() + "|" + position.id();
-    String payload = Base64.getUrlEncoder().withoutPadding().encodeToString(body.getBytes(StandardCharsets.UTF_8));
-    return payload + "." + Base64.getUrlEncoder().withoutPadding().encodeToString(sign(key, payload));
+    String body =
+        "1|" + scope + "|" + position.storeId() + "|" + position.rank() + "|" + position.id();
+    String payload =
+        Base64.getUrlEncoder()
+            .withoutPadding()
+            .encodeToString(body.getBytes(StandardCharsets.UTF_8));
+    return payload
+        + "."
+        + Base64.getUrlEncoder().withoutPadding().encodeToString(sign(key, payload));
   }
 
   public Position decode(String cursor, String scope) {
+    return decode(cursor, scope, 1);
+  }
+
+  Position decode(String cursor, String scope, int maxRank) {
     if (cursor == null) return Position.START;
     try {
       require(!cursor.isBlank() && cursor.length() <= 512, 400, "INVALID_CURSOR", "分页游标不正确");
       String[] token = cursor.split("\\.", -1);
       require(token.length == 2, 400, "INVALID_CURSOR", "分页游标不正确");
       byte[] provided = Base64.getUrlDecoder().decode(token[1]);
-      require(MessageDigest.isEqual(sign(key, token[0]), provided), 400, "INVALID_CURSOR", "分页游标不正确");
-      String[] fields = new String(Base64.getUrlDecoder().decode(token[0]), StandardCharsets.UTF_8).split("\\|", -1);
-      require(fields.length == 5 && fields[0].equals("1") && fields[1].equals(scope),
-          400, "INVALID_CURSOR", "筛选或账号已变化，请重新加载");
-      var position = new Position(Long.parseLong(fields[2]), Integer.parseInt(fields[3]), Long.parseLong(fields[4]));
-      require(position.storeId() >= 0 && position.id() > 0 && (position.rank() == 0 || position.rank() == 1),
-          400, "INVALID_CURSOR", "分页游标不正确");
+      require(
+          MessageDigest.isEqual(sign(key, token[0]), provided), 400, "INVALID_CURSOR", "分页游标不正确");
+      String[] fields =
+          new String(Base64.getUrlDecoder().decode(token[0]), StandardCharsets.UTF_8)
+              .split("\\|", -1);
+      require(
+          fields.length == 5 && fields[0].equals("1") && fields[1].equals(scope),
+          400,
+          "INVALID_CURSOR",
+          "筛选或账号已变化，请重新加载");
+      var position =
+          new Position(
+              Long.parseLong(fields[2]), Integer.parseInt(fields[3]), Long.parseLong(fields[4]));
+      require(
+          position.storeId() >= 0
+              && position.id() > 0
+              && position.rank() >= 0
+              && position.rank() <= maxRank,
+          400,
+          "INVALID_CURSOR",
+          "分页游标不正确");
       return position;
     } catch (BusinessException ex) {
       throw ex;

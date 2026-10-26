@@ -42,7 +42,19 @@ public class OpenApiConfiguration {
                           String field = rawField.toString();
                           Schema<?> property = (Schema<?>) rawProperty;
                           if ("int64".equals(property.getFormat()))
-                            schema.addProperty(field, new StringSchema().pattern("^[0-9]+$"));
+                            schema.addProperty(
+                                field,
+                                new StringSchema()
+                                    .pattern(
+                                        java.util.Set.of(
+                                                    "amountCents",
+                                                    "netCents",
+                                                    "openingNetCents",
+                                                    "currentOrderNetCents",
+                                                    "ledgerNetCents")
+                                                .contains(field)
+                                            ? "^-?[0-9]+$"
+                                            : "^[0-9]+$"));
                           if (java.util.List.of("price", "amount", "deliveryFee", "packagingFee")
                               .contains(field))
                             schema.addProperty(field, new StringSchema().example("12.00"));
@@ -54,6 +66,17 @@ public class OpenApiConfiguration {
                   item.readOperations()
                       .forEach(
                           op -> {
+                            if (op == item.getGet()
+                                && (java.util.Set.of(
+                                            "/api/v1/platform/staff",
+                                            "/api/v1/platform/coupons",
+                                            "/api/v1/user/coupons",
+                                            "/api/v1/user/wallet",
+                                            "/api/v1/user/favorites")
+                                        .contains(path)
+                                    || path.matches(
+                                        "/api/v1/(?:merchant|user)/stores/[^/]+/(?:staff|coupons|promotions)")))
+                              op.setDeprecated(true);
                             if (op.getParameters() != null)
                               for (var parameter : op.getParameters()) {
                                 var schema = parameter.getSchema();
@@ -63,6 +86,7 @@ public class OpenApiConfiguration {
                             if (!(path.endsWith("/auth/login")
                                 || path.endsWith("/auth/demo")
                                 || path.endsWith("/auth/wechat")
+                                || path.endsWith("/auth/capabilities")
                                 || path.startsWith("/api/v1/user/menu")
                                 || path.equals("/api/v1/user/shop")
                                 || path.equals("/api/v1/user/buildings")

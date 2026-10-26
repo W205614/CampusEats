@@ -83,7 +83,7 @@ test('workbench list loads more and a new filter resets its cursor', async ({ pa
   });
   await page.route('**/api/v1/**', route => {
     const url = new URL(route.request().url());
-    let data: unknown = [];
+    let data: unknown = url.pathname.endsWith('/page') ? envelope([]) : [];
     if (url.pathname === '/api/v1/merchant/stores/page') {
       reads.push(url);
       data = url.searchParams.get('query') === '筛选店铺'
@@ -115,13 +115,13 @@ test('claiming a coupon preserves loaded store pages, selection and the next cur
   await page.addInitScript(() => sessionStorage.setItem('campus-user', JSON.stringify({ id: '1', token: 'coupon-user', role: 'USER', name: '领券用户' })));
   await page.route('**/api/v1/user/**', route => {
     const url = new URL(route.request().url()), path = url.pathname.replace('/api/v1/user', '');
-    let data: unknown = [];
+    let data: unknown = path.endsWith('/page') ? envelope([]) : [];
     if (path === '/stores/page') {
       const cursor = url.searchParams.get('cursor'); reads.push(cursor);
       data = cursor === 'after2' ? envelope([shop('3')]) : cursor === 'after1' ? envelope([shop('2')], 'after2') : envelope([shop('1')], 'after1');
     }
-    if (path === '/coupons') data = claimed ? [] : [coupon];
-    if (path === '/wallet') data = claimed ? [coupon] : [];
+    if (path === '/coupons/page') data = envelope(claimed ? [] : [coupon]);
+    if (path === '/wallet/page') data = envelope(claimed ? [coupon] : []);
     if (path === '/coupons/99/claim') { claimed = true; data = { id: '99' }; }
     return route.fulfill({ json: { code: 'OK', data } });
   });

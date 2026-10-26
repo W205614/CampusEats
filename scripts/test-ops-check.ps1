@@ -54,6 +54,10 @@ $failed=Check-Fixture @{failedJob='maintenance';staleJob='outbox'}
 if($failed.report.issues -notcontains 'maintenance task check failed' -or $failed.report.issues -notcontains 'outbox task check failed'){throw 'Job failure or staleness hidden.'}
 $unknown=Check-Fixture @{invalidHealth=$true;invalidCounts=$true;scanFailure=$true}
 if($unknown.report.checks.operationsHealth -ne 'unknown' -or $unknown.report.checks.databaseOperationalState -ne 'unknown' -or $unknown.report.checks.imageInventoryState -ne 'unknown'){throw 'Unknown checks appeared healthy.'}
+$unknownJob=Check-Fixture @{unknownJob=$true}
+if($unknownJob.report.checks.operationsHealth -ne 'unknown'){throw 'Unknown job was silently accepted.'}
+$exceptionJob=Check-Fixture @{failedJob='fulfillmentExceptions'}
+if($exceptionJob.report.issues -notcontains 'fulfillmentExceptions task check failed'){throw 'Fulfillment exception task failure was hidden.'}
 $missing=Check-Fixture @{evidenceRefs=@('missing.png');productRefs=@('/uploads/product.png');files=@("EVIDENCE`torphan.png","TEMP`tinterrupted.part")}
 if($missing.report.checks.missingEvidence -ne 1 -or $missing.report.checks.missingProductImages -ne 1 -or $missing.report.checks.suspectedOrphanEvidence -ne 1 -or $missing.report.checks.temporaryFiles -ne 1){throw 'Image references were not checked in both directions.'}
 $present=Check-Fixture @{evidenceRefs=@('exists.png');productRefs=@('/uploads/product.png');files=@("EVIDENCE`texists.png","PRODUCT`tproduct.png")}

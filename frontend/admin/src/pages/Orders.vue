@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, computed, watch } from 'vue';
 import { ElAlert, ElCheckbox } from 'element-plus';
+import { useRoute } from 'vue-router';
 import { request } from '../platform-api';
 import { notifyError } from '../api';
 import { selectedStore } from '../context';
@@ -8,6 +9,8 @@ import { useSession } from '../stores/session';
 import { readPages } from '../../../contracts/paging';
 import { orderStatus, states, cents, type Order } from '../../../contracts/platform';
 const session = useSession(),
+  route = useRoute(),
+  availabilityDialog = ref(false), acceptingTasks = ref(true), availabilityBusy = ref(false),
   courier = computed(() => session.session?.role === 'DELIVERER'),
   orders = ref<Order[]>([]),
   pool = ref<
@@ -62,7 +65,12 @@ async function load(pages = loadedPages) {
     loadedPages = pages;
     if (isCourier) pool.value = related as typeof pool.value;
     else couriers.value = related as typeof couriers.value;
-    if (selected.value) selected.value = orders.value.find((o) => o.id === selected.value?.id);
+    if (selected.value) {
+      const id=selected.value.id;
+      const row=orders.value.find(o=>o.id===id) || await request<Order>((isCourier?'/courier':'/merchant')+'/orders/'+id);
+      if(!isCurrent())return;
+      selected.value=row;
+    }
     needsRefresh.value = false;
   } catch (e) {
     if (isCurrent()) notifyError(e);
@@ -72,6 +80,24 @@ async function load(pages = loadedPages) {
 }
 const loadMore = () => load(loadedPages + 1);
 const refresh = () => load(1);
+async function openRequestedOrder() {
+  const id=String(route.query.orderId||''); if(!mounted||!/^\d+$/.test(id))return;
+  const current=sequence;
+  try {
+    const row=await request<Order>((courier.value?'/courier':'/merchant')+'/orders/'+id);
+    if(mounted&&current===sequence)selected.value=row;
+  }catch(e){if(mounted&&current===sequence)notifyError(e);}
+}
+watch(()=>route.query.orderId,()=>void openRequestedOrder());
+async function openAvailability() {
+  try { acceptingTasks.value=(await request<{enabled:boolean}>('/courier/dispatch-availability')).enabled;availabilityDialog.value=true; }
+  catch(e){notifyError(e);}
+}
+async function saveAvailability() {
+  availabilityBusy.value=true;
+  try {await request('/courier/dispatch-availability','PUT',{enabled:acceptingTasks.value});availabilityDialog.value=false;}
+  catch(e){notifyError(e);}finally{availabilityBusy.value=false;}
+}
 async function perform(o: Order, operation: () => Promise<void>) {
   if (!mounted || busy.value || loading.value || needsRefresh.value) return;
   const current = sequence;
@@ -187,6 +213,7 @@ async function initialize() {
 onMounted(async () => {
   mounted = true;
   await initialize();
+  await openRequestedOrder();
   if (mounted) timer.value = setInterval(() => void load(), 15000);
 });
 onUnmounted(() => {
@@ -209,13 +236,14 @@ onUnmounted(() => {
   </section>
   <section v-if="courier" class="panel">
     <h2>校区抢单池</h2>
+    <el-button @click="openAvailability">接单设置</el-button>
     <el-table :data="pool"
       ><el-table-column prop="storeName" label="取餐店铺" /><el-table-column
         prop="buildingName"
         label="送达楼栋"
       /><el-table-column label="操作"
         ><template #default="{ row }"
-          ><el-button type="primary" :disabled="busy || loading || needsRefresh" @click="claim(row)">抢单</el-button></template
+           ><el-button type="primary" :disabled="busy || loading || needsRefresh || !acceptingTasks" @click="claim(row)">抢单</el-button></template
         ></el-table-column
       ></el-table
     >
@@ -234,7 +262,7 @@ onUnmounted(() => {
         ><template #default="{ row }">{{
           row.fulfillment === 'PICKUP' ? '到店自取' : '校区配送'
         }}</template></el-table-column
-      ><el-table-column prop="amount" label="应付 / 元" /><el-table-column label="退款"
+      ><el-table-column v-if="!courier" prop="amount" label="应付 / 元" /><el-table-column v-if="!courier" label="退款"
         ><template #default="{ row }">¥{{ cents(row.refundedCents) }}</template></el-table-column
       ><el-table-column label="操作"
         ><template #default="{ row }"
@@ -262,7 +290,7 @@ onUnmounted(() => {
         ><el-table-column prop="name" label="商品" /><el-table-column
           prop="number"
           label="数量"
-        /><el-table-column label="商品实付"
+        /><el-table-column v-if="!courier" label="商品实付"
           ><template #default="{ row }">¥{{ cents(row.lineTotalCents) }}</template></el-table-column
         ></el-table
       >
@@ -369,12 +397,17 @@ onUnmounted(() => {
         <el-button v-if="selected.courierId" :disabled="busy || needsRefresh" @click="openException(selected, 'reassign')">平台改派</el-button>
         <el-button type="danger" :disabled="busy || needsRefresh" @click="openException(selected, 'exception-cancel')">异常取消并退款</el-button>
       </div>
-      <h3>退款进度</h3>
-      <p v-for="r in selected.refunds" :key="r.id">
+      <h3 v-if="!courier">退款进度</h3>
+      <p v-for="r in (!courier ? selected.refunds : [])" :key="r.id">
         ¥{{ cents(r.amountCents) }} · {{ states[r.state] || r.state }}
       </p></template
     ></el-drawer
   >
+  <el-dialog v-model="availabilityDialog" title="配送接单设置" width="420px">
+    <p>停止接收新任务后，仍可完成原有配送；人员停用由平台处理。</p>
+    <el-switch v-model="acceptingTasks" active-text="接收新任务" inactive-text="暂停新任务" />
+    <template #footer><el-button :loading="availabilityBusy" @click="saveAvailability">保存接单设置</el-button></template>
+  </el-dialog>
   <el-dialog :model-value="!!exceptionOrder" :title="exceptionKind === 'reassign' ? '平台改派' : '异常取消订单'" :close-on-click-modal="false" :close-on-press-escape="!busy" :show-close="!busy" @close="exceptionOrder = undefined">
     <template v-if="exceptionOrder">
       <p>{{ exceptionOrder.number }}</p>

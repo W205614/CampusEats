@@ -46,6 +46,35 @@ public class AuthService {
     this.appid = appid;
     this.wxsecret = wxsecret;
     require(this.secret.length >= 32, 503, "CONFIGURATION", "JWT_ADMIN_SECRET 至少需要32字节，请使用启动脚本");
+    require(
+        !(environment.matchesProfiles("trial") && environment.matchesProfiles("demo")),
+        503,
+        "CONFIGURATION",
+        "试用模式不能同时启用共享演示身份");
+    require(
+        !environment.matchesProfiles("trial") || !secret.contains("replace-with-"),
+        503,
+        "CONFIGURATION",
+        "试用模式必须使用独立随机密钥");
+  }
+
+  @io.swagger.v3.oas.annotations.media.Schema(name = "AuthenticationCapabilities")
+  public record Capabilities(
+      boolean demoLoginEnabled,
+      boolean localLoginEnabled,
+      boolean wechatLoginEnabled,
+      String paymentMode,
+      String mode) {}
+
+  public Capabilities capabilities() {
+    return new Capabilities(
+        environment.matchesProfiles("demo") && !environment.matchesProfiles("trial"),
+        true,
+        !appid.isBlank() && !wxsecret.isBlank(),
+        "MOCK",
+        environment.matchesProfiles("trial")
+            ? "TRIAL"
+            : environment.matchesProfiles("demo") ? "DEMO" : "LOCAL");
   }
 
   @Transactional
@@ -92,7 +121,7 @@ public class AuthService {
 
   @Transactional
   public Map<String, Object> demo(DemoLogin input) {
-    require(environment.matchesProfiles("demo"), 404, "NOT_FOUND", "演示登录未启用");
+    require(capabilities().demoLoginEnabled(), 404, "NOT_FOUND", "演示登录未启用");
     String openid = "campus-demo-" + input.account();
     db.update(
         "INSERT INTO user(openid,name,create_time) VALUES(?,?,?) ON DUPLICATE KEY UPDATE"
@@ -165,7 +194,7 @@ public class AuthService {
       out.put("role", type.equals("USER") ? "USER" : row.get("role"));
       out.put("storeId", type.equals("USER") ? null : row.get("store_id"));
       out.put("campusId", type.equals("USER") ? null : row.get("campus_id"));
-      out.put("mustChangePassword", type.equals("ADMIN") && Db.bool(row, "must_change_password"));
+      out.put("mustChangePassword", Db.bool(row, "must_change_password"));
       return out;
     } catch (Exception ex) {
       throw new IllegalStateException(ex);
@@ -211,7 +240,7 @@ public class AuthService {
           type,
           type.equals("USER") ? "USER" : String.valueOf(row.get("role")),
           claims.getJWTID(),
-          type.equals("ADMIN") && Db.bool(row, "must_change_password"),
+          Db.bool(row, "must_change_password"),
           type.equals("USER") || row.get("store_id") == null ? null : Db.id(row, "store_id"),
           type.equals("USER") || row.get("campus_id") == null ? null : Db.id(row, "campus_id"));
     } catch (BusinessException ex) {
@@ -247,7 +276,11 @@ public class AuthService {
 
   private Map<String, Object> subject(String type, long id) {
     if (type.equals("ADMIN")) return db.one("SELECT * FROM employee WHERE id=?", id);
-    if (type.equals("USER")) return db.one("SELECT * FROM user WHERE id=?", id);
+    if (type.equals("USER"))
+      return db.one(
+          "SELECT u.*,COALESCE(a.must_change_password,false) must_change_password"
+              + " FROM user u LEFT JOIN local_user_account a ON a.user_id=u.id WHERE u.id=?",
+          id);
     return null;
   }
 

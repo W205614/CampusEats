@@ -36,6 +36,7 @@ public class RuntimeOperations implements HealthIndicator {
             "outbox",
             "legacyExpiry",
             "deliveryOverdue")) states.put(name, new State(enabled, 120));
+    states.put("fulfillmentExceptions", new State(enabled, 120));
     states.put("maintenance", new State(enabled, 720));
     states.put("metrics", new State(true, 60));
   }

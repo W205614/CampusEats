@@ -32,31 +32,37 @@ public class PlatformFulfillmentController {
   }
 
   @GetMapping("/user/orders")
-  public List<PlatformViews.OrderResponse> userOrders(@RequestParam(required = false) Long beforeId, @RequestParam(required = false) Integer limit) {
+  public List<PlatformViews.OrderResponse> userOrders(
+      @RequestParam(required = false) Long beforeId,
+      @RequestParam(required = false) Integer limit) {
     return PlatformViewFactory.orders(fulfillment.orders(null, beforeId, limit));
   }
 
   @GetMapping("/merchant/stores/{storeId}/orders")
-  public List<PlatformViews.OrderResponse> storeOrders(
-      @PathVariable long storeId, @RequestParam(required = false) Long beforeId, @RequestParam(required = false) Integer limit) {
-    return PlatformViewFactory.orders(fulfillment.orders(storeId, beforeId, limit));
+  public List<PlatformViews.MerchantOrderResponse> storeOrders(
+      @PathVariable long storeId,
+      @RequestParam(required = false) Long beforeId,
+      @RequestParam(required = false) Integer limit) {
+    return PlatformViewFactory.merchantOrders(fulfillment.orders(storeId, beforeId, limit));
   }
 
   @GetMapping("/courier/orders")
-  public List<PlatformViews.OrderResponse> courierOrders(@RequestParam(required = false) Long beforeId, @RequestParam(required = false) Integer limit) {
-    return PlatformViewFactory.orders(fulfillment.orders(null, beforeId, limit));
+  public List<PlatformViews.CourierOrderResponse> courierOrders(
+      @RequestParam(required = false) Long beforeId,
+      @RequestParam(required = false) Integer limit) {
+    return PlatformViewFactory.courierOrders(fulfillment.orders(null, beforeId, limit));
   }
 
   @GetMapping(value = "/merchant/orders/{id}")
   @io.swagger.v3.oas.annotations.Operation(operationId = "order")
-  public PlatformViews.OrderResponse order(@PathVariable long id) {
-    return PlatformViewFactory.order(fulfillment.detail(id));
+  public PlatformViews.MerchantOrderResponse order(@PathVariable long id) {
+    return PlatformViewFactory.merchantOrder(fulfillment.detail(id));
   }
 
   @GetMapping(value = "/courier/orders/{id}")
   @io.swagger.v3.oas.annotations.Operation(operationId = "order_1")
-  public PlatformViews.OrderResponse courierOrder(@PathVariable long id) {
-    return PlatformViewFactory.order(fulfillment.detail(id));
+  public PlatformViews.CourierOrderResponse courierOrder(@PathVariable long id) {
+    return PlatformViewFactory.courierOrder(fulfillment.detail(id));
   }
 
   @GetMapping(value = "/user/orders/{id}")

@@ -23,6 +23,9 @@ async function fixture(page: Page) {
     const token = route.request().headers().authorization;
     const ok = (data: unknown) => route.fulfill({ json: { code: 'OK', data } });
     if (path === '/auth/demo') return ok(user(String(route.request().postDataJSON().account)));
+    if (path === '/auth/capabilities') return ok({demoLoginEnabled:true,localLoginEnabled:true,wechatLoginEnabled:false,paymentMode:'MOCK',mode:'DEMO'});
+    if (path === '/auth/account') return ok({localAccount:false,username:null});
+    if (path === '/wallet/page') return ok({records:[],nextCursor:null,hasMore:false});
     if (path === state.hold && token === 'Bearer client-1') {
       await new Promise<void>(resolve => { state.release = resolve; });
     }

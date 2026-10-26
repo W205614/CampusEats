@@ -5,6 +5,12 @@
 | 用途 | 脚本 | 说明 |
 |---|---|---|
 | 首次启动、源码升级 | `start.ps1` | 生成本机配置、构建镜像并等待健康；已有数据会先暂停写入、备份和独立验证，详见[升级说明](../docs/platform-deployment.md) |
+| CI制品下载 | `download-release.ps1` | 核对成功run、来源SHA、归档及清单摘要，不保存GitHub令牌 |
+| CI制品发布 | `release.ps1` | 不构建镜像；停写迁移、原字段及上传核对、独立恢复后开放，保留原依赖及卷 |
+| CI制品导出 | `export-release.ps1` | CI末尾导出已测试扫描的两应用镜像、SBOM及来源清单 |
+| 加密副本与解密 | `encrypted-backups.ps1`、`decrypt-backup.ps1` | 固定age，缺公钥拒绝对外副本；私钥单独保管 |
+| 调度预览 | `ops-schedule.ps1` | 生成和校验Windows任务XML，不实际注册 |
+| 凭据权限 | `secure-files.ps1` | 写前限制权限并核验，失败中止；普通临时文件使用回收站清理 |
 | 前端源码构建 | `build-frontends.ps1` | 安装依赖，检查兼容层和类型，构建管理端、H5、小程序 |
 | 基础可用性 | `smoke.ps1` | HTTP 就绪与入口检查 |
 | 运维只读检查 | `ops-check.ps1` | 任务、积压、图片、空间及验证备份；发现异常返回非零 |

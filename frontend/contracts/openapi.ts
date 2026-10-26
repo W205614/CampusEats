@@ -15,6 +15,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/platform/users/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["update"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/platform/staff/{id}": {
         parameters: {
             query?: never;
@@ -24,6 +40,22 @@ export interface paths {
         };
         get?: never;
         put: operations["staffUpdate"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/staff/{id}/dispatch-availability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["availability"];
         post?: never;
         delete?: never;
         options?: never;
@@ -88,6 +120,22 @@ export interface paths {
         };
         get?: never;
         put: operations["storeUpdate"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/merchant/stores/{storeId}/service-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["policy"];
+        put: operations["policy_1"];
         post?: never;
         delete?: never;
         options?: never;
@@ -184,6 +232,22 @@ export interface paths {
         };
         get?: never;
         put: operations["staffUpdate_1"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/courier/dispatch-availability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ownAvailability"];
+        put: operations["ownAvailability_1"];
         post?: never;
         delete?: never;
         options?: never;
@@ -335,6 +399,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/user/messages/{id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["read"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/messages/{id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["read_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/user/coupons/{id}/claim": {
         parameters: {
             query?: never;
@@ -431,6 +527,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/user/auth/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["password"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/user/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/user/auth/demo": {
         parameters: {
             query?: never;
@@ -511,6 +639,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/platform/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["create"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/users/{id}/reset-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["reset"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/platform/stores": {
         parameters: {
             query?: never;
@@ -534,9 +694,42 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** @deprecated */
         get: operations["staff"];
         put?: never;
         post: operations["staffSave"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/staff/{id}/emergency-disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["emergency"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/settlements": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["generate"];
         delete?: never;
         options?: never;
         head?: never;
@@ -630,6 +823,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** @deprecated */
         get: operations["adminPlatformCoupons"];
         put?: never;
         post: operations["platformCoupon"];
@@ -703,6 +897,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/order-exceptions/{id}/acknowledge": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["acknowledge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/merchant/stores/{storeId}/uploads": {
         parameters: {
             query?: never;
@@ -726,6 +936,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** @deprecated */
         get: operations["promotions"];
         put?: never;
         post: operations["promotion"];
@@ -758,6 +969,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** @deprecated */
         get: operations["adminStoreCoupons"];
         put?: never;
         post: operations["storeCoupon"];
@@ -952,7 +1164,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["password"];
+        post: operations["password_1"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1000,7 +1212,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["login"];
+        post: operations["login_1"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1014,7 +1226,24 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** @deprecated */
         get: operations["wallet"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/user/wallet/page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["wallet_1"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1078,7 +1307,24 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** @deprecated */
         get: operations["storeCoupons"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/user/stores/{storeId}/coupons/page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["userCoupons"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1215,6 +1461,70 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/user/messages/unread": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["unread"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/messages/unread": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["unread_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/user/messages/page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["messages"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/messages/page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["messages_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/user/favorites": {
         parameters: {
             query?: never;
@@ -1222,7 +1532,24 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** @deprecated */
         get: operations["favorites"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/user/favorites/page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["favorites_1"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1238,7 +1565,24 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** @deprecated */
         get: operations["platformCoupons"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/user/coupons/page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["userCoupons_1"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1327,6 +1671,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/user/auth/capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["capabilities"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/user/auth/account": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["account"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/user/aftersales": {
         parameters: {
             query?: never;
@@ -1335,6 +1711,118 @@ export interface paths {
             cookie?: never;
         };
         get: operations["userAftersales"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/users/page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["page"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/staff/{id}/active-deliveries/page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["active"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/staff/page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["staff_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/settlements/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["statement"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/settlements/{id}/entries/page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["entries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/settlements/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["preview_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/settlements/page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["statements"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1391,6 +1879,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/platform/order-exceptions/page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["exceptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/ledger/page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["ledger"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/finance/reconciliation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["reconcile"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/platform/events": {
         parameters: {
             query?: never;
@@ -1399,6 +1935,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["events"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/coupons/page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["coupons"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1462,7 +2014,88 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
+        /** @deprecated */
         get: operations["storeStaff"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/merchant/stores/{storeId}/staff/page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["staff_2"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/merchant/stores/{storeId}/settlements/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["merchantStatement"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/merchant/stores/{storeId}/settlements/{id}/entries/page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["merchantEntries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/merchant/stores/{storeId}/settlements/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["merchantPreview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/merchant/stores/{storeId}/settlements/page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["merchantStatements"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1503,6 +2136,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/merchant/stores/{storeId}/promotions/page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["promotions_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/merchant/stores/{storeId}/products": {
         parameters: {
             query?: never;
@@ -1535,6 +2184,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/merchant/stores/{storeId}/order-exceptions/page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["storeExceptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/merchant/stores/{storeId}/ledger/page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["merchantLedger"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/merchant/stores/{storeId}/events": {
         parameters: {
             query?: never;
@@ -1559,6 +2240,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["couriers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/merchant/stores/{storeId}/coupons/page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["coupons_1"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1769,6 +2466,19 @@ export interface components {
             consignee: string;
             phone: string;
         };
+        LocalUserUpdate: {
+            name: string;
+            enabled?: boolean;
+        };
+        LocalUserView: {
+            id?: string;
+            username?: string;
+            name?: string;
+            enabled?: boolean;
+            mustChangePassword?: boolean;
+            /** Format: date-time */
+            createdAt?: string;
+        };
         Staff: {
             username: string;
             name: string;
@@ -1777,6 +2487,9 @@ export interface components {
             campusId?: string;
             enabled?: boolean;
             password?: string;
+        };
+        Availability: {
+            enabled?: boolean;
         };
         Coupon: {
             name: string;
@@ -1811,6 +2524,21 @@ export interface components {
             packagingFeeCents?: string;
             hours: string[];
             phone?: string;
+        };
+        Policy: {
+            /** Format: int32 */
+            acceptMinutes?: number;
+            /** Format: int32 */
+            prepareMinutes?: number;
+            /** Format: int32 */
+            dispatchMinutes?: number;
+            /** Format: int32 */
+            pickupMinutes?: number;
+            /** Format: int32 */
+            deliveryMinutes?: number;
+            /** Format: int32 */
+            selfPickupMinutes?: number;
+            version?: string;
         };
         Quota: {
             dishId: string;
@@ -1962,9 +2690,51 @@ export interface components {
             storeId?: string;
             campusId?: string;
         };
+        Password: {
+            oldPassword: string;
+            password: string;
+        };
+        LocalUserLogin: {
+            username: string;
+            password: string;
+        };
         DemoLogin: {
             /** Format: int32 */
             account?: number;
+        };
+        LocalUserCreate: {
+            username: string;
+            name: string;
+            password: string;
+        };
+        LocalUserResetPassword: {
+            password: string;
+        };
+        Reason: {
+            reason: string;
+        };
+        Generate: {
+            storeId?: string;
+            /** Format: date */
+            businessDate: string;
+        };
+        FinanceSettlement: {
+            id: string;
+            storeId: string;
+            storeName: string;
+            /** Format: date */
+            businessDate: string;
+            /** Format: date-time */
+            periodStart: string;
+            /** Format: date-time */
+            periodEnd: string;
+            paidCents: string;
+            refundedCents: string;
+            netCents: string;
+            entryCount: string;
+            carryForward: boolean;
+            /** Format: date-time */
+            createdAt: string;
         };
         Text: {
             text: string;
@@ -1983,13 +2753,41 @@ export interface components {
             approve?: boolean;
             reason: string;
         };
-        Password: {
-            oldPassword: string;
-            password: string;
+        Acknowledge: {
+            version?: string;
+            reason: string;
         };
         Login: {
             username: string;
             password: string;
+        };
+        Request: {
+            cursor?: string;
+            /** Format: int32 */
+            limit?: number;
+            state?: string;
+            query?: string;
+        };
+        CollectionWallet: {
+            id?: string;
+            state?: string;
+            checkoutId?: string;
+            couponTemplateId?: string;
+            storeId?: string;
+            name?: string;
+            kind?: string;
+            thresholdCents?: string;
+            value?: string;
+            capCents?: string;
+            /** Format: date-time */
+            startsAt?: string;
+            /** Format: date-time */
+            endsAt?: string;
+        };
+        PageCollectionWallet: {
+            records: components["schemas"]["CollectionWallet"][];
+            nextCursor?: string;
+            hasMore: boolean;
         };
         PublicReview: {
             id?: string;
@@ -2007,6 +2805,31 @@ export interface components {
         ReviewStats: {
             total?: string;
             rating?: number;
+        };
+        CollectionCoupon: {
+            id?: string;
+            storeId?: string;
+            name?: string;
+            kind?: string;
+            thresholdCents?: string;
+            value?: string;
+            capCents?: string;
+            /** Format: int32 */
+            total?: number;
+            /** Format: int32 */
+            claimed?: number;
+            /** Format: int32 */
+            perUser?: number;
+            /** Format: date-time */
+            startsAt?: string;
+            /** Format: date-time */
+            endsAt?: string;
+            enabled?: boolean;
+        };
+        PageCollectionCoupon: {
+            records: components["schemas"]["CollectionCoupon"][];
+            nextCursor?: string;
+            hasMore: boolean;
         };
         StoreResponse: {
             id?: string;
@@ -2209,6 +3032,194 @@ export interface components {
             succeededAt?: string;
             successTimeSource?: string;
         };
+        Message: {
+            id?: string;
+            orderId?: string;
+            storeId?: string;
+            eventType?: string;
+            summary?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            readAt?: string;
+        };
+        PageMessage: {
+            records: components["schemas"]["Message"][];
+            nextCursor?: string;
+            hasMore: boolean;
+        };
+        CollectionFavorite: {
+            targetType?: string;
+            targetId?: string;
+            storeId?: string;
+            storeName?: string;
+            name?: string;
+        };
+        PageCollectionFavorite: {
+            records: components["schemas"]["CollectionFavorite"][];
+            nextCursor?: string;
+            hasMore: boolean;
+        };
+        AuthenticationCapabilities: {
+            demoLoginEnabled?: boolean;
+            localLoginEnabled?: boolean;
+            wechatLoginEnabled?: boolean;
+            paymentMode?: string;
+            mode?: string;
+        };
+        LocalProfile: {
+            localAccount?: boolean;
+            username?: string;
+        };
+        LocalUsersPage: {
+            records?: components["schemas"]["LocalUserView"][];
+            nextCursor?: string;
+            hasMore?: boolean;
+        };
+        PageMapStringObject: {
+            records: {
+                [key: string]: unknown;
+            }[];
+            nextCursor?: string;
+            hasMore: boolean;
+        };
+        CollectionStaff: {
+            id?: string;
+            username?: string;
+            name?: string;
+            role?: string;
+            storeId?: string;
+            campusId?: string;
+            /** Format: int32 */
+            status?: number;
+            mustChangePassword?: boolean;
+            acceptingTasks?: boolean;
+        };
+        PageCollectionStaff: {
+            records: components["schemas"]["CollectionStaff"][];
+            nextCursor?: string;
+            hasMore: boolean;
+        };
+        FinanceLedgerLine: {
+            id: string;
+            sourceType: string;
+            sourceId: string;
+            orderId: string;
+            storeId: string;
+            storeName: string;
+            amountCents: string;
+            /** Format: date-time */
+            occurredAt: string;
+        };
+        PageFinanceLedgerLine: {
+            records: components["schemas"]["FinanceLedgerLine"][];
+            nextCursor?: string | null;
+            hasMore: boolean;
+        };
+        FinancePreview: {
+            storeId: string;
+            /** Format: date */
+            businessDate: string;
+            /** Format: date-time */
+            enabledAt: string;
+            /** Format: date-time */
+            periodStart: string;
+            /** Format: date-time */
+            periodEnd: string;
+            openingNetCents: string;
+            paidCents: string;
+            refundedCents: string;
+            netCents: string;
+            entryCount: string;
+            commissionCents: string;
+            channelFeeCents: string;
+            carryForward: boolean;
+            partialDay: boolean;
+            /** Format: date-time */
+            generatedAt: string;
+        };
+        PageFinanceSettlement: {
+            records: components["schemas"]["FinanceSettlement"][];
+            nextCursor?: string | null;
+            hasMore: boolean;
+        };
+        Daily: {
+            /** Format: date */
+            date?: string;
+            paidCents?: string;
+            paymentCount?: string;
+        };
+        Metrics: {
+            paymentCount?: string;
+            childOrderCount?: string;
+            paidCents?: string;
+            shopDiscountCents?: string;
+            platformDiscountCents?: string;
+            refundedCents?: string;
+            completed?: string;
+            completedCents?: string;
+            netCents?: string;
+        };
+        ReportSnapshot: {
+            metrics?: components["schemas"]["Metrics"];
+            daily?: components["schemas"]["Daily"][];
+            stores?: components["schemas"]["StoreTotal"][];
+            /** Format: date-time */
+            generatedAt?: string;
+        };
+        StoreTotal: {
+            storeId?: string;
+            storeName?: string;
+            paidCents?: string;
+            childOrderCount?: string;
+        };
+        ExceptionView: {
+            id?: string;
+            orderId?: string;
+            orderNumber?: string;
+            storeId?: string;
+            campusId?: string;
+            kind?: string;
+            stage?: string;
+            state?: string;
+            reason?: string;
+            version?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            /** Format: date-time */
+            deadlineAt?: string;
+            migrated?: boolean;
+        };
+        PageExceptionView: {
+            records: components["schemas"]["ExceptionView"][];
+            nextCursor?: string;
+            hasMore: boolean;
+        };
+        FinanceDifference: {
+            orderId: string;
+            storeId: string;
+            orderPaidCents: string;
+            orderRefundedCents: string;
+            ledgerPaidCents: string;
+            ledgerRefundedCents: string;
+        };
+        FinanceReconciliation: {
+            storeId?: string;
+            /** Format: date */
+            begin: string;
+            /** Format: date */
+            end: string;
+            periodPaidCents: string;
+            periodRefundedCents: string;
+            openingNetCents: string;
+            currentOrderNetCents: string;
+            ledgerNetCents: string;
+            differenceCount: string;
+            differences: components["schemas"]["FinanceDifference"][];
+            hasMoreDifferences: boolean;
+            /** Format: date-time */
+            generatedAt: string;
+        };
         Entry: {
             id?: string;
             actorType?: string;
@@ -2236,6 +3247,124 @@ export interface components {
         MerchantReviews: {
             stats?: components["schemas"]["ReviewStats"];
             records?: components["schemas"]["MerchantReview"][];
+        };
+        CollectionPromotion: {
+            id?: string;
+            storeId?: string;
+            itemType?: string;
+            itemId?: string;
+            priceCents?: string;
+            /** Format: date-time */
+            startsAt?: string;
+            /** Format: date-time */
+            endsAt?: string;
+            enabled?: boolean;
+        };
+        PageCollectionPromotion: {
+            records: components["schemas"]["CollectionPromotion"][];
+            nextCursor?: string;
+            hasMore: boolean;
+        };
+        MerchantOrderResponse: {
+            id?: string;
+            number?: string;
+            /** Format: int32 */
+            status?: number;
+            userId?: string;
+            addressBookId?: string;
+            orderTime?: string;
+            checkoutTime?: string;
+            /** Format: int32 */
+            payMethod?: number;
+            /** Format: int32 */
+            payStatus?: number;
+            /** @example 12.00 */
+            amount?: string;
+            remark?: string;
+            phone?: string;
+            address?: string;
+            userName?: string;
+            consignee?: string;
+            cancelReason?: string;
+            rejectionReason?: string;
+            cancelTime?: string;
+            estimatedDeliveryTime?: string;
+            deliveryStatus?: boolean;
+            deliveryTime?: string;
+            /** Format: int32 */
+            packAmount?: number;
+            /** Format: int32 */
+            tablewareNumber?: number;
+            tablewareStatus?: boolean;
+            requestId?: string;
+            version?: string;
+            businessDate?: string;
+            snapshotSource?: string;
+            buildingName?: string;
+            room?: string;
+            /** @example 12.00 */
+            deliveryFee?: string;
+            /** @example 12.00 */
+            packagingFee?: string;
+            payExpiresAt?: string;
+            deliveryStartedAt?: string;
+            courierId?: string;
+            deliveryOverdue?: boolean;
+            storeId?: string;
+            campusId?: string;
+            checkoutId?: string;
+            fulfillment?: string;
+            ready?: boolean;
+            completedAt?: string;
+            paidCents?: string;
+            refundedCents?: string;
+            reservedRefundCents?: string;
+            shopDiscountCents?: string;
+            platformDiscountCents?: string;
+            pickupCode?: string;
+            /** Format: int32 */
+            pickupAttempts?: number;
+            storeName?: string;
+            campusName?: string;
+            details?: components["schemas"]["OrderDetailResponse"][];
+            delivery?: components["schemas"]["DeliveryResponse"];
+            aftersales?: components["schemas"]["OrderAftersaleResponse"][];
+            refunds?: components["schemas"]["RefundResponse"][];
+            reviewed?: boolean;
+        };
+        CourierDetailResponse: {
+            id?: string;
+            name?: string;
+            /** Format: int32 */
+            number?: number;
+            image?: string;
+            dishFlavor?: string;
+        };
+        CourierOrderResponse: {
+            id?: string;
+            number?: string;
+            /** Format: int32 */
+            status?: number;
+            version?: string;
+            storeId?: string;
+            campusId?: string;
+            storeName?: string;
+            campusName?: string;
+            fulfillment?: string;
+            ready?: boolean;
+            orderTime?: string;
+            buildingName?: string;
+            phone?: string;
+            address?: string;
+            room?: string;
+            consignee?: string;
+            deliveryStartedAt?: string;
+            deliveryTime?: string;
+            completedAt?: string;
+            deliveryOverdue?: boolean;
+            courierId?: string;
+            delivery?: components["schemas"]["DeliveryResponse"];
+            details?: components["schemas"]["CourierDetailResponse"][];
         };
         Actor: {
             id?: string;
@@ -2308,6 +3437,39 @@ export interface operations {
             };
         };
     };
+    update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LocalUserUpdate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["LocalUserView"];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
     staffUpdate: {
         parameters: {
             query?: never;
@@ -2320,6 +3482,30 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["Staff"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    availability: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Availability"];
             };
         };
         responses: {
@@ -2417,6 +3603,59 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["Store"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    policy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                storeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["Policy"];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    policy_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                storeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Policy"];
             };
         };
         responses: {
@@ -2599,6 +3838,57 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["Staff"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ownAvailability: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: {
+                            [key: string]: boolean;
+                        };
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    ownAvailability_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Availability"];
             };
         };
         responses: {
@@ -2901,6 +4191,46 @@ export interface operations {
             };
         };
     };
+    read: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    read_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     claimCoupon: {
         parameters: {
             query?: never;
@@ -3112,6 +4442,59 @@ export interface operations {
             };
         };
     };
+    password: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Password"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    login: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LocalUserLogin"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["SessionView"];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
     demo: {
         parameters: {
             query?: never;
@@ -3269,6 +4652,70 @@ export interface operations {
             };
         };
     };
+    create: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LocalUserCreate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["LocalUserView"];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    reset: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LocalUserResetPassword"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["LocalUserView"];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
     store: {
         parameters: {
             query?: never;
@@ -3351,6 +4798,61 @@ export interface operations {
                         code: string;
                         message: string;
                         data: Record<string, never>;
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    emergency: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Reason"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    generate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Generate"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["FinanceSettlement"];
                         /** Format: uuid */
                         requestId: string;
                     };
@@ -3711,6 +5213,30 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["Decision"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    acknowledge: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Acknowledge"];
             };
         };
         responses: {
@@ -4240,7 +5766,7 @@ export interface operations {
             };
         };
     };
-    password: {
+    password_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -4298,7 +5824,7 @@ export interface operations {
             };
         };
     };
-    login: {
+    login_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -4349,6 +5875,35 @@ export interface operations {
                         code: string;
                         message: string;
                         data: Record<string, never>;
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    wallet_1: {
+        parameters: {
+            query: {
+                q: components["schemas"]["Request"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["PageCollectionWallet"];
                         /** Format: uuid */
                         requestId: string;
                     };
@@ -4472,6 +6027,37 @@ export interface operations {
                         code: string;
                         message: string;
                         data: Record<string, never>;
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    userCoupons: {
+        parameters: {
+            query: {
+                q: components["schemas"]["Request"];
+            };
+            header?: never;
+            path: {
+                storeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["PageCollectionCoupon"];
                         /** Format: uuid */
                         requestId: string;
                     };
@@ -4724,6 +6310,126 @@ export interface operations {
             };
         };
     };
+    unread: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: {
+                            [key: string]: string;
+                        };
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    unread_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: {
+                            [key: string]: string;
+                        };
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    messages: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+                unread?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["PageMessage"];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    messages_1: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+                unread?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["PageMessage"];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
     favorites: {
         parameters: {
             query?: never;
@@ -4751,6 +6457,35 @@ export interface operations {
             };
         };
     };
+    favorites_1: {
+        parameters: {
+            query: {
+                q: components["schemas"]["Request"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["PageCollectionFavorite"];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
     platformCoupons: {
         parameters: {
             query?: never;
@@ -4771,6 +6506,35 @@ export interface operations {
                         code: string;
                         message: string;
                         data: Record<string, never>;
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    userCoupons_1: {
+        parameters: {
+            query: {
+                q: components["schemas"]["Request"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["PageCollectionCoupon"];
                         /** Format: uuid */
                         requestId: string;
                     };
@@ -4919,6 +6683,60 @@ export interface operations {
             };
         };
     };
+    capabilities: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["AuthenticationCapabilities"];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    account: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["LocalProfile"];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
     userAftersales: {
         parameters: {
             query?: {
@@ -4954,6 +6772,223 @@ export interface operations {
             };
         };
     };
+    page: {
+        parameters: {
+            query?: {
+                query?: string;
+                enabled?: boolean;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["LocalUsersPage"];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    active: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["PageMapStringObject"];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    staff_1: {
+        parameters: {
+            query: {
+                q: components["schemas"]["Request"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["PageCollectionStaff"];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    statement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["FinanceSettlement"];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    entries: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["PageFinanceLedgerLine"];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    preview_1: {
+        parameters: {
+            query: {
+                storeId: string;
+                date?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["FinancePreview"];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    statements: {
+        parameters: {
+            query?: {
+                storeId?: string;
+                begin?: string;
+                end?: string;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["PageFinanceSettlement"];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
     report: {
         parameters: {
             query: {
@@ -4978,7 +7013,7 @@ export interface operations {
                         /** @example OK */
                         code: string;
                         message: string;
-                        data: Record<string, never>;
+                        data: components["schemas"]["ReportSnapshot"];
                         /** Format: uuid */
                         requestId: string;
                     };
@@ -5046,6 +7081,103 @@ export interface operations {
             };
         };
     };
+    exceptions: {
+        parameters: {
+            query?: {
+                storeId?: string;
+                cursor?: string;
+                limit?: number;
+                state?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["PageExceptionView"];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    ledger: {
+        parameters: {
+            query?: {
+                storeId?: string;
+                begin?: string;
+                end?: string;
+                type?: string;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["PageFinanceLedgerLine"];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    reconcile: {
+        parameters: {
+            query: {
+                storeId?: string;
+                begin: string;
+                end: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["FinanceReconciliation"];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
     events: {
         parameters: {
             query?: {
@@ -5074,6 +7206,35 @@ export interface operations {
                         code: string;
                         message: string;
                         data: Record<string, never>;
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    coupons: {
+        parameters: {
+            query: {
+                q: components["schemas"]["Request"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["PageCollectionCoupon"];
                         /** Format: uuid */
                         requestId: string;
                     };
@@ -5206,6 +7367,165 @@ export interface operations {
             };
         };
     };
+    staff_2: {
+        parameters: {
+            query: {
+                q: components["schemas"]["Request"];
+            };
+            header?: never;
+            path: {
+                storeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["PageCollectionStaff"];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    merchantStatement: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                storeId: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["FinanceSettlement"];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    merchantEntries: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                storeId: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["PageFinanceLedgerLine"];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    merchantPreview: {
+        parameters: {
+            query?: {
+                date?: string;
+            };
+            header?: never;
+            path: {
+                storeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["FinancePreview"];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    merchantStatements: {
+        parameters: {
+            query?: {
+                begin?: string;
+                end?: string;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                storeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["PageFinanceSettlement"];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
     adminReviews: {
         parameters: {
             query?: {
@@ -5275,6 +7595,37 @@ export interface operations {
             };
         };
     };
+    promotions_1: {
+        parameters: {
+            query: {
+                q: components["schemas"]["Request"];
+            };
+            header?: never;
+            path: {
+                storeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["PageCollectionPromotion"];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
     adminProducts: {
         parameters: {
             query?: never;
@@ -5328,7 +7679,75 @@ export interface operations {
                         /** @example OK */
                         code: string;
                         message: string;
-                        data: components["schemas"]["OrderResponse"][];
+                        data: components["schemas"]["MerchantOrderResponse"][];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    storeExceptions: {
+        parameters: {
+            query?: {
+                cursor?: string;
+                limit?: number;
+                state?: string;
+            };
+            header?: never;
+            path: {
+                storeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["PageExceptionView"];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    merchantLedger: {
+        parameters: {
+            query?: {
+                begin?: string;
+                end?: string;
+                type?: string;
+                cursor?: string;
+                limit?: number;
+            };
+            header?: never;
+            path: {
+                storeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["PageFinanceLedgerLine"];
                         /** Format: uuid */
                         requestId: string;
                     };
@@ -5395,6 +7814,37 @@ export interface operations {
                         code: string;
                         message: string;
                         data: Record<string, never>;
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    coupons_1: {
+        parameters: {
+            query: {
+                q: components["schemas"]["Request"];
+            };
+            header?: never;
+            path: {
+                storeId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["PageCollectionCoupon"];
                         /** Format: uuid */
                         requestId: string;
                     };
@@ -5532,7 +7982,7 @@ export interface operations {
                         /** @example OK */
                         code: string;
                         message: string;
-                        data: Record<string, never>;
+                        data: components["schemas"]["ReportSnapshot"];
                         /** Format: uuid */
                         requestId: string;
                     };
@@ -5586,7 +8036,7 @@ export interface operations {
                         /** @example OK */
                         code: string;
                         message: string;
-                        data: components["schemas"]["OrderResponse"];
+                        data: components["schemas"]["MerchantOrderResponse"];
                         /** Format: uuid */
                         requestId: string;
                     };
@@ -5665,7 +8115,7 @@ export interface operations {
                         /** @example OK */
                         code: string;
                         message: string;
-                        data: components["schemas"]["OrderResponse"][];
+                        data: components["schemas"]["CourierOrderResponse"][];
                         /** Format: uuid */
                         requestId: string;
                     };
@@ -5694,7 +8144,7 @@ export interface operations {
                         /** @example OK */
                         code: string;
                         message: string;
-                        data: components["schemas"]["OrderResponse"];
+                        data: components["schemas"]["CourierOrderResponse"];
                         /** Format: uuid */
                         requestId: string;
                     };

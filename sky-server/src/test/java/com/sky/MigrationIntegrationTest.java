@@ -18,20 +18,173 @@ class MigrationIntegrationTest {
   void v11ToV12AddsHistoryIndexesWithoutChangingBusinessRows() throws Exception {
     String url = create("v11_history_upgrade");
     Flyway.configure().dataSource(url, "root", "test").target("11").load().migrate();
-    try (var c = DriverManager.getConnection(url, "root", "test"); var s = c.createStatement()) {
-      s.execute("INSERT INTO review(order_id,user_id,store_id,rating,content,created_at) VALUES(1,1,1,5,'历史评价','2026-10-26 12:00:00')");
-      s.execute("INSERT INTO audit_log(actor_type,actor_id,action,target_id,detail,created_at,store_id) VALUES('ADMIN',1,'STORE_SAVE',1,'历史审计','2026-10-26 12:00:00',1)");
+    try (var c = DriverManager.getConnection(url, "root", "test");
+        var s = c.createStatement()) {
+      s.execute(
+          "INSERT INTO review(order_id,user_id,store_id,rating,content,created_at)"
+              + " VALUES(1,1,1,5,'历史评价','2026-10-26 12:00:00')");
+      s.execute(
+          "INSERT INTO audit_log(actor_type,actor_id,action,target_id,detail,created_at,store_id)"
+              + " VALUES('ADMIN',1,'STORE_SAVE',1,'历史审计','2026-10-26 12:00:00',1)");
     }
     var before = businessRows(url);
-    var flyway = Flyway.configure().dataSource(url, "root", "test").load();
+    var flyway = Flyway.configure().dataSource(url, "root", "test").target("12").load();
     assertEquals(1, flyway.migrate().migrationsExecuted);
     assertEquals("12", flyway.info().current().getVersion().toString());
     assertEquals(before, businessRows(url));
-    try (var c = DriverManager.getConnection(url, "root", "test"); var s = c.createStatement();
-        var rows = s.executeQuery("SELECT COUNT(DISTINCT INDEX_NAME) FROM information_schema.statistics WHERE TABLE_SCHEMA=DATABASE() AND INDEX_NAME IN ('ix_review_store_history','ix_audit_store_history','ix_audit_actor_history','ix_audit_action_history')")) {
-      assertTrue(rows.next()); assertEquals(4, rows.getInt(1));
+    try (var c = DriverManager.getConnection(url, "root", "test");
+        var s = c.createStatement();
+        var rows =
+            s.executeQuery(
+                "SELECT COUNT(DISTINCT INDEX_NAME) FROM information_schema.statistics WHERE"
+                    + " TABLE_SCHEMA=DATABASE() AND INDEX_NAME IN"
+                    + " ('ix_review_store_history','ix_audit_store_history','ix_audit_actor_history','ix_audit_action_history')")) {
+      assertTrue(rows.next());
+      assertEquals(4, rows.getInt(1));
     }
   }
+
+  @Test
+  void v12ToLatestPreservesOriginalColumnsAndCapturesTruthfulOpeningBalances() throws Exception {
+    String url = create("v12_complete_upgrade");
+    Flyway.configure().dataSource(url, "root", "test").target("12").load().migrate();
+    Timestamp migrationStarted;
+    try (var c = DriverManager.getConnection(url, "root", "test");
+        var s = c.createStatement()) {
+      s.execute(
+          "INSERT INTO employee(id,name,username,password,role,campus_id,phone,sex,id_number)"
+              + " VALUES(7,'历史配送员','preserved-courier','hash','DELIVERER',1,'','','')");
+      s.execute(
+          "INSERT INTO user(id,openid,name,status,auth_version)"
+              + " VALUES(20,'preserved-user','历史用户',0,3)");
+      s.execute(
+          "INSERT INTO"
+              + " checkout(id,user_id,request_id,request_hash,state,total_cents,paid_at,expires_at,created_at,quote_json)"
+              + " VALUES(31,20,'opening-paid',REPEAT('a',64),'PAID',1500,'2025-03-01"
+              + " 12:00:00','2025-03-01 12:15:00','2025-03-01"
+              + " 12:00:00','{}'),(32,20,'opening-pending',REPEAT('b',64),'PENDING',700,NULL,'2025-03-01"
+              + " 12:15:00','2025-03-01 12:00:00','{}')");
+      s.execute(
+          "INSERT INTO"
+              + " orders(id,number,status,user_id,address_book_id,order_time,amount,store_id,campus_id,checkout_id,paid_cents,refunded_cents,reserved_refund_cents,pay_status,address,building_name)"
+              + " VALUES(31,'opening-complete',5,20,0,'2025-03-01"
+              + " 12:00:00',10,1,1,31,1000,250,0,3,'原地址快照','原楼栋'),(32,'opening-preparing',3,20,0,'2025-03-01"
+              + " 12:00:00',5,1,1,31,500,0,100,1,'原地址快照','原楼栋'),(33,'opening-unpaid',1,20,0,'2025-03-01"
+              + " 12:00:00',7,1,1,32,0,0,0,0,'原地址快照','原楼栋')");
+      s.execute(
+          "INSERT INTO"
+              + " refund_request(id,order_id,store_id,amount_cents,state,next_attempt_at,created_at,succeeded_at)"
+              + " VALUES(41,31,1,250,'SUCCEEDED','2025-03-02 12:00:00','2025-03-02"
+              + " 12:00:00','2025-03-02 12:01:00'),(42,32,1,100,'REQUESTED','2025-03-02"
+              + " 12:00:00','2025-03-02 12:00:00',NULL)");
+      s.execute(
+          "INSERT INTO"
+              + " outbox_event(event_type,aggregate_id,payload,state,next_attempt_at,created_at,store_id,campus_id)"
+              + " VALUES('ORDER_PAID',31,'{\"orderId\":\"31\"}','SUCCEEDED','2025-03-01"
+              + " 12:00:00','2025-03-01 12:00:00',1,1)");
+      try (var rows = s.executeQuery("SELECT CURRENT_TIMESTAMP")) {
+        rows.next();
+        migrationStarted = rows.getTimestamp(1);
+      }
+    }
+    var originalColumns = businessColumns(url);
+    var originalRows = originalRows(url, originalColumns);
+    var flyway = Flyway.configure().dataSource(url, "root", "test").load();
+    assertEquals(5, flyway.migrate().migrationsExecuted);
+    assertEquals("17", flyway.info().current().getVersion().toString());
+    assertEquals(
+        originalRows,
+        originalRows(url, originalColumns),
+        "Every original business field and row is preserved");
+    try (var c = DriverManager.getConnection(url, "root", "test");
+        var s = c.createStatement()) {
+      try (var rows = s.executeQuery("SELECT COUNT(*) FROM finance_opening")) {
+        rows.next();
+        assertEquals(3, rows.getLong(1));
+      }
+      try (var rows =
+          s.executeQuery(
+              "SELECT COUNT(*) FROM orders o LEFT JOIN finance_opening f ON f.order_id=o.id WHERE"
+                  + " f.order_id IS NULL OR f.store_id<>o.store_id OR f.paid_cents<>o.paid_cents OR"
+                  + " f.refunded_cents<>o.refunded_cents")) {
+        rows.next();
+        assertEquals(0, rows.getLong(1));
+      }
+      try (var rows =
+          s.executeQuery(
+              "SELECT SUM(paid_cents),SUM(refunded_cents),SUM(paid_cents-refunded_cents) FROM"
+                  + " finance_opening")) {
+        rows.next();
+        assertEquals(1500, rows.getLong(1));
+        assertEquals(250, rows.getLong(2));
+        assertEquals(1250, rows.getLong(3));
+      }
+      for (String table :
+          List.of("finance_ledger", "finance_settlement", "inbox_message", "order_exception"))
+        try (var rows = s.executeQuery("SELECT COUNT(*) FROM " + table)) {
+          rows.next();
+          assertEquals(0, rows.getLong(1), table);
+        }
+      try (var rows =
+          s.executeQuery(
+              "SELECT c.captured_at,COUNT(f.order_id) FROM finance_cutover c JOIN finance_opening f"
+                  + " ON f.captured_at=c.captured_at GROUP BY c.captured_at")) {
+        assertTrue(rows.next());
+        assertFalse(rows.getTimestamp(1).before(migrationStarted));
+        assertEquals(3, rows.getLong(2));
+      }
+      try (var rows =
+          s.executeQuery(
+              "SELECT stage,started_at,deadline_at,migrated FROM order_stage WHERE order_id=32")) {
+        assertTrue(rows.next());
+        assertEquals("PREPARING", rows.getString(1));
+        assertFalse(rows.getTimestamp(2).before(migrationStarted));
+        assertTrue(rows.getTimestamp(3).after(rows.getTimestamp(2)));
+        assertTrue(rows.getBoolean(4));
+      }
+    }
+  }
+
+  private Map<String, List<String>> businessColumns(String url) throws Exception {
+    var result = new TreeMap<String, List<String>>();
+    try (var c = DriverManager.getConnection(url, "root", "test");
+        var tables = c.getMetaData().getTables(c.getCatalog(), null, "%", new String[] {"TABLE"})) {
+      while (tables.next()) {
+        String table = tables.getString("TABLE_NAME");
+        if (table.equals("flyway_schema_history")) continue;
+        var columns = new ArrayList<String>();
+        try (var rows = c.getMetaData().getColumns(c.getCatalog(), null, table, "%")) {
+          while (rows.next()) columns.add(rows.getString("COLUMN_NAME"));
+        }
+        result.put(table, columns);
+      }
+    }
+    return result;
+  }
+
+  private Map<String, List<List<String>>> originalRows(
+      String url, Map<String, List<String>> columns) throws Exception {
+    var result = new TreeMap<String, List<List<String>>>();
+    try (var c = DriverManager.getConnection(url, "root", "test")) {
+      for (var table : columns.entrySet()) {
+        var values = new ArrayList<List<String>>();
+        String projection =
+            String.join(",", table.getValue().stream().map(name -> "`" + name + "`").toList());
+        try (var s = c.createStatement();
+            var rows = s.executeQuery("SELECT " + projection + " FROM `" + table.getKey() + "`")) {
+          while (rows.next()) {
+            var row = new ArrayList<String>();
+            for (int i = 1; i <= table.getValue().size(); i++) row.add(rows.getString(i));
+            values.add(row);
+          }
+        }
+        values.sort(Comparator.comparing(Object::toString));
+        result.put(table.getKey(), values);
+      }
+    }
+    return result;
+  }
+
   @Container
   static final MySQLContainer mysql =
       new MySQLContainer("mysql:8.4")
@@ -137,10 +290,13 @@ class MigrationIntegrationTest {
   void v9ToV10AddsEmptyGatewayLedgerWithoutChangingHistoricalRows() throws Exception {
     String url = create("v9_mock_gateway_upgrade");
     Flyway.configure().dataSource(url, "root", "test").target("9").load().migrate();
-    try (var c = DriverManager.getConnection(url, "root", "test"); var s = c.createStatement()) {
+    try (var c = DriverManager.getConnection(url, "root", "test");
+        var s = c.createStatement()) {
       s.execute("INSERT INTO user(id,openid,name) VALUES(1,'upgrade-mock-v9','历史用户')");
-      s.execute("INSERT INTO outbox_event(event_type,aggregate_id,payload,state,next_attempt_at,created_at)"
-          + " VALUES('TEST',0,'{}','SUCCEEDED','2026-10-15 12:00:00','2026-10-15 12:00:00')");
+      s.execute(
+          "INSERT INTO"
+              + " outbox_event(event_type,aggregate_id,payload,state,next_attempt_at,created_at)"
+              + " VALUES('TEST',0,'{}','SUCCEEDED','2026-10-15 12:00:00','2026-10-15 12:00:00')");
     }
     var before = businessRows(url);
     var result = Flyway.configure().dataSource(url, "root", "test").target("10").load().migrate();
@@ -154,16 +310,25 @@ class MigrationIntegrationTest {
   void v10ToV11AddsOrderedSearchIndexesAndPreservesBusinessRows() throws Exception {
     String url = create("v10_search_order_upgrade");
     Flyway.configure().dataSource(url, "root", "test").target("10").load().migrate();
-    try (var c = DriverManager.getConnection(url, "root", "test"); var s = c.createStatement()) {
+    try (var c = DriverManager.getConnection(url, "root", "test");
+        var s = c.createStatement()) {
       s.execute("INSERT INTO user(id,openid,name) VALUES(1,'upgrade-search-v10','历史用户')");
-      s.execute("INSERT INTO category(id,store_id,type,name,status) VALUES(1,1,1,'历史菜品',1),(2,1,2,'历史套餐',1)");
-      s.execute("INSERT INTO dish(id,store_id,category_id,name,price,status) VALUES(1,1,1,'原菜品',7,1)");
-      s.execute("INSERT INTO setmeal(id,store_id,category_id,name,price,status) VALUES(1,1,2,'原套餐',10,1)");
+      s.execute(
+          "INSERT INTO category(id,store_id,type,name,status)"
+              + " VALUES(1,1,1,'历史菜品',1),(2,1,2,'历史套餐',1)");
+      s.execute(
+          "INSERT INTO dish(id,store_id,category_id,name,price,status) VALUES(1,1,1,'原菜品',7,1)");
+      s.execute(
+          "INSERT INTO setmeal(id,store_id,category_id,name,price,status)"
+              + " VALUES(1,1,2,'原套餐',10,1)");
       s.execute("INSERT INTO dish_flavor(dish_id,name,value) VALUES(1,'温度','[\"热\"]')");
-      s.execute("INSERT INTO setmeal_dish(setmeal_id,dish_id,name,price,copies) VALUES(1,1,'原菜品',7,1)");
+      s.execute(
+          "INSERT INTO setmeal_dish(setmeal_id,dish_id,name,price,copies) VALUES(1,1,'原菜品',7,1)");
       s.execute("INSERT INTO daily_quota VALUES('2026-10-25',1,100,2,3)");
-      s.execute("INSERT INTO outbox_event(event_type,aggregate_id,payload,state,next_attempt_at,created_at)"
-          + " VALUES('TEST',0,'{}','SUCCEEDED','2026-10-25 12:00:00','2026-10-25 12:00:00')");
+      s.execute(
+          "INSERT INTO"
+              + " outbox_event(event_type,aggregate_id,payload,state,next_attempt_at,created_at)"
+              + " VALUES('TEST',0,'{}','SUCCEEDED','2026-10-25 12:00:00','2026-10-25 12:00:00')");
     }
     var before = businessRows(url);
     assertEquals(1, before.get("dish").size());
@@ -174,14 +339,23 @@ class MigrationIntegrationTest {
     assertEquals("11", flyway.info().current().getVersion().toString());
     assertEquals(before, businessRows(url));
     var definitions = new TreeMap<String, String>();
-    try (var c = DriverManager.getConnection(url, "root", "test"); var s = c.createStatement();
-        var rows = s.executeQuery("SELECT INDEX_NAME,GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX)"
-            + " FROM information_schema.statistics WHERE TABLE_SCHEMA='v10_search_order_upgrade'"
-            + " AND INDEX_NAME IN ('ix_dish_search_order','ix_setmeal_search_order') GROUP BY INDEX_NAME")) {
+    try (var c = DriverManager.getConnection(url, "root", "test");
+        var s = c.createStatement();
+        var rows =
+            s.executeQuery(
+                "SELECT INDEX_NAME,GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) FROM"
+                    + " information_schema.statistics WHERE TABLE_SCHEMA='v10_search_order_upgrade'"
+                    + " AND INDEX_NAME IN ('ix_dish_search_order','ix_setmeal_search_order') GROUP"
+                    + " BY INDEX_NAME")) {
       while (rows.next()) definitions.put(rows.getString(1), rows.getString(2));
     }
-    assertEquals(Map.of("ix_dish_search_order", "store_id,status,id",
-        "ix_setmeal_search_order", "store_id,status,id"), definitions);
+    assertEquals(
+        Map.of(
+            "ix_dish_search_order",
+            "store_id,status,id",
+            "ix_setmeal_search_order",
+            "store_id,status,id"),
+        definitions);
   }
 
   private Map<String, List<List<String>>> businessRows(String url) throws Exception {

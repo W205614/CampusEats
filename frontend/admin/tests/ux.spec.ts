@@ -28,12 +28,15 @@ test('users can reach every login action with Tab and complete demo login using 
   await page.getByRole('link', { name: '登录点餐', exact: true }).click();
   await expect(page).toHaveURL(/\/app\/pages\/login\/index$/);
   await expect(page.getByText('进入演示用户 1', { exact: true })).toBeVisible();
-  for (const action of ['进入演示用户 1', '进入演示用户 2', '进入演示用户 3', '使用微信登录']) {
+  const actions = [page.locator('uni-input[aria-label="独立账号"] input'),page.locator('uni-input[aria-label="账号密码"] input'),
+    page.getByText('登录独立账号',{exact:true}), ...['进入演示用户 1','进入演示用户 2','进入演示用户 3'].map(action=>page.getByText(action,{exact:true})),
+    page.getByRole('link',{name:'进入工作台登录'})];
+  for (const action of actions) {
     await page.keyboard.press('Tab');
-    await expect(page.getByText(action, { exact: true })).toBeFocused();
+    await expect(action).toBeFocused();
   }
-  await page.keyboard.press('Space');
-  await expect(page.getByText('微信登录请使用已配置微信应用的小程序；浏览器可选择演示账户。', { exact: true })).toBeVisible();
+  await expect(page.getByText('当前未配置微信登录，请使用独立测试账号或演示账号。',{exact:true})).toBeVisible();
+  await expect(page.getByText('使用微信登录',{exact:true})).toHaveCount(0);
   for (let i = 0; i < 3; i++) await page.keyboard.press('Shift+Tab');
   await expect(page.getByText('进入演示用户 1', { exact: true })).toBeFocused();
   const loggedIn = page.waitForResponse(response => response.url().endsWith('/user/auth/demo'));

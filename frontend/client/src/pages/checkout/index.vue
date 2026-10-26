@@ -1,8 +1,9 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue';
-import { onShow } from '@dcloudio/uni-app';
+import { onShow, onHide } from '@dcloudio/uni-app';
 import { api, toast, loggedIn, uuid, ApiError } from '../../api';
 import { useSession } from '../../stores/session';
+import { usePagedList } from '../../paged-list';
 import {
   cents,
   type Cart,
@@ -16,13 +17,15 @@ import {
 const session = useSession(),
   carts = ref<Cart[]>([]),
   addresses = ref<Address[]>([]),
-  wallet = ref<Coupon[]>([]),
   selections = ref<Selection[]>([]),
   platformCoupon = ref<string | null>(null),
   remark = ref(''),
   quote = ref<Quote>(),
   busy = ref(false),
   pending = ref<{ key: string; body: CheckoutInput }>();
+let active = true;
+const walletPage = usePagedList<Coupon>(() => '/wallet/page?state=AVAILABLE', row => row.id, () => active);
+const wallet = walletPage.records, walletMore = walletPage.hasMore, walletLoading = walletPage.loading;
 const pendingKey = () => 'checkout-pending-' + session.session?.id;
 let sessionVersion = 0, loadSequence = 0, quoteSequence = 0;
 watch(() => session.session?.token, () => {
@@ -30,7 +33,7 @@ watch(() => session.session?.token, () => {
   loadSequence++;
   carts.value = [];
   addresses.value = [];
-  wallet.value = [];
+  walletPage.clear();
   selections.value = [];
   platformCoupon.value = null;
   remark.value = '';
@@ -49,15 +52,14 @@ async function load() {
   try {
     pending.value = uni.getStorageSync(pendingKey()) || undefined;
     const selected = (uni.getStorageSync('checkout-stores') as string[]) || [];
-    const [loadedCarts, loadedAddresses, loadedWallet] = await Promise.all([
+    const [loadedCarts, loadedAddresses, walletLoaded] = await Promise.all([
       api<Cart[]>('/carts'),
       api<Address[]>('/addresses'),
-      api<Coupon[]>('/wallet'),
+      walletPage.load(),
     ]);
-    if (owner !== sessionVersion || sequence !== loadSequence) return;
+    if (!active || owner !== sessionVersion || sequence !== loadSequence || !walletLoaded) return;
     carts.value = loadedCarts.filter((c) => selected.includes(c.storeId) && c.items.length);
     addresses.value = loadedAddresses;
-    wallet.value = loadedWallet;
     selections.value = carts.value.map(
       (c) =>
         selections.value.find(
@@ -180,7 +182,8 @@ async function recover() {
   }
 }
 const navTo = (url: string) => uni.navigateTo({ url });
-onShow(load);
+onShow(() => { active = true; void load(); });
+onHide(() => { active = false; ++loadSequence; ++quoteSequence; walletPage.cancel(); });
 </script>
 <template>
   <view class="screen"
@@ -230,6 +233,7 @@ onShow(load);
         ></view
       ><view class="card"
         ><text class="tap" @click="navTo('/pages/addresses/index')">管理各校区收货地址</text
+        ><button v-if="walletMore" class="secondary small-button" :loading="walletLoading" :disabled="walletLoading" @click="walletPage.load(false)">加载更多可用优惠券</button
         ><picker
           :range="['不使用平台券', ...coupons().map((c) => c.name)]"
           @change="

@@ -7,12 +7,13 @@ $ErrorActionPreference='Stop'
 $taskRoot=Split-Path $PSScriptRoot -Parent
 . (Join-Path $PSScriptRoot 'operations-lock.ps1')
 . (Join-Path $PSScriptRoot 'operations-support.ps1')
+. (Join-Path $PSScriptRoot 'encrypted-backups.ps1')
 $lease=$null
 try {
  $lease=Enter-OperationsLock -Root $taskRoot -ProjectName $ProjectName
  $issues=[Collections.Generic.List[string]]::new()
  $codes=[Collections.Generic.List[string]]::new()
- $config=@{schemaVersion=1;replicaDirectory=$null;alertWebhookUrl=$null;alertTimeoutSeconds=5;alertMaxAttempts=2}
+ $config=@{schemaVersion=1;replicaDirectory=$null;replicaRecipient=$null;alertWebhookUrl=$null;alertTimeoutSeconds=5;alertMaxAttempts=2}
  $configPath=[IO.Path]::GetFullPath($ConfigFile,$taskRoot)
  if(Test-Path -LiteralPath $configPath){
   try {
@@ -22,7 +23,8 @@ try {
    if($config.alertTimeoutSeconds -isnot [long] -and $config.alertTimeoutSeconds -isnot [int]){throw 'Invalid timeout.'}
    if($config.alertMaxAttempts -isnot [long] -and $config.alertMaxAttempts -isnot [int]){throw 'Invalid attempts.'}
    if($config.alertTimeoutSeconds -lt 1 -or $config.alertTimeoutSeconds -gt 10 -or $config.alertMaxAttempts -lt 1 -or $config.alertMaxAttempts -gt 3){throw 'Alert bounds are invalid.'}
-   foreach($field in @('replicaDirectory','alertWebhookUrl')){if($null -ne $config[$field] -and $config[$field] -isnot [string]){throw 'Invalid integration value.'}}
+   foreach($field in @('replicaDirectory','replicaRecipient','alertWebhookUrl')){if($null -ne $config[$field] -and $config[$field] -isnot [string]){throw 'Invalid integration value.'}}
+   if($config.replicaDirectory -and $config.replicaRecipient -notmatch '^age1[0-9a-z]{20,120}$'){throw 'Encrypted replica requires a valid public recipient.'}
   } catch {throw 'Operations configuration is invalid; inspect it locally.'}
  }
  $integrations=[ordered]@{replica='not_configured';alert='not_configured'}
@@ -42,14 +44,14 @@ try {
    if(!(Test-Path -LiteralPath (Join-Path $backup 'verified.json'))){throw 'Backup completion marker missing.'}
    if($config.replicaDirectory){
     $replicaRoot=[IO.Path]::GetFullPath($config.replicaDirectory,$taskRoot)
-    $replica=Copy-VerifiedBackupReplica -Source $backup -ReplicaDirectory $replicaRoot -ProjectName $ProjectName
+    $replica=Copy-EncryptedBackupReplica -Source $backup -ReplicaDirectory $replicaRoot -ProjectName $ProjectName -Recipient $config.replicaRecipient
     $integrations.replica='copied_verified'
    }
   } catch {$issues.Add('Backup or replica did not complete');$codes.Add('BACKUP_FAILED')}
  }
  if($config.replicaDirectory){
   try {
-   $replica=Find-VerifiedBackupReplica -ReplicaDirectory ([IO.Path]::GetFullPath($config.replicaDirectory,$taskRoot)) -ProjectName $ProjectName
+   $replica=Find-VerifiedEncryptedBackupReplica -ReplicaDirectory ([IO.Path]::GetFullPath($config.replicaDirectory,$taskRoot)) -ProjectName $ProjectName
    $integrations.replica=if($Action -eq 'Backup' -and $integrations.replica -eq 'copied_verified'){'copied_verified'}else{'verified'}
   } catch {$integrations.replica='unavailable';$issues.Add('No recent complete verified replica is available');$codes.Add('REPLICA_UNAVAILABLE')}
  }

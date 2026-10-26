@@ -34,6 +34,8 @@ public class SecurityConfiguration {
                 a.requestMatchers(
                         "/api/v1/admin/auth/login",
                         "/api/v1/user/auth/demo",
+                        "/api/v1/user/auth/login",
+                        "/api/v1/user/auth/capabilities",
                         "/api/v1/user/auth/wechat",
                         "/actuator/health",
                         "/actuator/health/readiness",

@@ -104,6 +104,40 @@ public class FulfillmentService {
       row.put("aftersales", aftersales.getOrDefault(id, List.of()));
       row.put("refunds", refunds.getOrDefault(id, List.of()));
       row.put("reviewed", reviews.containsKey(id));
+      if (a.role().equals("DELIVERER")) {
+        row.keySet()
+            .retainAll(
+                Set.of(
+                    "id",
+                    "number",
+                    "status",
+                    "version",
+                    "store_id",
+                    "campus_id",
+                    "store_name",
+                    "campus_name",
+                    "fulfillment",
+                    "ready",
+                    "order_time",
+                    "building_name",
+                    "phone",
+                    "address",
+                    "room",
+                    "consignee",
+                    "delivery_started_at",
+                    "delivery_time",
+                    "completed_at",
+                    "delivery_overdue",
+                    "courier_id",
+                    "delivery",
+                    "details"));
+        if (Db.integer(row, "status") >= 5)
+          for (String field : List.of("phone", "address", "room", "consignee")) row.remove(field);
+        @SuppressWarnings("unchecked")
+        var safeDetails = (List<Map<String, Object>>) row.get("details");
+        safeDetails.forEach(
+            d -> d.keySet().retainAll(Set.of("id", "name", "number", "image", "dish_flavor")));
+      }
     }
   }
 
@@ -132,6 +166,7 @@ public class FulfillmentService {
 
   @Transactional
   public Map<String, Object> action(long id, String action, PlatformCommands.Action input) {
+    lockOrderCouriers(id, action.equals("assign") ? input.courierId() : null);
     var o = scope.order(id, true);
     Actor a = Actor.current();
     int status = Db.integer(o, "status");
@@ -188,7 +223,7 @@ public class FulfillmentService {
               input.courierId() != null
                   && db.count(
                           "SELECT COUNT(*) FROM employee WHERE id=? AND role='DELIVERER' AND"
-                              + " status=1 AND campus_id=?",
+                              + " status=1 AND accepting_tasks=true AND campus_id=?",
                           input.courierId(),
                           o.get("campus_id"))
                       == 1,
@@ -274,6 +309,7 @@ public class FulfillmentService {
   @Transactional
   public Map<String, Object> reassign(long id, PlatformCommands.Reassign input) {
     scope.platform();
+    lockOrderCouriers(id, input.courierId());
     String reason = exceptionReason(input.reason());
     var order = scope.order(id, true);
     require(Db.id(order, "version") == input.version(), 409, "VERSION_CONFLICT", "订单状态已变化，请刷新");
@@ -291,6 +327,7 @@ public class FulfillmentService {
         courier != null
             && "DELIVERER".equals(courier.get("role"))
             && Db.integer(courier, "status") == 1
+            && Db.bool(courier, "accepting_tasks")
             && Objects.equals(courier.get("campus_id"), order.get("campus_id"))
             && !Objects.equals(input.courierId(), order.get("courier_id")),
         400,
@@ -445,9 +482,8 @@ public class FulfillmentService {
     require(a.campusId() != null, 403, "FORBIDDEN", "无配送校区");
     scope.courier(a.campusId());
     return db.rows(
-        "SELECT t.id,t.order_id,t.version,s.name store_name,b.name building_name,o.ready FROM"
+        "SELECT t.id,t.order_id,t.version,s.name store_name,o.building_name,o.ready FROM"
             + " delivery_task t JOIN orders o ON o.id=t.order_id JOIN store s ON s.id=o.store_id"
-            + " LEFT JOIN campus_building b ON b.name=o.building_name AND b.campus_id=o.campus_id"
             + " WHERE t.campus_id=? AND t.state='OPEN' AND o.status=3 AND NOT EXISTS (SELECT 1"
             + " FROM aftersale a WHERE a.order_id=o.id AND a.kind='CANCEL' AND a.state"
             + " IN('PENDING','ESCALATED')) ORDER BY t.id LIMIT 100",
@@ -459,6 +495,16 @@ public class FulfillmentService {
     var initial = db.one("SELECT order_id,campus_id FROM delivery_task WHERE id=?", task);
     require(initial != null, 404, "NOT_FOUND", "任务不存在");
     Actor a = scope.courier(Db.id(initial, "campus_id"));
+    var courier = db.one("SELECT * FROM employee WHERE id=? FOR UPDATE", a.id());
+    require(
+        courier != null
+            && Db.integer(courier, "status") == 1
+            && Db.bool(courier, "accepting_tasks")
+            && "DELIVERER".equals(courier.get("role"))
+            && Objects.equals(courier.get("campus_id"), initial.get("campus_id")),
+        409,
+        "COURIER_UNAVAILABLE",
+        "当前未接收新配送任务");
     var o = db.one("SELECT * FROM orders WHERE id=? FOR UPDATE", initial.get("order_id"));
     require(Db.integer(o, "status") == 3, 409, "ORDER_STATE", "订单已不能配送");
     requireNoCancellation(Db.id(o, "id"));
@@ -476,6 +522,20 @@ public class FulfillmentService {
     db.update("UPDATE orders SET courier_id=?,version=version+1 WHERE id=?", a.id(), o.get("id"));
     scope.event(Db.id(o, "id"), "DELIVERY_ASSIGNED");
     scope.audit("DELIVERY_CLAIM", Db.id(o, "id"), Db.id(o, "store_id"), "配送员抢单");
+  }
+
+  private void lockOrderCouriers(long order, Long target) {
+    var initial = scope.order(order, false);
+    var ids = new TreeSet<Long>();
+    if (initial.get("courier_id") != null) ids.add(Db.id(initial, "courier_id"));
+    if (target != null) ids.add(target);
+    for (long id : ids) db.one("SELECT id FROM employee WHERE id=? FOR UPDATE", id);
+    var current = db.one("SELECT courier_id FROM orders WHERE id=?", order);
+    require(
+        Objects.equals(current.get("courier_id"), initial.get("courier_id")),
+        409,
+        "VERSION_CONFLICT",
+        "配送归属已变化，请刷新");
   }
 
   public void cancelPaid(Map<String, Object> o, String reason) {

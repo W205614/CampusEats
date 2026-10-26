@@ -38,7 +38,7 @@ export function api<T>(
       /^\/stores\/[1-9]\d*$/.test(pathname) ||
       /^\/campuses\/[^/]+\/buildings$/.test(pathname) ||
       /^\/stores\/[^/]+\/(products|categories|reviews)$/.test(pathname));
-  const login = /^\/auth\/(demo|wechat)$/.test(pathname);
+  const login = /^\/auth\/(demo|wechat|login|capabilities)$/.test(pathname);
   const token = login ? undefined : store.session?.token;
   return new Promise((resolve, reject) => {
     function request(anonymous = false) {

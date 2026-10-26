@@ -32,7 +32,9 @@ try {
   }
   if(!$ready){throw 'Backup database not ready.'}
    & (Join-Path $PSScriptRoot 'backup.ps1') -ProjectName $ProjectName -Destination $Destination -EnvFile $EnvFile -OperationToken $operationLease.Token
-  & (Join-Path $PSScriptRoot 'restore-check.ps1') -BackupDirectory $Destination
+   $restoreImage=(& docker inspect --format '{{.Image}}' $mysql) -join ''
+   if($LASTEXITCODE -ne 0 -or !$restoreImage){throw 'Cannot bind restore check to the source MySQL image.'}
+   & (Join-Path $PSScriptRoot 'restore-check.ps1') -BackupDirectory $Destination -MySqlImage $restoreImage
   $manifest=Join-Path $Destination 'sha256.json'
   $marker=[ordered]@{project=$ProjectName;verifiedAt=[DateTime]::UtcNow.ToString('o');directory=$Destination;manifestSha256=(Get-FileHash -LiteralPath $manifest -Algorithm SHA256).Hash}
  } finally {

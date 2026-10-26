@@ -10,8 +10,9 @@ COPY frontend/admin frontend/admin
 COPY frontend/client frontend/client
 RUN cd frontend/admin && npm run build
 RUN cd frontend/client && npm run test:toolchain && npm run typecheck && npm run build:h5 && npm run build:mp-weixin
-FROM nginx:1.30.6-alpine3.24@sha256:970364228b1e4f932abc22d321932816782cca8a20b85a77552a7cfe9acfb3b5
-RUN for attempt in 1 2 3; do \
+FROM nginx:1.30.6-alpine3.24@sha256:970364228b1e4f932abc22d321932816782cca8a20b85a77552a7cfe9acfb3b5 AS runtime
+ARG RUNTIME_REFRESH=initial
+RUN test -n "$RUNTIME_REFRESH" && for attempt in 1 2 3; do \
       apk upgrade --no-cache && exit 0; \
       [ "$attempt" = 3 ] && exit 1; \
       sleep 2; \

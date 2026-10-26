@@ -237,7 +237,7 @@ test('browser cross-campus mixed fulfillment preserves coupon cents, repeated pa
       const currentCouponStore = coupon.storeId === storeA.id ? storeA : storeB;
       // Wait for the action's coupon refresh before selecting the next store.
       const reloaded = customer.waitForResponse(response =>
-        new URL(response.url()).pathname === '/api/v1/user/stores/' + currentCouponStore.id + '/coupons');
+        new URL(response.url()).pathname === '/api/v1/user/stores/' + currentCouponStore.id + '/coupons/page');
       await postUI(customer, '/user/coupons/' + coupon.id + '/claim', () => card.getByText('领取', { exact: true }).click());
       await (await reloaded).finished();
       await expect(customer.getByText((currentCouponStore.id === storeA.id ? names.storeA : names.storeB) + ' ▾', { exact: true })).toBeVisible();

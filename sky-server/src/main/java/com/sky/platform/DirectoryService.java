@@ -204,7 +204,8 @@ public class DirectoryService {
   public List<Map<String, Object>> couriers(long store) {
     scope.merchant(store, false);
     return db.rows(
-        "SELECT id,name FROM employee WHERE role='DELIVERER' AND status=1 AND campus_id=? ORDER BY id",
+        "SELECT id,name FROM employee WHERE role='DELIVERER' AND status=1 AND accepting_tasks=true"
+            + " AND campus_id=? ORDER BY id LIMIT 200",
         scope.store(store, false).get("campus_id"));
   }
 
@@ -214,7 +215,7 @@ public class DirectoryService {
     return db.rows(
         "SELECT id,username,name,role,store_id,campus_id,status,must_change_password FROM employee"
             + (store == null ? "" : " WHERE store_id=?")
-            + " ORDER BY id",
+            + " ORDER BY id LIMIT 200",
         store == null ? new Object[] {} : new Object[] {store});
   }
 
@@ -304,6 +305,17 @@ public class DirectoryService {
                 LocalDateTime.now(clock))
             : id;
     if (id != null) {
+      var previous = db.one("SELECT role,campus_id FROM employee WHERE id=?", id);
+      if (previous != null
+          && "DELIVERER".equals(previous.get("role"))
+          && (!input.enabled()
+              || !"DELIVERER".equals(input.role())
+              || !Objects.equals(previous.get("campus_id"), campus)))
+        require(
+            db.count("SELECT COUNT(*) FROM orders WHERE courier_id=? AND status IN(3,4)", id) == 0,
+            409,
+            "COURIER_HANDOVER_REQUIRED",
+            "配送员仍有未结束任务，请先移交；紧急情况使用紧急停用");
       require(
           db.update(
                   "UPDATE employee SET"

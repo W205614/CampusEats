@@ -63,12 +63,14 @@ async function logout() {
   router.push('/');
 }
 const links = computed(() => {
-  if (role.value === 'DELIVERER') return [['/orders', '抢单与配送']];
+  if (role.value === 'DELIVERER') return [['/orders', '抢单与配送'],['/messages','站内消息']];
   const base = [
     ['/', '校区与店铺'],
     ['/orders', '订单履约'],
     ['/operations/aftersales', '售后处理'],
     ['/operations/reviews', '用户评价'],
+    ['/service-operations', '履约异常'],
+    ['/messages', '站内消息'],
   ];
   if (role.value !== 'OPERATOR')
     base.push(
@@ -78,9 +80,10 @@ const links = computed(() => {
       ['/operations/refunds', '退款任务'],
       ['/operations/outbox', '通知任务'],
       ['/reports', '经营统计'],
+      ['/finance', '模拟账务'],
       ['/operations/audit', '操作记录'],
     );
-  if (role.value === 'PLATFORM_ADMIN') base.push(['/operations/buildings', '校区楼栋']);
+  if (role.value === 'PLATFORM_ADMIN') base.push(['/operations/buildings', '校区楼栋'],['/users','用户账号']);
   return base;
 });
 </script>
@@ -147,7 +150,7 @@ const links = computed(() => {
         </div>
       </header>
       <div class="content">
-        <router-view v-if="router.currentRoute.value.path === '/password' || (role === 'DELIVERER' ? router.currentRoute.value.path === '/orders' : storesLoaded)" :key="router.currentRoute.value.path + selectedStore" @stores-changed="load" />
+        <router-view v-if="router.currentRoute.value.path === '/password' || (role === 'DELIVERER' ? ['/orders','/messages'].includes(router.currentRoute.value.path) : storesLoaded)" :key="router.currentRoute.value.path + selectedStore" @stores-changed="load" />
         <section v-else class="panel"><p>正在读取授权店铺；加载失败时可重试。</p><el-button @click="load">重新加载店铺</el-button></section>
       </div>
     </main>

@@ -1,3 +1,5 @@
+. (Join-Path $PSScriptRoot 'secure-files.ps1')
+
 function Write-OperationsJson {
  param([string]$Path,$Value)
  [void][IO.Directory]::CreateDirectory((Split-Path $Path -Parent))
@@ -5,7 +7,7 @@ function Write-OperationsJson {
  try {
   [IO.File]::WriteAllText($temporary,($Value | ConvertTo-Json -Depth 15),[Text.UTF8Encoding]::new($false))
   [IO.File]::Move($temporary,$Path,$true)
- } finally {if(Test-Path -LiteralPath $temporary){Remove-Item -LiteralPath $temporary}}
+ } finally {if(Test-Path -LiteralPath $temporary){Move-ProjectFileToRecycleBin -Path $temporary}}
 }
 
 function Get-OperationsFingerprint {
@@ -64,11 +66,11 @@ function Copy-VerifiedBackupReplica {
   if(!$path.StartsWith($sourceRoot+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase) -or !(Test-Path -LiteralPath $path -PathType Leaf)) {throw 'Invalid backup manifest path.'}
   if((Get-Item -LiteralPath $path -Force).Length -ne $entry.bytes -or (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ne $entry.sha256){throw 'Backup hash verification failed.'}
  }
- [void][IO.Directory]::CreateDirectory($replicaRoot)
+ New-SecureDirectory -Path $replicaRoot | Out-Null
  $id=[guid]::NewGuid().ToString('N')
  $stage=Join-Path $replicaRoot ('.partial-'+$id)
  $destination=Join-Path $replicaRoot ($ProjectName+'-'+(Split-Path $sourceRoot -Leaf)+'-'+$id)
- [void][IO.Directory]::CreateDirectory($stage)
+ New-SecureDirectory -Path $stage | Out-Null
  try {
   # Enumerating -Force is essential for .env on Linux and Hidden files on Windows.
   Get-ChildItem -LiteralPath $sourceRoot -Force | ForEach-Object {Copy-Item -LiteralPath $_.FullName -Destination $stage -Recurse -Force -ErrorAction Stop}
@@ -98,7 +100,7 @@ function Copy-VerifiedBackupReplica {
   return $destination
  } catch {
   # A failed .partial directory is retained for diagnosis and never has a public final name.
-  if(Test-Path -LiteralPath (Join-Path $stage 'replica-complete.json')){Remove-Item -LiteralPath (Join-Path $stage 'replica-complete.json')}
+  if(Test-Path -LiteralPath (Join-Path $stage 'replica-complete.json')){Move-ProjectFileToRecycleBin -Path (Join-Path $stage 'replica-complete.json')}
   throw 'Backup replica was not completed; inspect the local replica directory.'
  }
 }

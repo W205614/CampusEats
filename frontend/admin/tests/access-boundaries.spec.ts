@@ -130,21 +130,24 @@ test('a delayed unauthorized private read neither replays nor clears a newer use
     const ok = (data: unknown) => route.fulfill({ json: { code: 'OK', data } });
     if (path === '/user/auth/demo' && request.method() === 'POST') return ok(newSession);
     if (request.method() !== 'GET') { unexpected.push(request.method() + ' ' + path); return route.abort(); }
-    if (path === '/user/wallet') {
+    if (path === '/user/auth/capabilities') return ok({demoLoginEnabled:true,localLoginEnabled:true,wechatLoginEnabled:false,paymentMode:'MOCK',mode:'DEMO'});
+    if (path === '/user/auth/account') return ok({localAccount:false,username:null});
+    if (path === '/user/wallet/page') {
       if (request.headers().authorization === 'Bearer ' + oldSession.token) {
         reads.old++; arrived(); await pending;
         return route.fulfill({ status: 401, json: { code: 'UNAUTHORIZED', message: '旧登录已失效', data: null } });
       }
       reads.current++;
-      return ok([{ id: '71', name: '新账号专属券', state: 'AVAILABLE', endsAt: '2099-12-31T23:59:59+08:00' }]);
+      return ok({records:[{ id: '71', name: '新账号专属券', state: 'AVAILABLE', endsAt: '2099-12-31T23:59:59+08:00' }],nextCursor:null,hasMore:false});
     }
-    if (path === '/user/favorites') return ok([{ targetType: 'STORE', targetId: '1', storeId: '1', storeName: store.name, name: '新账号收藏' }]);
+    if (path === '/user/favorites/page') return ok({records:[{ targetType: 'STORE', targetId: '1', storeId: '1', storeName: store.name, name: '新账号收藏' }],nextCursor:null,hasMore:false});
     if (path === '/user/campuses') return ok([{ id: '1', name: '测试校区', enabled: true }]);
     if (path === '/user/stores/page') return ok({ records: [store], nextCursor: null, hasMore: false });
     if (path === '/user/stores/1') return ok(store);
     if (path === '/user/stores/1/products') return ok([{ id: '1', storeId: '1', itemType: 'DISH', categoryId: '1', name: '新账号餐品', price: '10.00', remaining: 10, flavors: [] }]);
     if (path === '/user/stores/1/cart') return ok({ storeId: '1', cartVersion: '0', items: [] });
-    if (['/user/stores/1/categories', '/user/stores/1/coupons', '/user/coupons'].includes(path)) return ok([]);
+    if (path === '/user/stores/1/categories') return ok([]);
+    if (['/user/stores/1/coupons/page', '/user/coupons/page'].includes(path)) return ok({records:[],nextCursor:null,hasMore:false});
     unexpected.push(request.method() + ' ' + path);
     return route.abort();
   });
@@ -159,7 +162,7 @@ test('a delayed unauthorized private read neither replays nor clears a newer use
   await page.getByText('领券与我的收藏', { exact: true }).click();
   await expect(page.getByText('新账号专属券', { exact: true })).toBeVisible();
   await expect(page.getByText('新账号收藏 · 新账号店铺', { exact: true })).toBeVisible();
-  const oldFailure = page.waitForResponse(response => response.url().endsWith('/api/v1/user/wallet')
+  const oldFailure = page.waitForResponse(response => new URL(response.url()).pathname === '/api/v1/user/wallet/page'
     && response.request().headers().authorization === 'Bearer ' + oldSession.token);
   unblock();
   const failed = await oldFailure;
@@ -184,15 +187,15 @@ test('the account page replaces an unavailable saved store and explains empty co
     localStorage.setItem('store-choice', JSON.stringify({ type: 'string', data: '99999999999999999' }));
   }, userSession);
   for (const endpoint of ['wallet', 'favorites', 'coupons']) {
-    await page.route('**/api/v1/user/' + endpoint, route => route.fulfill({ json: { code: 'OK', data: [] } }));
+    await page.route('**/api/v1/user/' + endpoint + '/page*', route => route.fulfill({ json: { code: 'OK', data: {records:[],nextCursor:null,hasMore:false} } }));
   }
   const couponReads: string[] = [];
-  await page.route('**/api/v1/user/stores/*/coupons', async route => {
+  await page.route('**/api/v1/user/stores/*/coupons/page*', async route => {
     couponReads.push(new URL(route.request().url()).pathname);
     // Verify the chosen store against the real server before stubbing its list empty.
     const response = await route.fetch();
     expect(response.ok()).toBeTruthy();
-    await route.fulfill({ response, json: { code: 'OK', data: [] } });
+    await route.fulfill({ response, json: { code: 'OK', data: {records:[],nextCursor:null,hasMore:false} } });
   });
   await page.goto('/app/pages/account/index');
   await expect(page.getByText(first.name + ' ▾', { exact: true })).toBeVisible();
@@ -201,5 +204,5 @@ test('the account page replaces an unavailable saved store and explains empty co
     '还没有优惠券，领取后会保存在这里。',
     '还没有收藏，去点餐页收藏喜欢的店铺和餐品吧。',
   ]) await expect(page.getByText(text, { exact: true })).toBeVisible();
-  expect(couponReads).toEqual(['/api/v1/user/stores/' + first.id + '/coupons']);
+  expect(couponReads).toEqual(['/api/v1/user/stores/' + first.id + '/coupons/page']);
 });

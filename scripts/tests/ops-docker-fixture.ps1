@@ -17,13 +17,14 @@ if($command -like 'curl *'){
  if($command -notlike '*--config -*' -or $inputConfig.Trim() -ne ('header = "X-Campus-Operations-Key: '+$key+'"')){throw 'Scoped operations authentication missing.'}
  if($config.invalidHealth){'unparseable';exit}
  $jobs=[ordered]@{}
- foreach($name in @('checkoutExpiry','platformRefunds','legacyRefunds','outbox','legacyExpiry','deliveryOverdue','maintenance','metrics')){
+ foreach($name in @('checkoutExpiry','platformRefunds','legacyRefunds','outbox','legacyExpiry','deliveryOverdue','fulfillmentExceptions','maintenance','metrics')){
   $enabled=$name -eq 'metrics' -or !$config.disabled
   $status=if($enabled){'OK'}else{'DISABLED'}
   if($config.failedJob -eq $name){$status='FAILED'}
   if($config.staleJob -eq $name){$status='STALE'}
   $jobs[$name]=@{enabled=$enabled;status=$status;lastError='fixture-private-detail'}
  }
+ if($config.unknownJob){$jobs['unknownJob']=@{enabled=$true;status='OK'}}
  $status=if($config.failedJob -or $config.staleJob){'DOWN'}else{'UP'}
  @{status=$status;components=@{runtimeOperations=@{status=$status;details=@{tasksEnabled=(!$config.disabled);jobs=$jobs;issues=@()}}}} | ConvertTo-Json -Depth 8 -Compress
  exit

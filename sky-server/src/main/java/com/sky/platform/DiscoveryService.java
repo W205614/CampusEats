@@ -16,14 +16,21 @@ public class DiscoveryService {
   private final StoreCatalog catalog;
   private final Clock clock;
   private final DirectoryService directory;
+  private final ReportQueryService reports;
 
   public DiscoveryService(
-      Db db, PlatformScope scope, StoreCatalog catalog, Clock clock, DirectoryService directory) {
+      Db db,
+      PlatformScope scope,
+      StoreCatalog catalog,
+      Clock clock,
+      DirectoryService directory,
+      ReportQueryService reports) {
     this.db = db;
     this.scope = scope;
     this.catalog = catalog;
     this.clock = clock;
     this.directory = directory;
+    this.reports = reports;
   }
 
   public List<Map<String, Object>> search(long campus, String query, Long category, Boolean open) {
@@ -51,7 +58,7 @@ public class DiscoveryService {
             + " ON s.id=f.store_id LEFT JOIN dish d ON f.target_type='DISH' AND d.id=f.target_id"
             + " AND d.store_id=f.store_id LEFT JOIN setmeal m ON f.target_type='SETMEAL' AND"
             + " m.id=f.target_id AND m.store_id=f.store_id WHERE f.user_id=? ORDER BY"
-            + " f.store_id,f.target_type,f.target_id",
+            + " f.store_id,f.target_type,f.target_id LIMIT 200",
         Actor.user().id());
   }
 
@@ -99,29 +106,60 @@ public class DiscoveryService {
   }
 
   public record ReviewStats(long total, java.math.BigDecimal rating) {}
-  public record PublicReview(long id, int rating, String content, String reply,
+
+  public record PublicReview(
+      long id, int rating, String content, String reply, LocalDateTime createdAt) {}
+
+  public record MerchantReview(
+      long id,
+      long orderId,
+      int rating,
+      String content,
+      String reply,
+      boolean hidden,
+      String hideReason,
       LocalDateTime createdAt) {}
-  public record MerchantReview(long id, long orderId, int rating, String content, String reply,
-      boolean hidden, String hideReason, LocalDateTime createdAt) {}
+
   public record PublicReviews(ReviewStats stats, List<PublicReview> records) {}
+
   public record MerchantReviews(ReviewStats stats, List<MerchantReview> records) {}
 
   public PublicReviews publicReviews(long store, ReviewQuery query) {
     // This public read follows the same enabled campus/store boundary as discovery.
     scope.store(store, true);
     var rows = reviewRows(store, query, false);
-    return new PublicReviews(reviewStats(store), rows.stream().map(r -> new PublicReview(
-        Db.id(r, "id"), Db.integer(r, "rating"), r.get("content").toString(),
-        (String) r.get("reply"), Db.time(r.get("created_at")))).toList());
+    return new PublicReviews(
+        reviewStats(store),
+        rows.stream()
+            .map(
+                r ->
+                    new PublicReview(
+                        Db.id(r, "id"),
+                        Db.integer(r, "rating"),
+                        r.get("content").toString(),
+                        (String) r.get("reply"),
+                        Db.time(r.get("created_at"))))
+            .toList());
   }
 
   public MerchantReviews merchantReviews(long store, ReviewQuery query) {
     scope.merchant(store, false);
     var rows = reviewRows(store, query, true);
-    return new MerchantReviews(reviewStats(store), rows.stream().map(r -> new MerchantReview(
-        Db.id(r, "id"), Db.id(r, "order_id"), Db.integer(r, "rating"), r.get("content").toString(),
-        (String) r.get("reply"), Db.bool(r, "hidden"), (String) r.get("hide_reason"),
-        Db.time(r.get("created_at")))).toList());
+    return new MerchantReviews(
+        reviewStats(store),
+        rows.stream()
+            .map(
+                r ->
+                    new MerchantReview(
+                        Db.id(r, "id"),
+                        Db.id(r, "order_id"),
+                        Db.integer(r, "rating"),
+                        r.get("content").toString(),
+                        (String) r.get("reply"),
+                        Db.bool(r, "hidden"),
+                        (String) r.get("hide_reason"),
+                        Db.time(r.get("created_at"))))
+            .toList());
   }
 
   private List<Map<String, Object>> reviewRows(long store, ReviewQuery query, boolean admin) {
@@ -130,16 +168,24 @@ public class DiscoveryService {
     args.add(store);
     if (query.beforeId() != null) args.add(query.beforeId());
     args.add(limit);
-    return db.rows("SELECT id,rating,content,reply,created_at"
-        + (admin ? ",order_id,hidden,hide_reason" : "") + " FROM review WHERE store_id=?"
-        + (admin ? "" : " AND hidden=false")
-        + (query.beforeId() == null ? "" : " AND id<?") + " ORDER BY id DESC LIMIT ?", args.toArray());
+    return db.rows(
+        "SELECT id,rating,content,reply,created_at"
+            + (admin ? ",order_id,hidden,hide_reason" : "")
+            + " FROM review WHERE store_id=?"
+            + (admin ? "" : " AND hidden=false")
+            + (query.beforeId() == null ? "" : " AND id<?")
+            + " ORDER BY id DESC LIMIT ?",
+        args.toArray());
   }
 
   private ReviewStats reviewStats(long store) {
-    var stats = db.one("SELECT COUNT(*) total,COALESCE(AVG(rating),0) rating FROM review"
-        + " WHERE store_id=? AND hidden=false", store);
-    return new ReviewStats(Db.id(stats, "total"), new java.math.BigDecimal(stats.get("rating").toString()));
+    var stats =
+        db.one(
+            "SELECT COUNT(*) total,COALESCE(AVG(rating),0) rating FROM review"
+                + " WHERE store_id=? AND hidden=false",
+            store);
+    return new ReviewStats(
+        Db.id(stats, "total"), new java.math.BigDecimal(stats.get("rating").toString()));
   }
 
   @Transactional
@@ -163,154 +209,15 @@ public class DiscoveryService {
   }
 
   public Map<String, Object> report(Long campus, Long store, LocalDate begin, LocalDate end) {
-    Actor a = Actor.employee();
-    if (store != null) scope.merchant(store, true);
-    else scope.platform();
-    require(
-        begin != null
-            && end != null
-            && !end.isBefore(begin)
-            && java.time.temporal.ChronoUnit.DAYS.between(begin, end) < 366,
-        400,
-        "INVALID_RANGE",
-        "日期范围最多366天");
-    String filter = "";
-    var args = new ArrayList<Object>();
-    if (store != null) {
-      filter += " AND o.store_id=?";
-      args.add(store);
-    }
-    if (campus != null) {
-      filter += " AND o.campus_id=?";
-      args.add(campus);
-    }
-    var payments = new ArrayList<Object>();
-    payments.add(begin.atStartOfDay());
-    payments.add(end.plusDays(1).atStartOfDay());
-    payments.addAll(args);
-    var paid =
-        db.one(
-            "SELECT COUNT(DISTINCT o.checkout_id) payment_count,COUNT(*)"
-                + " child_order_count,COALESCE(SUM(o.paid_cents),0)"
-                + " paid_cents,COALESCE(SUM(o.shop_discount_cents),0)"
-                + " shop_discount_cents,COALESCE(SUM(o.platform_discount_cents),0)"
-                + " platform_discount_cents FROM orders o JOIN checkout c ON c.id=o.checkout_id"
-                + " WHERE c.paid_at>=? AND c.paid_at<?"
-                + filter,
-            payments.toArray());
-    var refunds =
-        db.one(
-            "SELECT COALESCE(SUM(r.amount_cents),0) refunded_cents FROM refund_request r JOIN"
-                + " orders o ON o.id=r.order_id WHERE r.state='SUCCEEDED' AND r.succeeded_at>=? AND"
-                + " r.succeeded_at<?"
-                + filter,
-            payments.toArray());
-    var completed =
-        db.one(
-            "SELECT COUNT(*) completed,COALESCE(SUM(ROUND(o.amount*100)),0) completed_cents FROM"
-                + " orders o WHERE o.status=5 AND o.completed_at>=? AND o.completed_at<?"
-                + filter,
-            payments.toArray());
-    var metrics = new LinkedHashMap<String, Object>();
-    metrics.putAll(paid);
-    metrics.putAll(refunds);
-    metrics.putAll(completed);
-    long p = ((Number) paid.get("paid_cents")).longValue(),
-        r = ((Number) refunds.get("refunded_cents")).longValue();
-    metrics.put("net_cents", p - r);
-    var daily =
-        db.rows(
-            "SELECT DATE(c.paid_at) date,SUM(o.paid_cents) paid_cents,COUNT(DISTINCT c.id)"
-                + " payment_count FROM orders o JOIN checkout c ON c.id=o.checkout_id WHERE"
-                + " c.paid_at>=? AND c.paid_at<?"
-                + filter
-                + " GROUP BY DATE(c.paid_at) ORDER BY date",
-            payments.toArray());
-    var byStore =
-        db.rows(
-            "SELECT o.store_id,s.name store_name,SUM(o.paid_cents) paid_cents,COUNT(*)"
-                + " child_order_count FROM orders o JOIN checkout c ON c.id=o.checkout_id JOIN"
-                + " store s ON s.id=o.store_id WHERE c.paid_at>=? AND c.paid_at<?"
-                + filter
-                + " GROUP BY o.store_id,s.name ORDER BY o.store_id",
-            payments.toArray());
-    return Map.of("metrics", metrics, "daily", daily, "stores", byStore);
+    return reports.snapshot(campus, store, begin, end);
+  }
+
+  public ReportQueryService.ReportSnapshot reportView(
+      Long campus, Long store, LocalDate begin, LocalDate end) {
+    return reports.view(campus, store, begin, end);
   }
 
   public byte[] export(Long campus, Long store, LocalDate begin, LocalDate end) {
-    var report = report(campus, store, begin, end);
-    try (var wb = new org.apache.poi.xssf.usermodel.XSSFWorkbook();
-        var out = new java.io.ByteArrayOutputStream()) {
-      var sheet = wb.createSheet("经营统计");
-      int row = 0;
-      @SuppressWarnings("unchecked")
-      var metrics = (Map<String, Object>) report.get("metrics");
-      for (var entry : metrics.entrySet()) {
-        var line = sheet.createRow(row++);
-        line.createCell(0).setCellValue(metricLabel(entry.getKey()));
-        line.createCell(1)
-            .setCellValue(
-                entry.getKey().endsWith("_cents")
-                    ? Money.text(((Number) entry.getValue()).longValue())
-                    : entry.getValue().toString());
-      }
-      sheet.setColumnWidth(0, 8000);
-      sheet.setColumnWidth(1, 6000);
-      @SuppressWarnings("unchecked")
-      var daily = (List<Map<String, Object>>) report.get("daily");
-      @SuppressWarnings("unchecked")
-      var stores = (List<Map<String, Object>>) report.get("stores");
-      exportRows(wb, "每日支付", daily, List.of("date", "payment_count", "paid_cents"));
-      exportRows(wb, "店铺分布", stores, List.of("store_name", "child_order_count", "paid_cents"));
-      wb.write(out);
-      return out.toByteArray();
-    } catch (java.io.IOException ex) {
-      throw new IllegalStateException(ex);
-    }
-  }
-
-  private String metricLabel(String key) {
-    return switch (key) {
-      case "payment_count" -> "合单支付笔数";
-      case "child_order_count" -> "店铺子订单数";
-      case "paid_cents" -> "支付额 / 元";
-      case "refunded_cents" -> "成功退款额 / 元";
-      case "net_cents" -> "净收款 / 元";
-      case "shop_discount_cents" -> "店铺优惠 / 元";
-      case "platform_discount_cents" -> "平台优惠 / 元";
-      case "completed" -> "完成订单数";
-      case "completed_cents" -> "完成单成交额 / 元";
-      case "date" -> "日期";
-      case "store_name" -> "店铺";
-      default -> key;
-    };
-  }
-
-  private void exportRows(
-      org.apache.poi.xssf.usermodel.XSSFWorkbook wb,
-      String name,
-      List<Map<String, Object>> rows,
-      List<String> columns) {
-    var sheet = wb.createSheet(name);
-    var heading = sheet.createRow(0);
-    for (int c = 0; c < columns.size(); c++) {
-      heading.createCell(c).setCellValue(metricLabel(columns.get(c)));
-      sheet.setColumnWidth(c, 6500);
-    }
-    int index = 1;
-    for (var record : rows) {
-      var row = sheet.createRow(index++);
-      for (int c = 0; c < columns.size(); c++) {
-        String key = columns.get(c);
-        Object value = record.get(key);
-        row.createCell(c)
-            .setCellValue(
-                value == null
-                    ? ""
-                    : key.endsWith("_cents")
-                        ? Money.text(((Number) value).longValue())
-                        : value.toString());
-      }
-    }
+    return reports.export(campus, store, begin, end);
   }
 }

@@ -57,6 +57,7 @@ public class AuthFilter extends OncePerRequestFilter {
     String requestId = UUID.randomUUID().toString();
     req.setAttribute("requestId", requestId);
     res.setHeader("X-Request-Id", requestId);
+    org.slf4j.MDC.put("requestId", requestId);
     try {
       String path = req.getRequestURI();
       if (req.getMethod().equals("GET")) {
@@ -95,7 +96,12 @@ public class AuthFilter extends OncePerRequestFilter {
         if (actor.mustChangePassword()
             && !path.equals("/api/v1/admin/auth/password")
             && !path.equals("/api/v1/admin/auth/me")
-            && !path.equals("/api/v1/admin/auth/logout"))
+            && !path.equals("/api/v1/admin/auth/logout")
+            && !path.equals("/api/v1/user/auth/password")
+            && !path.equals("/api/v1/user/auth/me")
+            && !path.equals("/api/v1/user/auth/account")
+            && !path.equals("/api/v1/user/auth/logout")
+            && !path.equals("/api/v1/user/auth/capabilities"))
           throw new BusinessException(403, "PASSWORD_CHANGE_REQUIRED", "请先修改初始密码");
         if (!req.getMethod().equals("GET")
             && (path.contains("/orders") || path.contains("/checkouts") || path.contains("/claim")))
@@ -103,9 +109,12 @@ public class AuthFilter extends OncePerRequestFilter {
       } else {
         Actor maintenance = operations.authenticate(req);
         if (maintenance != null)
-          SecurityContextHolder.getContext().setAuthentication(
-              new UsernamePasswordAuthenticationToken(maintenance, null,
-                  List.of(new SimpleGrantedAuthority("ROLE_PLATFORM_ADMIN"))));
+          SecurityContextHolder.getContext()
+              .setAuthentication(
+                  new UsernamePasswordAuthenticationToken(
+                      maintenance,
+                      null,
+                      List.of(new SimpleGrantedAuthority("ROLE_PLATFORM_ADMIN"))));
       }
       if (path.endsWith("/auth/login")
           || path.endsWith("/auth/demo")
@@ -135,6 +144,7 @@ public class AuthFilter extends OncePerRequestFilter {
             .increment();
       }
       SecurityContextHolder.clearContext();
+      org.slf4j.MDC.remove("requestId");
     }
   }
 }

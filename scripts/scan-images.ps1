@@ -5,6 +5,7 @@ param(
 )
 $ErrorActionPreference='Stop'
 $taskRoot=Split-Path $PSScriptRoot -Parent
+. (Join-Path $PSScriptRoot 'secure-files.ps1')
 $outputRoot=[IO.Path]::GetFullPath($OutputDirectory,$taskRoot)
 [void][IO.Directory]::CreateDirectory($outputRoot)
 $version='0.76.0'
@@ -75,7 +76,7 @@ function Export-ImageRuntimeBom([string]$ImageId,[string]$Log){
   [ordered]@{imageId=$ImageId;appJarSha256=$hashes['app.jar'];sbomSha256=$hashes['sbom.cdx.json'];mavenComponents=$maven.Count;source='BOM and JAR extracted from the same non-running image container'} | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $outputRoot 'server-runtime-provenance.json') -Encoding utf8
   return $bom
  } finally {
-  if(Test-Path -LiteralPath $jar){[IO.File]::Delete($jar)}
+  if(Test-Path -LiteralPath $jar){Move-ProjectFileToRecycleBin -Path $jar}
   if($containerId -match '^[a-f0-9]{64}$'){
    $label=(& docker inspect --format '{{index .Config.Labels "campuseats.purpose"}}' $containerId 2>> $Log) -join ''
    if($LASTEXITCODE -eq 0 -and $label -ceq 'sbom-extract'){

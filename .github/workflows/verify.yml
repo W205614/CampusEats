@@ -3,7 +3,25 @@ on: [push, pull_request]
 permissions:
   contents: read
 jobs:
+  windows-permissions:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify real Windows credential ACL and fail-before-write behavior
+        shell: pwsh
+        run: ./scripts/test-secure-files.ps1
+      - name: Verify release bundle provenance rejection without Docker
+        shell: pwsh
+        run: ./scripts/test-release-bundle.ps1
+      - name: Verify cross-platform migration hash normalization
+        shell: pwsh
+        run: ./scripts/test-migration-hash.ps1
+      - name: Validate schedule XML with native Windows definitions without registering
+        shell: pwsh
+        run: ./scripts/ops-schedule.ps1 -OutputDirectory .local/ci-schedule-preview
   verify:
+    needs: windows-permissions
     runs-on: ubuntu-latest
     timeout-minutes: 45
     steps:
@@ -41,6 +59,13 @@ jobs:
           ./scripts/test-ops-check.ps1
           ./scripts/test-ops-run.ps1
           ./scripts/test-image-scan.ps1
+          ./scripts/test-secure-files.ps1
+          ./scripts/test-encrypted-backup.ps1
+          ./scripts/test-release-bundle.ps1
+          ./scripts/test-platform-data-manifest.ps1
+          ./scripts/test-migration-hash.ps1
+          ./scripts/test-artifact-release.ps1
+          ./scripts/test-restore-ownership.ps1
           ./scripts/start.ps1 -SkipVerify
       - name: Compare live API schema
         run: node scripts/generate-contracts.mjs --fetch && git diff --exit-code -- frontend/contracts/openapi.json frontend/contracts/openapi.ts
@@ -59,10 +84,24 @@ jobs:
       - name: Scan source-built application images and retain SBOMs
         shell: pwsh
         run: ./scripts/scan-images.ps1 -ServerImage campuseats-server:v1 -WebImage campuseats-web:v1 -OutputDirectory '.local/security'
+      - name: Export the same tested and scanned application images
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        shell: pwsh
+        run: ./scripts/export-release.ps1
+      - name: Upload immutable deployment bundle
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-${{ github.sha }}
+          overwrite: true
+          path: .local/release-bundle/
+          if-no-files-found: error
+          retention-days: 7
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: validation-results
+          overwrite: true
           path: |
             sky-server/target/surefire-reports
             .local/playwright-results

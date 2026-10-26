@@ -64,6 +64,7 @@ public class CheckoutService {
   private final AddressService addresses;
   private final QuotaService quotas;
   private final PaymentGateway gateway;
+  private final com.sky.finance.LedgerService ledger;
 
   public CheckoutService(
       Db db,
@@ -77,7 +78,8 @@ public class CheckoutService {
       MarketingService marketing,
       AddressService addresses,
       QuotaService quotas,
-      PaymentGateway gateway) {
+      PaymentGateway gateway,
+      com.sky.finance.LedgerService ledger) {
     this.db = db;
     this.json = json;
     this.clock = clock;
@@ -90,6 +92,7 @@ public class CheckoutService {
     this.addresses = addresses;
     this.quotas = quotas;
     this.gateway = gateway;
+    this.ledger = ledger;
   }
 
   private List<PlatformCommands.Selection> selections(PlatformCommands.Checkout c) {
@@ -452,6 +455,7 @@ public class CheckoutService {
           paymentRef + "-" + o.get("id"),
           now());
       scope.event(Db.id(o, "id"), "ORDER_PAID");
+      ledger.payment(Db.id(o, "id"));
     }
     db.update("UPDATE user_coupon SET state='USED' WHERE checkout_id=? AND state='LOCKED'", id);
     scope.audit("CHECKOUT_PAY", id, null, "整批模拟支付成功");

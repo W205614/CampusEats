@@ -21,7 +21,13 @@ public class PlatformManagementController {
   private final PlatformJobs jobs;
   private final AuditHistory auditHistory;
 
-  public PlatformManagementController(DirectoryService directory, PlatformScope scope, MarketingService marketing, DiscoveryService discovery, PlatformJobs jobs, AuditHistory auditHistory) {
+  public PlatformManagementController(
+      DirectoryService directory,
+      PlatformScope scope,
+      MarketingService marketing,
+      DiscoveryService discovery,
+      PlatformJobs jobs,
+      AuditHistory auditHistory) {
     this.directory = directory;
     this.scope = scope;
     this.marketing = marketing;
@@ -123,7 +129,8 @@ public class PlatformManagementController {
 
   @PutMapping(value = "/merchant/staff/{id}")
   @io.swagger.v3.oas.annotations.Operation(operationId = "staffUpdate_1")
-  public void merchantStaffUpdate(@PathVariable long id, @Valid @RequestBody PlatformCommands.Staff input) {
+  public void merchantStaffUpdate(
+      @PathVariable long id, @Valid @RequestBody PlatformCommands.Staff input) {
     directory.staff(id, input);
   }
 
@@ -218,13 +225,15 @@ public class PlatformManagementController {
   }
 
   @GetMapping("/user/stores/{storeId}/reviews")
-  public DiscoveryService.PublicReviews reviews(@PathVariable long storeId,
+  public DiscoveryService.PublicReviews reviews(
+      @PathVariable long storeId,
       @org.springdoc.core.annotations.ParameterObject @ModelAttribute ReviewQuery query) {
     return discovery.publicReviews(storeId, query);
   }
 
   @GetMapping("/merchant/stores/{storeId}/reviews")
-  public DiscoveryService.MerchantReviews adminReviews(@PathVariable long storeId,
+  public DiscoveryService.MerchantReviews adminReviews(
+      @PathVariable long storeId,
       @org.springdoc.core.annotations.ParameterObject @ModelAttribute ReviewQuery query) {
     return discovery.merchantReviews(storeId, query);
   }
@@ -241,25 +250,27 @@ public class PlatformManagementController {
 
   @GetMapping(value = "/platform/reports")
   @io.swagger.v3.oas.annotations.Operation(operationId = "report")
-  public Object report(
+  public com.sky.platform.ReportQueryService.ReportSnapshot report(
       @RequestParam(required = false) Long campusId,
       @RequestParam(required = false) Long storeId,
       @RequestParam LocalDate begin,
       @RequestParam LocalDate end) {
-    return discovery.report(campusId, storeId, begin, end);
+    return discovery.reportView(campusId, storeId, begin, end);
   }
 
   @GetMapping(value = "/merchant/reports")
   @io.swagger.v3.oas.annotations.Operation(operationId = "report_1")
-  public Object merchantReport(
+  public com.sky.platform.ReportQueryService.ReportSnapshot merchantReport(
       @RequestParam(required = false) Long campusId,
       @RequestParam(required = false) Long storeId,
       @RequestParam LocalDate begin,
       @RequestParam LocalDate end) {
-    return discovery.report(campusId, storeId, begin, end);
+    return discovery.reportView(campusId, storeId, begin, end);
   }
 
-  @GetMapping(value = "/platform/reports/export", produces = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+  @GetMapping(
+      value = "/platform/reports/export",
+      produces = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
   @io.swagger.v3.oas.annotations.Operation(operationId = "export")
   public byte[] export(
       @RequestParam(required = false) Long campusId,
@@ -269,7 +280,9 @@ public class PlatformManagementController {
     return discovery.export(campusId, storeId, begin, end);
   }
 
-  @GetMapping(value = "/merchant/reports/export", produces = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+  @GetMapping(
+      value = "/merchant/reports/export",
+      produces = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
   @io.swagger.v3.oas.annotations.Operation(operationId = "export_1")
   public byte[] merchantExport(
       @RequestParam(required = false) Long campusId,
@@ -286,7 +299,8 @@ public class PlatformManagementController {
   }
 
   @GetMapping("/merchant/stores/{storeId}/audit")
-  public List<AuditHistory.Entry> storeAudit(@PathVariable long storeId,
+  public List<AuditHistory.Entry> storeAudit(
+      @PathVariable long storeId,
       @org.springdoc.core.annotations.ParameterObject @ModelAttribute AuditQuery query) {
     return auditHistory.list(storeId, query);
   }

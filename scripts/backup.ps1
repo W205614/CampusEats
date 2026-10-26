@@ -6,10 +6,11 @@ $backupRoot=[IO.Path]::GetFullPath($Destination)
 $localRoot=[IO.Path]::GetFullPath((Join-Path $taskRoot '.local'))
 if(-not $backupRoot.StartsWith($localRoot+[IO.Path]::DirectorySeparatorChar)){throw 'Backups must remain inside the protected workspace .local directory.'}
 . (Join-Path $PSScriptRoot 'operations-lock.ps1')
+. (Join-Path $PSScriptRoot 'secure-files.ps1')
 $operationLease=Enter-OperationsLock -Root $taskRoot -ProjectName $ProjectName -Token $OperationToken
 Push-Location $taskRoot
 try {
- New-Item -ItemType Directory -Path $backupRoot -Force | Out-Null
+ New-SecureDirectory -Path $backupRoot | Out-Null
  $countSql='SELECT COUNT(*) FROM orders; SELECT COUNT(*) FROM order_detail; SELECT COUNT(*) FROM user; SELECT COUNT(*) FROM refund_task; SELECT COUNT(*) FROM outbox_event; SELECT COUNT(*) FROM daily_quota;'
  $before=$countSql | docker compose --env-file $EnvFile -p $ProjectName exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_PASSWORD" mysql -u campus sky_take_out -N'
  if($LASTEXITCODE -ne 0){throw 'Backup source checks failed.'}
@@ -35,13 +36,11 @@ try {
  docker compose --env-file $EnvFile -p $ProjectName images --format json | Set-Content -LiteralPath (Join-Path $backupRoot 'images.json') -Encoding utf8
  docker compose --env-file $EnvFile -p $ProjectName cp server:/app/uploads (Join-Path $backupRoot 'uploads')
  if($LASTEXITCODE -ne 0){throw 'Upload backup failed.'}
- Copy-Item -LiteralPath ([IO.Path]::GetFullPath($EnvFile,$taskRoot)) -Destination (Join-Path $backupRoot '.env')
+ Write-SecureTextFile -Path (Join-Path $backupRoot '.env') -Content ([IO.File]::ReadAllText([IO.Path]::GetFullPath($EnvFile,$taskRoot)))
  $mounts=docker compose --env-file $EnvFile -p $ProjectName ps -q | ForEach-Object { docker inspect --format '{{.Name}} {{range .Mounts}}{{.Name}}:{{.Destination}} {{end}}' $_ }
  $mounts | Set-Content -LiteralPath (Join-Path $backupRoot 'mounts.txt') -Encoding utf8
  Get-ChildItem -LiteralPath $backupRoot -Recurse -Force -File | Where-Object Name -ne 'sha256.json' | ForEach-Object { [pscustomobject]@{path=$_.FullName.Substring($backupRoot.Length+1);bytes=$_.Length;sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash} } | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $backupRoot 'sha256.json') -Encoding utf8
- if($IsWindows) {
-  $owner=[Security.Principal.WindowsIdentity]::GetCurrent().Name
-  & icacls.exe $backupRoot /inheritance:r /grant:r "${owner}:(OI)(CI)F" | Out-Null
- }
+ Set-SecurePathPermissions -Path $backupRoot
+ Get-ChildItem -LiteralPath $backupRoot -Recurse -Force | ForEach-Object {Set-SecurePathPermissions -Path $_.FullName}
  Write-Host "Verified backup files saved: $backupRoot"
 } finally { Pop-Location;Exit-OperationsLock $operationLease }

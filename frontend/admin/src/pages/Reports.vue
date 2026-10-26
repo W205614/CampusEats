@@ -7,6 +7,7 @@ import { selectedStore } from '../context';
 import { localDate } from '../dates';
 import { cents, type Campus } from '../../../contracts/platform';
 interface Report {
+  generatedAt?: string;
   metrics: Record<string, string | number>;
   daily: { date: string; paidCents: string; paymentCount: number }[];
   stores: { storeName: string; paidCents: string; childOrderCount: number }[];
@@ -99,6 +100,7 @@ onMounted(async () => {
     </div>
   </section>
   <p v-if="applied" class="muted" data-testid="report-applied">当前结果：{{ applied.label }}；导出使用当前结果的筛选条件。</p>
+  <p v-if="report?.generatedAt" class="muted">数据快照：{{ report.generatedAt }}；支付汇总、每日及店铺分布来自同一数据库快照。</p>
   <div v-if="report" class="metrics">
     <section class="metric" v-for="(value, key) in report.metrics" :key="key">
       <span>{{ names[key] || key }}</span

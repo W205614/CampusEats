@@ -75,7 +75,9 @@ SELECT COUNT(*) FROM orders WHERE status=4 AND delivery_started_at<DATE_SUB(NOW(
    $checks.tasksEnabled=$details.tasksEnabled
    if(!$details.tasksEnabled -and !$AllowTasksDisabled){$issues.Add('Background tasks are disabled')}
    $checks.backgroundJobs=[ordered]@{}
-   foreach($name in @('checkoutExpiry','platformRefunds','legacyRefunds','outbox','legacyExpiry','deliveryOverdue','maintenance','metrics')) {
+   $knownJobs=@('checkoutExpiry','platformRefunds','legacyRefunds','outbox','legacyExpiry','deliveryOverdue','fulfillmentExceptions','maintenance','metrics')
+   if((@($details.jobs.PSObject.Properties.Name | Sort-Object) -join ',') -cne (@($knownJobs | Sort-Object) -join ',')){throw 'Missing or unknown operations job.'}
+   foreach($name in $knownJobs) {
     $job=$details.jobs.$name
     if($null -eq $job -or $job.enabled -isnot [bool] -or $job.status -notin @('STARTING','OK','FAILED','STALE','DISABLED')){throw 'Invalid job status.'}
     if($job.enabled -and $job.status -eq 'DISABLED' -or !$job.enabled -and $job.status -ne 'DISABLED' -or (!$job.enabled -and ($name -eq 'metrics' -or $details.tasksEnabled))){throw 'Inconsistent job status.'}

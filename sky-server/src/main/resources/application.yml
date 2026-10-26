@@ -89,6 +89,8 @@ campus:
     search-per-minute: ${SEARCH_REQUESTS_PER_MINUTE:1200}
     catalog-per-minute: ${CATALOG_REQUESTS_PER_MINUTE:3000}
 logging:
+  pattern:
+    level: "%5p [requestId:%X{requestId:-}]"
   level:
     com.sky: INFO
     org.springframework.security: WARN

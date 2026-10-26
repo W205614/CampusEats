@@ -10,9 +10,18 @@ import org.springframework.stereotype.Service;
 @Service
 public class PlatformScope {
   private final Db db;
+  private final FulfillmentStages stages;
+  private final BusinessMessages messages;
 
   public PlatformScope(Db db) {
+    this(db, null, null);
+  }
+
+  @org.springframework.beans.factory.annotation.Autowired
+  public PlatformScope(Db db, FulfillmentStages stages, BusinessMessages messages) {
     this.db = db;
+    this.stages = stages;
+    this.messages = messages;
   }
 
   public Actor platform() {
@@ -96,15 +105,18 @@ public class PlatformScope {
 
   public void event(long order, String type) {
     var ownership = db.one("SELECT store_id,campus_id FROM orders WHERE id=?", order);
-    db.update(
-        "INSERT INTO"
-            + " outbox_event(event_type,aggregate_id,payload,next_attempt_at,created_at,store_id,campus_id)"
-            + " VALUES(?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,?,?)",
-        type,
-        order,
-        "{\"orderId\":\"" + order + "\",\"type\":\"" + type + "\"}",
-        ownership.get("store_id"),
-        ownership.get("campus_id"));
+    long event =
+        db.insert(
+            "INSERT INTO"
+                + " outbox_event(event_type,aggregate_id,payload,next_attempt_at,created_at,store_id,campus_id)"
+                + " VALUES(?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,?,?)",
+            type,
+            order,
+            "{\"orderId\":\"" + order + "\",\"type\":\"" + type + "\"}",
+            ownership.get("store_id"),
+            ownership.get("campus_id"));
+    if (stages != null) stages.sync(order);
+    if (messages != null) messages.publish(event, order, type);
   }
 
   public static String table(String type) {

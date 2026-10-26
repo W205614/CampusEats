@@ -5,10 +5,10 @@ import static org.mockito.Mockito.*;
 
 import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import org.junit.jupiter.api.Test;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.connection.RedisConnection;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
 import org.springframework.data.redis.connection.RedisServerCommands;
+import org.springframework.data.redis.core.StringRedisTemplate;
 
 class OperationalMetricsTest {
   @Test
@@ -24,11 +24,16 @@ class OperationalMetricsTest {
     info.setProperty("evicted_keys", "17");
     when(server.info("stats")).thenReturn(info);
     var registry = new SimpleMeterRegistry();
-    var metrics = new OperationalMetrics(mock(Db.class), redis, registry,
-        new RuntimeOperations(java.time.Clock.systemUTC(), true));
+    var db = mock(Db.class);
+    when(db.one(contains("TIMESTAMPDIFF"), any(Object[].class)))
+        .thenReturn(java.util.Map.of("age", 5L));
+    var metrics =
+        new OperationalMetrics(
+            db, redis, registry, new RuntimeOperations(java.time.Clock.systemUTC(), true));
     metrics.sample();
     assertEquals(17, registry.get("campus.redis.evicted.keys").gauge().value());
     assertEquals(1, registry.get("campus.metrics.valid").gauge().value());
+    assertEquals(5, registry.get("campus.refund.oldest.wait.seconds").gauge().value());
     when(server.info("stats")).thenThrow(new IllegalStateException("stats denied"));
     metrics.sample();
     assertEquals(-1, registry.get("campus.redis.evicted.keys").gauge().value());
@@ -40,6 +45,8 @@ class OperationalMetricsTest {
     var db = mock(Db.class);
     var registry = new SimpleMeterRegistry();
     when(db.count(anyString())).thenReturn(4L);
+    when(db.one(contains("TIMESTAMPDIFF"), any(Object[].class)))
+        .thenReturn(java.util.Map.of("age", 5L));
     var metrics =
         new OperationalMetrics(
             db,

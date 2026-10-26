@@ -4,26 +4,24 @@ $taskRoot = Split-Path $PSScriptRoot -Parent
 $composeArgs=@('compose','--env-file',$EnvFile,'-p',$ProjectName)
 . (Join-Path $PSScriptRoot 'operations-lock.ps1')
 . (Join-Path $PSScriptRoot 'operations-support.ps1')
+. (Join-Path $PSScriptRoot 'secure-files.ps1')
 $operationLease=Enter-OperationsLock -Root $taskRoot -ProjectName $ProjectName
 Push-Location $taskRoot
 try {
     docker info --format '{{.ServerVersion}}' | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'Docker Desktop Linux engine is unavailable.' }
     function New-TaskSecret { $bytes = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Fill($bytes); return -join ($bytes | ForEach-Object { $_.ToString('x2') }) }
-    if (-not (Test-Path -LiteralPath $EnvFile)) { Copy-Item -LiteralPath '.env.example' -Destination $EnvFile }
-    $config = [IO.File]::ReadAllText(([IO.Path]::GetFullPath($EnvFile,$taskRoot)))
+    $envPath=[IO.Path]::GetFullPath($EnvFile,$taskRoot)
+    if (Test-Path -LiteralPath $envPath) {Set-SecurePathPermissions -Path $envPath;$config=[IO.File]::ReadAllText($envPath)}
+    else {$config=[IO.File]::ReadAllText((Join-Path $taskRoot '.env.example'))}
+    if($config -match '(?m)^SERVER_IMAGE=campuseats-server:sha-[a-f0-9]{40}\s*$'){throw 'This environment uses tested CI artifacts. Upgrade with scripts/release.ps1; source rebuilding must not overwrite immutable release references.'}
     foreach ($placeholder in @('root-password','app-password','redis-password','admin-signing-key','demo-password')) { $config = $config.Replace("replace-with-random-$placeholder", (New-TaskSecret)) }
     if ($config -notmatch '(?m)^DEMO_ADMIN_PASSWORD=') { $config += "`nDEMO_ADMIN_PASSWORD=$(New-TaskSecret)`n" }
-    [IO.File]::WriteAllText(([IO.Path]::GetFullPath($EnvFile,$taskRoot)), $config, [Text.UTF8Encoding]::new($false))
-    New-Item -ItemType Directory -Path '.local' -Force | Out-Null
+    Write-SecureTextFile -Path $envPath -Content $config
+    New-SecureDirectory -Path (Join-Path $taskRoot '.local') | Out-Null
     $credentialsFile=Join-Path $taskRoot (".local/"+$(if($ProjectName -eq "campuseats-v1"){"demo-credentials.txt"}else{$ProjectName+"-demo-credentials.txt"}))
     $demoPassword = [regex]::Match($config,'(?m)^DEMO_ADMIN_PASSWORD=([^\r\n]+)').Groups[1].Value
-    [IO.File]::WriteAllText($credentialsFile, "Demo only. Platform administrator: admin`nInitial password: $demoPassword`nDemo managers: manager1, manager2, manager3, manager4`nDemo operators: operator1, operator2, operator3, operator4`nCampus couriers: courier1, courier1b, courier2, courier2b`nNew demo employees use the initial password above and must change it on first login.`nExisting accounts keep their password; changing .env does not reset it.`n")
-    if ($IsWindows) {
-        $owner=[Security.Principal.WindowsIdentity]::GetCurrent().Name
-        & icacls.exe ([IO.Path]::GetFullPath($EnvFile,$taskRoot)) /inheritance:r /grant:r "${owner}:F" | Out-Null
-        & icacls.exe $credentialsFile /inheritance:r /grant:r "${owner}:F" | Out-Null
-    }
+    Write-SecureTextFile -Path $credentialsFile -Content "Demo only. Platform administrator: admin`nInitial password: $demoPassword`nDemo managers: manager1, manager2, manager3, manager4`nDemo operators: operator1, operator2, operator3, operator4`nCampus couriers: courier1, courier1b, courier2, courier2b`nNew demo employees use the initial password above and must change it on first login.`nExisting accounts keep their password; changing .env does not reset it.`n"
     if (-not $SkipVerify) {
         mvn -B -ntp clean verify
         if ($LASTEXITCODE -ne 0) { throw 'Backend verification failed.' }
@@ -51,7 +49,7 @@ try {
     }
     $revision=git rev-parse HEAD
     if($LASTEXITCODE -ne 0){$revision='unknown'}
-    & docker @composeArgs build --build-arg "SOURCE_REVISION=$revision"
+    & docker @composeArgs build --pull --build-arg "SOURCE_REVISION=$revision" --build-arg ('RUNTIME_REFRESH='+[DateTimeOffset]::UtcNow.ToUnixTimeSeconds())
     if($LASTEXITCODE -ne 0){throw 'Source image build failed; running containers were preserved.'}
     # Dependencies must be reachable even when the whole previous stack was stopped.
     & docker @composeArgs up -d --wait --wait-timeout 180 mysql redis

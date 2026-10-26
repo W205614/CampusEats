@@ -13,10 +13,11 @@ RUN --mount=type=cache,target=/root/.m2 mvn -s /workspace/maven-settings.xml -Dm
 RUN cd /workspace/sky-server/target && test -s bom.json && \
     sha256sum sky-server-1.0-SNAPSHOT.jar bom.json | \
     sed 's/sky-server-1.0-SNAPSHOT.jar/app.jar/; s/bom.json/sbom.cdx.json/' > runtime-manifest.sha256
-FROM eclipse-temurin:21-jre
+FROM eclipse-temurin:21-jre AS runtime
+ARG RUNTIME_REFRESH=initial
 ARG SOURCE_REVISION=unknown
 LABEL org.opencontainers.image.revision=$SOURCE_REVISION
-RUN sed -i 's|http://archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g; s|http://security.ubuntu.com/ubuntu|https://security.ubuntu.com/ubuntu|g' /etc/apt/sources.list.d/ubuntu.sources && \
+RUN test -n "$RUNTIME_REFRESH" && sed -i 's|http://archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g; s|http://security.ubuntu.com/ubuntu|https://security.ubuntu.com/ubuntu|g' /etc/apt/sources.list.d/ubuntu.sources && \
     apt-get -o Acquire::Retries=3 update && \
     apt-get -o Acquire::Retries=3 install -y --no-install-recommends curl && \
     rm -rf /var/lib/apt/lists/*
