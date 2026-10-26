@@ -79,6 +79,8 @@ H5 默认使用同源 API。H5 和小程序构建成功不代表微信登录、�
 
 ## 本机文件与验证范围
 
-`target/`、`node_modules/`、`dist/`、浏览器报告由工具生成，受 Git 忽略。`.env`、`.local/` 中可能有密码、用户数据、备份及回滚证据，不能作为“多余文件”批量删除。
+根目录保留 Maven、Docker、Git 和编辑器需要默认发现的入口配置；部署文件与运维配置模板集中在 `deploy/`，应用配置及前端构建配置留在所属模块，见[部署配置导航](../deploy/README.md)。不将所有配置搬入统一目录后再为每个工具补路径。
 
-本地只验证改动直接影响的模块或流程；提交后以该提交的 GitHub Actions 结论为准。构建、类型、契约、依赖审计、隔离业务验收和备份恢复的完整步骤见 CI，已有证据见[验收索引](verification/README.md)。
+`target/`、`node_modules/`、`dist/`、浏览器报告由工具生成，受 Git 忽略。当前原始验证材料集中在 `.local/verification/current/` 的 `architecture/`、`deployment/`、`organization/`；`.local/backups/` 只保留 `current-architecture-20261026/`。工具、扫描缓存、运维状态与锁继续按用途保留。`.env`、凭据、最新恢复集和业务卷不能作为过时文件批量删除，旧验证和旧备份按明确清单移入回收站。
+
+本地只验证改动直接影响的模块或流程；提交后以该提交的 GitHub Actions 结论为准。构建、类型、契约、依赖审计、隔离业务验收和备份恢复的完整步骤见 CI，当前证据见[当前版本验证与维护记录](verification/current.md)。

@@ -61,12 +61,12 @@ pwsh -NoProfile -File ./scripts/safe-backup.ps1
 
 开放真实用户前仍需独立用户身份、关闭共享演示登录、HTTPS及异机备份；当前默认配置仍用于演示，模拟支付成功不能作为真实收款凭证。
 
-四角色用户验收覆盖了点餐、商家备餐、配送／自取、售后和平台异常处理。已修复重复评价入口、待取消订单仍可抢单、报价过期回写及切换账号后的旧页面数据残留；平台介入入口按“商家拒绝或48小时未处理”的既有规则显示。验收继续使用模拟支付与退款，详情见[本轮验收记录](verification/role-acceptance-20261019.md)。
+平台介入入口按“商家拒绝或48小时未处理”的规则显示，支付与退款继续使用模拟实现。当前源码测试与日常部署核验的范围见[当前版本验证与维护记录](verification/current.md)；完整角色回归以最终提交的 CI 结果为准。
 
 ## 可配置的一次性运维入口
 
 ```powershell
-Copy-Item ./scripts/ops-config.example.json ./.local/ops-config.json
+Copy-Item ./deploy/ops-config.example.json ./.local/ops-config.json
 pwsh -NoProfile -File ./scripts/ops-run.ps1 -Action Check
 # 有意执行备份时才会暂停业务写入
 pwsh -NoProfile -File ./scripts/ops-run.ps1 -Action Backup

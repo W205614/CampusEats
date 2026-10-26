@@ -6,7 +6,7 @@
 
 DCloud H5 使用自带 Vue fork，编译器固定 3.4.21；Vue 3.5 的 compiler 与该 fork 混用曾在真实导航中报只读 slot 属性错误。不能仅以 npm install 成功判定兼容；必须经过两端构建和浏览器业务验收。
 
-2026-10-15 已通过本仓库 glob／watch 适配层、chokidar 4 和 Jimp 1 移除 braces 与旧 phin 的受影响路径，两端当前 npm 审计均为0项已知漏洞。旧 `audit-exceptions.json` 已删除，审计规则拒绝任意级别的新发现或无效报告。兼容补丁对锁定的两个上游文件检查版本与修改前后哈希，未知内容必须重新审查；详见[替换方案与验证证据](verification/dependency-security-20261015.md)。零已知漏洞不是全面安全认证。
+本仓库通过 glob／watch 适配层、chokidar 4 和 Jimp 1 移除 braces 与旧 phin 的受影响路径，不使用历史漏洞例外清单。审计规则拒绝任意级别的新发现或无效报告；兼容补丁对锁定的两个上游文件检查版本与修改前后哈希，未知内容必须重新审查。当前审计结论以对应提交的 GitHub Actions 和扫描产物为准，不沿用旧日期的零漏洞结论；验证边界见[当前版本记录](verification/current.md)。
 
 重新检查：
 

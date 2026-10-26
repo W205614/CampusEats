@@ -13,10 +13,10 @@
 | 前端依赖约束与兼容层 | [前端依赖说明](frontend-security-review.md) |
 | 启动、构建、验证及维护脚本的用途 | [脚本导航](../scripts/README.md) |
 
-## 验证与历史材料
+## 当前版本验证
 
-- [验收记录](verification/README.md)：按主题查找每轮实际验证的范围、结果和限制。记录中的数字、审计和容器状态只代表当轮环境。
-- [历史归档](archive/README.md)：旧单店架构、审查与验收材料，用于追溯实现变化，不作为当前操作手册。
-- `images/`：项目首页使用的当前演示截图；`archive/evidence/`：历史报告引用的截图。
+- [当前版本验证与维护记录](verification/current.md)：当前V12源码、日常部署与目录整理的范围、结果和限制；以记录中的提交与环境为准。
+- [部署配置导航](../deploy/README.md)：根目录、部署目录和模块配置的存放规则。
+- `images/`：项目首页使用的演示截图。
 
-新增现行操作说明放在本目录；带日期的验证报告放入 `verification/`；已被替代但需要追溯的记录放入 `archive/`。备份、密钥、原始日志和临时脚本只保存在受忽略的 `.local/`，不要提交。
+新增现行操作说明放在本目录；`verification/current.md` 只维护当前版本记录，不累计旧日期报告。对应本机材料统一放在 `.local/verification/current/{architecture,deployment,organization}/`；旧验证、历史验收备份和旧镜像包按明确清单移入回收站。密钥、原始日志、备份及镜像包不提交 Git，当前业务数据卷、最新恢复集和运维状态不属于过时验证文件。

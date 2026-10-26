@@ -9,7 +9,7 @@
 | 基础可用性 | `smoke.ps1` | HTTP 就绪与入口检查 |
 | 运维只读检查 | `ops-check.ps1` | 任务、积压、图片、空间及验证备份；发现异常返回非零 |
 | 一次性运维入口 | `ops-run.ps1 -Action Check\|Backup` | 可接定时调用，项目互斥；按配置复制验证备份、发送变化或恢复通知；不会自动注册定时任务 |
-| 运维接入模板 | `ops-config.example.json` | 复制到 `.local/ops-config.json` 配置受控副本目录与告警地址；配置与状态不提交 Git |
+| 运维接入模板 | [`../deploy/ops-config.example.json`](../deploy/ops-config.example.json) | 复制到 `.local/ops-config.json` 配置受控副本目录与告警地址；配置与状态不提交 Git |
 | 安全备份 | `safe-backup.ps1` | 暂停写入，调用备份及独立恢复检查，恢复原运行状态；日常备份优先用此入口 |
 | 备份底层步骤 | `backup.ps1` | 导出数据库、文件与清单；单独运行不等同于完整安全备份流程 |
 | 独立恢复核验 | `restore-check.ps1` | 读取指定备份，在临时容器恢复并核验，不覆盖日常数据库 |
