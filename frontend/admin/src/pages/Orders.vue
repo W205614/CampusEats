@@ -143,7 +143,10 @@ async function reset(o: Order) {
   });
 }
 function openException(o: Order, kind: 'reassign' | 'exception-cancel') {
-  if (busy.value || loading.value || needsRefresh.value) return;
+  // Opening a confirmation does not mutate business state. A websocket/periodic read can begin
+  // between a pointer event and Vue's disabled update; do not swallow that click. Submission
+  // remains disabled during the read and uses the captured version for server-side validation.
+  if (busy.value || needsRefresh.value) return;
   exceptionOrder.value = o;
   exceptionKind.value = kind;
   exceptionReason.value = '';
@@ -363,8 +366,8 @@ onUnmounted(() => {
         >撤回配送分配</el-button
       >
       <div v-if="session.session?.role === 'PLATFORM_ADMIN' && selected.fulfillment === 'DELIVERY' && ((selected.status === 3 && selected.ready) || selected.status === 4)" class="toolbar">
-        <el-button v-if="selected.courierId" :disabled="busy || loading || needsRefresh" @click="openException(selected, 'reassign')">平台改派</el-button>
-        <el-button type="danger" :disabled="busy || loading || needsRefresh" @click="openException(selected, 'exception-cancel')">异常取消并退款</el-button>
+        <el-button v-if="selected.courierId" :disabled="busy || needsRefresh" @click="openException(selected, 'reassign')">平台改派</el-button>
+        <el-button type="danger" :disabled="busy || needsRefresh" @click="openException(selected, 'exception-cancel')">异常取消并退款</el-button>
       </div>
       <h3>退款进度</h3>
       <p v-for="r in selected.refunds" :key="r.id">

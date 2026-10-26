@@ -9,7 +9,8 @@ async function workspace(page: Page, role = 'PLATFORM_ADMIN') {
     delivery: { state: 'PICKED' },
   };
   const writes: { path: string; body: Record<string, unknown> }[] = [];
-  const state = { failDetails: false, failWrites: false, conflict: false, release: undefined as (() => void) | undefined, hold: false };
+  const state = { failDetails: false, failWrites: false, conflict: false, release: undefined as (() => void) | undefined, hold: false,
+    holdList: false, releaseList: undefined as (() => void) | undefined };
   await page.addInitScript((role) => {
     sessionStorage.setItem('campus-admin', JSON.stringify({ token: 'ui-test', id: '1', name: '测试人员', role, mustChangePassword: false }));
     localStorage.setItem('campus-store', '1');
@@ -18,7 +19,10 @@ async function workspace(page: Page, role = 'PLATFORM_ADMIN') {
     const path = new URL(route.request().url()).pathname.replace('/api/v1', '');
     const ok = (data: unknown) => route.fulfill({ json: { code: 'OK', data } });
     if (path === '/merchant/stores/page') return ok({ records: [{ id: '1', name: '测试店铺', campusName: '校区' }], nextCursor: null, hasMore: false });
-    if (path === '/merchant/stores/1/orders') return ok([order]);
+    if (path === '/merchant/stores/1/orders') {
+      if (state.holdList) await new Promise<void>(resolve => { state.releaseList = resolve; });
+      return ok([order]);
+    }
     if (path === '/merchant/stores/1/couriers') return ok([{ id: '11', name: '原配送员' }, { id: '12', name: '接管配送员' }]);
     if (path === '/merchant/orders/501') return state.failDetails ? route.abort() : ok(order);
     if (path.startsWith('/platform/orders/501/')) {
@@ -68,6 +72,27 @@ test('merchant never receives platform exception controls', async ({ page }) => 
   await workspace(page, 'SHOP_MANAGER');
   await expect(page.getByRole('button', { name: '平台改派', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: '异常取消并退款', exact: true })).toHaveCount(0);
+});
+
+test('background synchronization does not swallow an exception dialog and still blocks submission', async ({ page }) => {
+  await page.clock.install();
+  const { writes, state } = await workspace(page);
+  state.holdList = true;
+  await page.clock.fastForward(15000);
+  await expect.poll(() => !!state.releaseList).toBeTruthy();
+  const cancel = page.getByRole('button', { name: '异常取消并退款', exact: true });
+  await expect(cancel).toBeEnabled({ timeout: 1000 });
+  await cancel.click();
+  const dialog = page.getByRole('dialog', { name: '异常取消订单' });
+  await dialog.getByPlaceholder('必填：操作原因').fill('同步时确认异常取消');
+  await expect(dialog.getByRole('button', { name: '确认操作' })).toBeDisabled();
+  expect(writes).toEqual([]);
+  state.holdList = false;
+  state.releaseList!();
+  await expect(dialog.getByRole('button', { name: '确认操作' })).toBeEnabled();
+  await dialog.getByRole('button', { name: '确认操作' }).click();
+  await expect.poll(() => writes.length).toBe(1);
+  expect(writes[0]?.path).toBe('/platform/orders/501/exception-cancel');
 });
 
 test('version conflict refreshes details before the next explicit operation', async ({ page }) => {
