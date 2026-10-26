@@ -15,6 +15,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/platform/staff/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["staffUpdate"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/platform/coupons/{id}": {
         parameters: {
             query?: never;
@@ -152,22 +168,6 @@ export interface paths {
         };
         get?: never;
         put: operations["categoryUpdate"];
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/platform/staff/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put: operations["staffUpdate"];
         post?: never;
         delete?: never;
         options?: never;
@@ -313,6 +313,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["apply"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/user/orders/{id}/actions/{action}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["orderAction"];
         delete?: never;
         options?: never;
         head?: never;
@@ -505,6 +521,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["store"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/staff": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["staff"];
+        put?: never;
+        post: operations["staffSave"];
         delete?: never;
         options?: never;
         head?: never;
@@ -767,22 +799,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/platform/staff": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["staff"];
-        put?: never;
-        post: operations["staffSave"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/merchant/staff": {
         parameters: {
             query?: never;
@@ -825,38 +841,6 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["refundRetry"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/user/orders/{id}/actions/{action}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["orderAction"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/courier/orders/{id}/actions/{action}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        post: operations["orderAction_1"];
         delete?: never;
         options?: never;
         head?: never;
@@ -921,6 +905,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["claimTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/courier/orders/{id}/actions/{action}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["orderAction_1"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1199,6 +1199,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/user/orders/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["order_2"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/user/favorites": {
         parameters: {
             query?: never;
@@ -1319,6 +1335,38 @@ export interface paths {
             cookie?: never;
         };
         get: operations["userAftersales"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/reports": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["report"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/reports/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["export"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1567,14 +1615,14 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/platform/reports/export": {
+    "/api/v1/merchant/reports": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        get: operations["export"];
+        get: operations["report_1"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1599,38 +1647,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/platform/reports": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["report"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/merchant/reports": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["report_1"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/v1/merchant/orders/{id}": {
         parameters: {
             query?: never;
@@ -1639,38 +1655,6 @@ export interface paths {
             cookie?: never;
         };
         get: operations["order"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/courier/orders/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["order_1"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/user/orders/{id}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["order_2"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1727,6 +1711,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/courier/orders/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["order_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/user/auth/me": {
         parameters: {
             query?: never;
@@ -1768,6 +1768,15 @@ export interface components {
             room: string;
             consignee: string;
             phone: string;
+        };
+        Staff: {
+            username: string;
+            name: string;
+            role: string;
+            storeId?: string;
+            campusId?: string;
+            enabled?: boolean;
+            password?: string;
         };
         Coupon: {
             name: string;
@@ -1847,15 +1856,6 @@ export interface components {
             sort?: number;
             enabled?: boolean;
         };
-        Staff: {
-            username: string;
-            name: string;
-            role: string;
-            storeId?: string;
-            campusId?: string;
-            enabled?: boolean;
-            password?: string;
-        };
         CartChange: {
             cartVersion?: string;
             itemType?: string;
@@ -1884,6 +1884,12 @@ export interface components {
             detailId?: string;
             /** Format: int32 */
             quantity?: number;
+        };
+        Action: {
+            version?: string;
+            reason?: string;
+            courierId?: string;
+            code?: string;
         };
         Checkout: {
             stores: components["schemas"]["Selection"][];
@@ -1963,12 +1969,6 @@ export interface components {
         Text: {
             text: string;
         };
-        Action: {
-            version?: string;
-            reason?: string;
-            courierId?: string;
-            code?: string;
-        };
         Reassign: {
             version?: string;
             courierId: string;
@@ -1991,12 +1991,251 @@ export interface components {
             username: string;
             password: string;
         };
-        Page: {
-            records?: {
-                [key: string]: unknown;
-            }[];
+        PublicReview: {
+            id?: string;
+            /** Format: int32 */
+            rating?: number;
+            content?: string;
+            reply?: string;
+            /** Format: date-time */
+            createdAt?: string;
+        };
+        PublicReviews: {
+            stats?: components["schemas"]["ReviewStats"];
+            records?: components["schemas"]["PublicReview"][];
+        };
+        ReviewStats: {
+            total?: string;
+            rating?: number;
+        };
+        StoreResponse: {
+            id?: string;
+            campusId?: string;
+            name?: string;
+            enabled?: boolean;
+            open?: boolean;
+            /** @example 12.00 */
+            deliveryFee?: string;
+            /** @example 12.00 */
+            packagingFee?: string;
+            hours?: string[];
+            phone?: string;
+            version?: string;
+            campusName?: string;
+            accepting?: boolean;
+        };
+        StorePageResponse: {
+            records?: components["schemas"]["StoreResponse"][];
             nextCursor?: string;
             hasMore?: boolean;
+        };
+        ComponentResponse: {
+            id?: string;
+            setmealId?: string;
+            dishId?: string;
+            name?: string;
+            /** @example 12.00 */
+            price?: string;
+            /** Format: int32 */
+            copies?: number;
+            currentName?: string;
+            /** Format: int32 */
+            status?: number;
+        };
+        FlavorResponse: {
+            id?: string;
+            name?: string;
+            values?: string[];
+        };
+        ProductResponse: {
+            id?: string;
+            name?: string;
+            categoryId?: string;
+            /** @example 12.00 */
+            price?: string;
+            image?: string;
+            description?: string;
+            /** Format: int32 */
+            status?: number;
+            createTime?: string;
+            updateTime?: string;
+            createUser?: string;
+            updateUser?: string;
+            /** Format: int32 */
+            defaultQuota?: number;
+            storeId?: string;
+            /** Format: int32 */
+            categoryStatus?: number;
+            /** @enum {string} */
+            itemType?: "DISH" | "SETMEAL";
+            storeName?: string;
+            flavors?: components["schemas"]["FlavorResponse"][];
+            components?: components["schemas"]["ComponentResponse"][];
+            /** Format: int32 */
+            remaining?: number;
+            promotion?: components["schemas"]["PromotionResponse"];
+        };
+        PromotionResponse: {
+            id?: string;
+            priceCents?: string;
+            endsAt?: string;
+        };
+        SearchPageResponse: {
+            records?: components["schemas"]["ProductResponse"][];
+            nextCursor?: string;
+            hasMore?: boolean;
+        };
+        DeliveryResponse: {
+            id?: string;
+            orderId?: string;
+            campusId?: string;
+            courierId?: string;
+            state?: string;
+            version?: string;
+        };
+        OrderAftersaleResponse: {
+            id?: string;
+            orderId?: string;
+            userId?: string;
+            storeId?: string;
+            kind?: string;
+            state?: string;
+            reason?: string;
+            decision?: string;
+            amountCents?: string;
+            feeCents?: string;
+            appealed?: boolean;
+            createdAt?: string;
+            version?: string;
+        };
+        OrderDetailResponse: {
+            id?: string;
+            name?: string;
+            image?: string;
+            orderId?: string;
+            dishId?: string;
+            setmealId?: string;
+            dishFlavor?: string;
+            /** Format: int32 */
+            number?: number;
+            /** @example 12.00 */
+            amount?: string;
+            lineTotalCents?: string;
+            /** Format: int32 */
+            refundedQuantity?: number;
+            /** Format: int32 */
+            reservedQuantity?: number;
+        };
+        OrderResponse: {
+            id?: string;
+            number?: string;
+            /** Format: int32 */
+            status?: number;
+            userId?: string;
+            addressBookId?: string;
+            orderTime?: string;
+            checkoutTime?: string;
+            /** Format: int32 */
+            payMethod?: number;
+            /** Format: int32 */
+            payStatus?: number;
+            /** @example 12.00 */
+            amount?: string;
+            remark?: string;
+            phone?: string;
+            address?: string;
+            userName?: string;
+            consignee?: string;
+            cancelReason?: string;
+            rejectionReason?: string;
+            cancelTime?: string;
+            estimatedDeliveryTime?: string;
+            deliveryStatus?: boolean;
+            deliveryTime?: string;
+            /** Format: int32 */
+            packAmount?: number;
+            /** Format: int32 */
+            tablewareNumber?: number;
+            tablewareStatus?: boolean;
+            requestId?: string;
+            version?: string;
+            businessDate?: string;
+            snapshotSource?: string;
+            buildingName?: string;
+            room?: string;
+            /** @example 12.00 */
+            deliveryFee?: string;
+            /** @example 12.00 */
+            packagingFee?: string;
+            payExpiresAt?: string;
+            deliveryStartedAt?: string;
+            courierId?: string;
+            deliveryOverdue?: boolean;
+            storeId?: string;
+            campusId?: string;
+            checkoutId?: string;
+            fulfillment?: string;
+            ready?: boolean;
+            completedAt?: string;
+            paidCents?: string;
+            refundedCents?: string;
+            reservedRefundCents?: string;
+            shopDiscountCents?: string;
+            platformDiscountCents?: string;
+            pickupCode?: string;
+            /** Format: int32 */
+            pickupAttempts?: number;
+            storeName?: string;
+            campusName?: string;
+            details?: components["schemas"]["OrderDetailResponse"][];
+            delivery?: components["schemas"]["DeliveryResponse"];
+            aftersales?: components["schemas"]["OrderAftersaleResponse"][];
+            refunds?: components["schemas"]["RefundResponse"][];
+            reviewed?: boolean;
+        };
+        RefundResponse: {
+            id?: string;
+            orderId?: string;
+            aftersaleId?: string;
+            storeId?: string;
+            amountCents?: string;
+            state?: string;
+            /** Format: int32 */
+            attempts?: number;
+            nextAttemptAt?: string;
+            leaseUntil?: string;
+            lastError?: string;
+            createdAt?: string;
+            succeededAt?: string;
+            successTimeSource?: string;
+        };
+        Entry: {
+            id?: string;
+            actorType?: string;
+            actorId?: string;
+            action?: string;
+            targetId?: string;
+            detail?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            storeId?: string;
+            campusId?: string;
+        };
+        MerchantReview: {
+            id?: string;
+            orderId?: string;
+            /** Format: int32 */
+            rating?: number;
+            content?: string;
+            reply?: string;
+            hidden?: boolean;
+            hideReason?: string;
+            /** Format: date-time */
+            createdAt?: string;
+        };
+        MerchantReviews: {
+            stats?: components["schemas"]["ReviewStats"];
+            records?: components["schemas"]["MerchantReview"][];
         };
         Actor: {
             id?: string;
@@ -2059,6 +2298,30 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    staffUpdate: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Staff"];
+            };
+        };
         responses: {
             /** @description OK */
             200: {
@@ -2312,30 +2575,6 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["Category"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    staffUpdate: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["Staff"];
             };
         };
         responses: {
@@ -2607,6 +2846,40 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["Aftersale"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: Record<string, never>;
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    orderAction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                action: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Action"];
             };
         };
         responses: {
@@ -3006,6 +3279,64 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["Store"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: Record<string, never>;
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    staff: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: Record<string, never>;
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    staffSave: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Staff"];
             };
         };
         responses: {
@@ -3669,64 +4000,6 @@ export interface operations {
             };
         };
     };
-    staff: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": {
-                        /** @example OK */
-                        code: string;
-                        message: string;
-                        data: Record<string, never>;
-                        /** Format: uuid */
-                        requestId: string;
-                    };
-                };
-            };
-        };
-    };
-    staffSave: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["Staff"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": {
-                        /** @example OK */
-                        code: string;
-                        message: string;
-                        data: Record<string, never>;
-                        /** Format: uuid */
-                        requestId: string;
-                    };
-                };
-            };
-        };
-    };
     staffSave_1: {
         parameters: {
             query?: never;
@@ -3799,74 +4072,6 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
-            };
-        };
-    };
-    orderAction: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-                action: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["Action"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": {
-                        /** @example OK */
-                        code: string;
-                        message: string;
-                        data: Record<string, never>;
-                        /** Format: uuid */
-                        requestId: string;
-                    };
-                };
-            };
-        };
-    };
-    orderAction_1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-                action: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["Action"];
-            };
-        };
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": {
-                        /** @example OK */
-                        code: string;
-                        message: string;
-                        data: Record<string, never>;
-                        /** Format: uuid */
-                        requestId: string;
-                    };
-                };
             };
         };
     };
@@ -3969,6 +4174,40 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    orderAction_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+                action: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Action"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: Record<string, never>;
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
             };
         };
     };
@@ -4149,7 +4388,10 @@ export interface operations {
     };
     reviews: {
         parameters: {
-            query?: never;
+            query?: {
+                beforeId?: string;
+                limit?: number;
+            };
             header?: never;
             path: {
                 storeId: string;
@@ -4168,7 +4410,7 @@ export interface operations {
                         /** @example OK */
                         code: string;
                         message: string;
-                        data: Record<string, never>;
+                        data: components["schemas"]["PublicReviews"];
                         /** Format: uuid */
                         requestId: string;
                     };
@@ -4316,7 +4558,7 @@ export interface operations {
                         /** @example OK */
                         code: string;
                         message: string;
-                        data: Record<string, never>;
+                        data: components["schemas"]["StoreResponse"];
                         /** Format: uuid */
                         requestId: string;
                     };
@@ -4349,7 +4591,7 @@ export interface operations {
                         /** @example OK */
                         code: string;
                         message: string;
-                        data: components["schemas"]["Page"];
+                        data: components["schemas"]["StorePageResponse"];
                         /** Format: uuid */
                         requestId: string;
                     };
@@ -4415,7 +4657,7 @@ export interface operations {
                         /** @example OK */
                         code: string;
                         message: string;
-                        data: components["schemas"]["Page"];
+                        data: components["schemas"]["SearchPageResponse"];
                         /** Format: uuid */
                         requestId: string;
                     };
@@ -4445,7 +4687,36 @@ export interface operations {
                         /** @example OK */
                         code: string;
                         message: string;
-                        data: Record<string, never>;
+                        data: components["schemas"]["OrderResponse"][];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    order_2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["OrderResponse"];
                         /** Format: uuid */
                         requestId: string;
                     };
@@ -4683,6 +4954,63 @@ export interface operations {
             };
         };
     };
+    report: {
+        parameters: {
+            query: {
+                campusId?: string;
+                storeId?: string;
+                begin: string;
+                end: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: Record<string, never>;
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    export: {
+        parameters: {
+            query: {
+                campusId?: string;
+                storeId?: string;
+                begin: string;
+                end: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+        };
+    };
     refunds: {
         parameters: {
             query?: {
@@ -4710,7 +5038,7 @@ export interface operations {
                         /** @example OK */
                         code: string;
                         message: string;
-                        data: Record<string, never>;
+                        data: components["schemas"]["RefundResponse"][];
                         /** Format: uuid */
                         requestId: string;
                     };
@@ -4755,7 +5083,14 @@ export interface operations {
     };
     audit: {
         parameters: {
-            query?: never;
+            query?: {
+                beforeId?: string;
+                limit?: number;
+                actorId?: string;
+                action?: string;
+                begin?: string;
+                end?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -4772,7 +5107,7 @@ export interface operations {
                         /** @example OK */
                         code: string;
                         message: string;
-                        data: Record<string, never>;
+                        data: components["schemas"]["Entry"][];
                         /** Format: uuid */
                         requestId: string;
                     };
@@ -4873,7 +5208,10 @@ export interface operations {
     };
     adminReviews: {
         parameters: {
-            query?: never;
+            query?: {
+                beforeId?: string;
+                limit?: number;
+            };
             header?: never;
             path: {
                 storeId: string;
@@ -4892,7 +5230,7 @@ export interface operations {
                         /** @example OK */
                         code: string;
                         message: string;
-                        data: Record<string, never>;
+                        data: components["schemas"]["MerchantReviews"];
                         /** Format: uuid */
                         requestId: string;
                     };
@@ -4929,7 +5267,7 @@ export interface operations {
                         /** @example OK */
                         code: string;
                         message: string;
-                        data: Record<string, never>;
+                        data: components["schemas"]["RefundResponse"][];
                         /** Format: uuid */
                         requestId: string;
                     };
@@ -4990,7 +5328,7 @@ export interface operations {
                         /** @example OK */
                         code: string;
                         message: string;
-                        data: Record<string, never>;
+                        data: components["schemas"]["OrderResponse"][];
                         /** Format: uuid */
                         requestId: string;
                     };
@@ -5066,7 +5404,14 @@ export interface operations {
     };
     storeAudit: {
         parameters: {
-            query?: never;
+            query?: {
+                beforeId?: string;
+                limit?: number;
+                actorId?: string;
+                action?: string;
+                begin?: string;
+                end?: string;
+            };
             header?: never;
             path: {
                 storeId: string;
@@ -5085,7 +5430,7 @@ export interface operations {
                         /** @example OK */
                         code: string;
                         message: string;
-                        data: Record<string, never>;
+                        data: components["schemas"]["Entry"][];
                         /** Format: uuid */
                         requestId: string;
                     };
@@ -5155,89 +5500,7 @@ export interface operations {
                         /** @example OK */
                         code: string;
                         message: string;
-                        data: components["schemas"]["Page"];
-                        /** Format: uuid */
-                        requestId: string;
-                    };
-                };
-            };
-        };
-    };
-    export: {
-        parameters: {
-            query: {
-                campusId?: string;
-                storeId?: string;
-                begin: string;
-                end: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
-                };
-            };
-        };
-    };
-    export_1: {
-        parameters: {
-            query: {
-                campusId?: string;
-                storeId?: string;
-                begin: string;
-                end: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
-                };
-            };
-        };
-    };
-    report: {
-        parameters: {
-            query: {
-                campusId?: string;
-                storeId?: string;
-                begin: string;
-                end: string;
-            };
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": {
-                        /** @example OK */
-                        code: string;
-                        message: string;
-                        data: Record<string, never>;
+                        data: components["schemas"]["StorePageResponse"];
                         /** Format: uuid */
                         requestId: string;
                     };
@@ -5277,6 +5540,31 @@ export interface operations {
             };
         };
     };
+    export_1: {
+        parameters: {
+            query: {
+                campusId?: string;
+                storeId?: string;
+                begin: string;
+                end: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": string;
+                };
+            };
+        };
+    };
     order: {
         parameters: {
             query?: never;
@@ -5298,65 +5586,7 @@ export interface operations {
                         /** @example OK */
                         code: string;
                         message: string;
-                        data: Record<string, never>;
-                        /** Format: uuid */
-                        requestId: string;
-                    };
-                };
-            };
-        };
-    };
-    order_1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": {
-                        /** @example OK */
-                        code: string;
-                        message: string;
-                        data: Record<string, never>;
-                        /** Format: uuid */
-                        requestId: string;
-                    };
-                };
-            };
-        };
-    };
-    order_2: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": {
-                        /** @example OK */
-                        code: string;
-                        message: string;
-                        data: Record<string, never>;
+                        data: components["schemas"]["OrderResponse"];
                         /** Format: uuid */
                         requestId: string;
                     };
@@ -5435,7 +5665,36 @@ export interface operations {
                         /** @example OK */
                         code: string;
                         message: string;
-                        data: Record<string, never>;
+                        data: components["schemas"]["OrderResponse"][];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    order_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["OrderResponse"];
                         /** Format: uuid */
                         requestId: string;
                     };

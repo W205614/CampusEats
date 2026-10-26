@@ -74,9 +74,26 @@ public class StoreCart {
         db.rows(
             "SELECT c.store_id,s.name store_name,s.campus_id,p.name campus_name,c.version"
                 + " cart_version FROM store_cart_state c JOIN store s ON s.id=c.store_id JOIN"
-                + " campus p ON p.id=s.campus_id WHERE c.user_id=? ORDER BY s.campus_id,s.id",
+                + " campus p ON p.id=s.campus_id WHERE c.user_id=? AND EXISTS"
+                + " (SELECT 1 FROM store_cart_item i WHERE i.user_id=c.user_id AND i.store_id=c.store_id)"
+                + " ORDER BY s.campus_id,s.id",
             user);
-    for (var row : rows) row.put("items", items(user, Db.id(row, "store_id")));
+    if (rows.isEmpty()) return rows;
+    var byStore = new HashMap<Long, List<Map<String, Object>>>();
+    // Read only actual items, joining both whitelisted product types in one query. Empty version
+    // roots deliberately survive clearing: deleting them could make an old version valid again.
+    var items = db.rows("SELECT i.*,COALESCE(d.name,m.name) name,COALESCE(d.price,m.price) price,"
+        + "COALESCE(d.image,m.image) image,COALESCE(d.status,m.status) status,c.id category_exists"
+        + " FROM store_cart_item i LEFT JOIN dish d ON i.item_type='DISH' AND d.id=i.item_id"
+        + " AND d.store_id=i.store_id LEFT JOIN setmeal m ON i.item_type='SETMEAL' AND m.id=i.item_id"
+        + " AND m.store_id=i.store_id LEFT JOIN category c ON c.id=COALESCE(d.category_id,m.category_id)"
+        + " AND c.store_id=i.store_id WHERE i.user_id=? ORDER BY i.store_id,i.item_type,i.item_id,i.flavor_hash", user);
+    for (var item : items) {
+      require(item.remove("category_exists") != null, 404, "NOT_FOUND", "本店商品不存在");
+      item.put("flavors", json.flavors(item.get("flavors").toString()));
+      byStore.computeIfAbsent(Db.id(item, "store_id"), ignored -> new ArrayList<>()).add(item);
+    }
+    for (var row : rows) row.put("items", byStore.getOrDefault(Db.id(row, "store_id"), List.of()));
     return rows;
   }
 

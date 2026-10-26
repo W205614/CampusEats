@@ -10,7 +10,7 @@
 |---|---|
 | `sky-common/src/main/java/com/sky/common/` | 公共异常 `BusinessException`、摘要工具 `Hashes` |
 | `sky-pojo/src/main/java/com/sky/api/` | 请求 `Commands` 和响应 `Views` |
-| `sky-server/src/main/java/com/sky/web/` | HTTP 入口；先看 `PlatformController`，再看认证和统一异常处理 |
+| `sky-server/src/main/java/com/sky/web/` | HTTP 入口；按目录、结算、履约、售后和管理控制器阅读，再看认证与统一异常处理 |
 | `sky-server/src/main/java/com/sky/platform/` | 多校区主业务：`PlatformScope` 权限、`StoreCart` 购物车、`CheckoutService` 合单、`FulfillmentService` 履约、`AftersaleService` 售后 |
 | `sky-server/src/main/java/com/sky/business/` | 商品、地址、配额、缓存、支付接口等复用服务，也保留旧接口使用的交易服务 |
 | `sky-server/src/main/java/com/sky/security/` | 登录、会话、角色校验与限流 |
@@ -19,7 +19,7 @@
 | `sky-server/src/main/resources/` | 应用配置和 `db/migration/` 中的 Flyway 迁移 |
 | `sky-server/src/test/` | 集成测试、并发及边界测试，与生产代码分开 |
 
-`PlatformController` 默认启用；旧交易控制器由 `campus.legacy-api=true` 条件启用，部分集成测试仍覆盖旧交易路径。`business/` 与 `platform/` 并非可以整目录删除的重复实现。不要修改已执行的 Flyway 迁移；数据库变化应新增迁移。
+平台五类控制器默认启用：`PlatformController`（目录发现）、`PlatformCheckoutController`、`PlatformFulfillmentController`、`PlatformAftersaleController`、`PlatformManagementController`；旧交易控制器由 `campus.legacy-api=true` 条件启用，部分集成测试仍覆盖旧交易路径。`business/` 与 `platform/` 并非可以整目录删除的重复实现。不要修改已执行的 Flyway 迁移；数据库变化应新增迁移。
 
 ## 前端与接口
 
@@ -31,7 +31,7 @@
 | `frontend/admin/tests/` | Playwright 场景，包含用户端与工作台流程，运行前确认隔离环境 |
 | `frontend/client/tooling/` | 锁定 uni-app 工具链的兼容包、补丁与回归；[用途和升级规则](../frontend/client/tooling/README.md) |
 
-阅读顺序：用户 `pages/checkout/index.vue` → `api.ts` → 后端 `PlatformController` → `CheckoutService` → `StoreCart`、`Money`、`PlatformScope` → `V5__multi_campus_platform.sql`。随后看 `FulfillmentService` 和 `AftersaleService`，对照[架构规则](platform-architecture.md)理解事务和权限边界。
+阅读顺序：用户 `pages/checkout/index.vue` → `api.ts` → 后端 `PlatformCheckoutController` → `CheckoutService` → `StoreCart`、`Money`、`PlatformScope` → `V5__multi_campus_platform.sql`。随后看 `FulfillmentService` 和 `AftersaleService`，对照[架构规则](platform-architecture.md)理解事务和权限边界。
 
 ## 本地构建与前端开发
 

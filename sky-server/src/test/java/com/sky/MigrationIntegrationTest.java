@@ -14,6 +14,24 @@ import org.testcontainers.mysql.MySQLContainer;
 
 @Testcontainers
 class MigrationIntegrationTest {
+  @Test
+  void v11ToV12AddsHistoryIndexesWithoutChangingBusinessRows() throws Exception {
+    String url = create("v11_history_upgrade");
+    Flyway.configure().dataSource(url, "root", "test").target("11").load().migrate();
+    try (var c = DriverManager.getConnection(url, "root", "test"); var s = c.createStatement()) {
+      s.execute("INSERT INTO review(order_id,user_id,store_id,rating,content,created_at) VALUES(1,1,1,5,'历史评价','2026-10-26 12:00:00')");
+      s.execute("INSERT INTO audit_log(actor_type,actor_id,action,target_id,detail,created_at,store_id) VALUES('ADMIN',1,'STORE_SAVE',1,'历史审计','2026-10-26 12:00:00',1)");
+    }
+    var before = businessRows(url);
+    var flyway = Flyway.configure().dataSource(url, "root", "test").load();
+    assertEquals(1, flyway.migrate().migrationsExecuted);
+    assertEquals("12", flyway.info().current().getVersion().toString());
+    assertEquals(before, businessRows(url));
+    try (var c = DriverManager.getConnection(url, "root", "test"); var s = c.createStatement();
+        var rows = s.executeQuery("SELECT COUNT(DISTINCT INDEX_NAME) FROM information_schema.statistics WHERE TABLE_SCHEMA=DATABASE() AND INDEX_NAME IN ('ix_review_store_history','ix_audit_store_history','ix_audit_actor_history','ix_audit_action_history')")) {
+      assertTrue(rows.next()); assertEquals(4, rows.getInt(1));
+    }
+  }
   @Container
   static final MySQLContainer mysql =
       new MySQLContainer("mysql:8.4")

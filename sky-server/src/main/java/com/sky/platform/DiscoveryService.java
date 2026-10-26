@@ -98,22 +98,48 @@ public class DiscoveryService {
         LocalDateTime.now(clock));
   }
 
-  public Map<String, Object> reviews(long store, boolean admin) {
-    if (admin) scope.merchant(store, false);
-    else scope.store(store, false);
-    var rows =
-        db.rows(
-            "SELECT id,order_id,rating,content,reply,hidden,hide_reason,created_at FROM review"
-                + " WHERE store_id=?"
-                + (admin ? "" : " AND hidden=false")
-                + " ORDER BY id DESC LIMIT 100",
-            store);
-    var stats =
-        db.one(
-            "SELECT COUNT(*) total,COALESCE(AVG(rating),0) rating FROM review WHERE store_id=? AND"
-                + " hidden=false",
-            store);
-    return Map.of("stats", stats, "records", rows);
+  public record ReviewStats(long total, java.math.BigDecimal rating) {}
+  public record PublicReview(long id, int rating, String content, String reply,
+      LocalDateTime createdAt) {}
+  public record MerchantReview(long id, long orderId, int rating, String content, String reply,
+      boolean hidden, String hideReason, LocalDateTime createdAt) {}
+  public record PublicReviews(ReviewStats stats, List<PublicReview> records) {}
+  public record MerchantReviews(ReviewStats stats, List<MerchantReview> records) {}
+
+  public PublicReviews publicReviews(long store, ReviewQuery query) {
+    // This public read follows the same enabled campus/store boundary as discovery.
+    scope.store(store, true);
+    var rows = reviewRows(store, query, false);
+    return new PublicReviews(reviewStats(store), rows.stream().map(r -> new PublicReview(
+        Db.id(r, "id"), Db.integer(r, "rating"), r.get("content").toString(),
+        (String) r.get("reply"), Db.time(r.get("created_at")))).toList());
+  }
+
+  public MerchantReviews merchantReviews(long store, ReviewQuery query) {
+    scope.merchant(store, false);
+    var rows = reviewRows(store, query, true);
+    return new MerchantReviews(reviewStats(store), rows.stream().map(r -> new MerchantReview(
+        Db.id(r, "id"), Db.id(r, "order_id"), Db.integer(r, "rating"), r.get("content").toString(),
+        (String) r.get("reply"), Db.bool(r, "hidden"), (String) r.get("hide_reason"),
+        Db.time(r.get("created_at")))).toList());
+  }
+
+  private List<Map<String, Object>> reviewRows(long store, ReviewQuery query, boolean admin) {
+    int limit = query.pageLimit();
+    var args = new ArrayList<Object>();
+    args.add(store);
+    if (query.beforeId() != null) args.add(query.beforeId());
+    args.add(limit);
+    return db.rows("SELECT id,rating,content,reply,created_at"
+        + (admin ? ",order_id,hidden,hide_reason" : "") + " FROM review WHERE store_id=?"
+        + (admin ? "" : " AND hidden=false")
+        + (query.beforeId() == null ? "" : " AND id<?") + " ORDER BY id DESC LIMIT ?", args.toArray());
+  }
+
+  private ReviewStats reviewStats(long store) {
+    var stats = db.one("SELECT COUNT(*) total,COALESCE(AVG(rating),0) rating FROM review"
+        + " WHERE store_id=? AND hidden=false", store);
+    return new ReviewStats(Db.id(stats, "total"), new java.math.BigDecimal(stats.get("rating").toString()));
   }
 
   @Transactional

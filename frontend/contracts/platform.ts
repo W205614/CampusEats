@@ -1,3 +1,6 @@
+import type { components } from './openapi';
+// Required display fields are selected from generated API records, rather than redeclared.
+type Fields<T, K extends keyof T> = { [P in K]-?: NonNullable<T[P]> };
 export type Id = string;
 export interface CursorPage<T> {
   records: T[];
@@ -14,35 +17,16 @@ export interface Campus {
   name: string;
   enabled: boolean;
 }
-export interface Store {
-  id: Id;
-  campusId: Id;
-  campusName: string;
-  name: string;
-  enabled: boolean;
-  open: boolean;
-  accepting: boolean;
-  hours: string[];
-  deliveryFee: string;
-  packagingFee: string;
-  phone: string;
-  version: Id;
-}
-export interface Product {
-  id: Id;
-  storeId: Id;
-  name: string;
-  itemType: 'DISH' | 'SETMEAL';
-  categoryId: Id;
-  price: string;
-  status: number;
-  description: string;
-  image: string;
-  remaining: number;
-  flavors?: { name: string; values: string[] }[];
-  components?: { dishId: Id; copies: number }[];
-  promotion?: { id: Id; priceCents: Id; endsAt: string };
-}
+export type Store = Fields<components['schemas']['StoreResponse'],
+  'id' | 'campusId' | 'campusName' | 'name' | 'enabled' | 'open' | 'accepting' |
+  'hours' | 'deliveryFee' | 'packagingFee' | 'phone' | 'version'>;
+export type Product = Fields<components['schemas']['ProductResponse'],
+  'id' | 'storeId' | 'name' | 'itemType' | 'categoryId' | 'price' | 'status' |
+  'description' | 'image' | 'remaining'> & {
+  flavors?: Fields<components['schemas']['FlavorResponse'], 'name' | 'values'>[];
+  components?: Fields<components['schemas']['ComponentResponse'], 'dishId' | 'copies'>[];
+  promotion?: Fields<components['schemas']['PromotionResponse'], 'id' | 'priceCents' | 'endsAt'>;
+};
 export interface CartItem {
   id: Id;
   itemType: 'DISH' | 'SETMEAL';
@@ -109,42 +93,22 @@ export interface Checkout {
   version: Id;
   orders: Order[];
 }
-export interface Order {
-  id: Id;
-  number: string;
-  storeId: Id;
-  storeName: string;
-  campusName: string;
-  version: Id;
-  status: number;
-  payStatus: number;
-  fulfillment: string;
-  ready: boolean;
-  reviewed?: boolean;
-  pickupCode?: string;
-  amount: string;
-  paidCents: Id;
-  refundedCents: Id;
-  phone?: string;
-  address: string;
-  consignee: string;
-  courierId?: Id;
+export type Order = Fields<components['schemas']['OrderResponse'],
+  'id' | 'number' | 'storeId' | 'storeName' | 'campusName' | 'version' | 'status' |
+  'payStatus' | 'fulfillment' | 'ready' | 'amount' | 'paidCents' | 'refundedCents' |
+  'address' | 'consignee'> & Pick<components['schemas']['OrderResponse'],
+  'reviewed' | 'pickupCode' | 'phone' | 'courierId'> & {
   details: Detail[];
-  aftersales: Aftersale[];
+  aftersales: components['schemas']['OrderAftersaleResponse'][];
   refunds: Refund[];
-  delivery?: { state: string };
-}
-export interface Detail {
-  id: Id;
-  name: string;
-  number: number;
-  lineTotalCents: Id;
-  refundedQuantity: number;
-  reservedQuantity: number;
-}
+  delivery?: Fields<components['schemas']['DeliveryResponse'], 'state'>;
+};
+export type Detail = Fields<components['schemas']['OrderDetailResponse'],
+  'id' | 'name' | 'number' | 'lineTotalCents' | 'refundedQuantity' | 'reservedQuantity'>;
 export interface Aftersale {
   id: Id;
   orderId: Id;
+  orderStatus?: number;
   storeId: Id;
   kind: string;
   state: string;
@@ -163,10 +127,8 @@ export interface Task {
   attempts: number;
   lastError: string;
 }
-export interface Refund extends Task {
-  orderId: Id;
-  amountCents: Id;
-}
+export type Refund = Fields<components['schemas']['RefundResponse'],
+  'id' | 'orderId' | 'amountCents' | 'state' | 'attempts' | 'lastError'>;
 export interface OutboxEvent extends Task {
   aggregateId: Id;
   eventType: string;

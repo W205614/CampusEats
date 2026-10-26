@@ -48,7 +48,10 @@ async function moreStores() {
   try { await loadStores(); } catch (e) { notifyError(e); }
 }
 const history = ['aftersales', 'refunds', 'outbox'].includes(kind);
-const emptyFilters = (): HistoryFilters => ({ state: '', orderNumber: '', begin: '', end: '', ...(kind === 'aftersales' ? {} : { taskId: '' }) });
+const paged = history || kind === 'reviews' || kind === 'audit';
+type RecordFilters = HistoryFilters & { actorId?: string; action?: string };
+const emptyFilters = (): RecordFilters => ({ state: '', orderNumber: '', begin: '', end: '',
+  ...(kind === 'audit' ? { actorId: '', action: '' } : kind === 'aftersales' ? {} : { taskId: '' }) });
 const filters = ref(emptyFilters()), applied = ref(emptyFilters()), loading = ref(false), busy = ref(false), hasMore = ref(false);
 const tasks = computed(() => kind === 'outbox' ? events.value : refunds.value);
 let loadedPages = 1, sequence = 0, mounted = false;
@@ -58,7 +61,7 @@ watch([() => session.session?.token, selectedStore], () => {
   loadedPages = 1;
   filters.value = emptyFilters();
   applied.value = emptyFilters();
-  aftersales.value = []; refunds.value = []; events.value = [];
+  aftersales.value = []; refunds.value = []; events.value = []; reviews.value = []; audit.value = [];
   hasMore.value = false;
   loading.value = false;
   busy.value = false;
@@ -107,12 +110,23 @@ async function load(pages = loadedPages) {
       hasMore.value = result.hasMore;
       loadedPages = pages;
     }
-    if (kind === 'reviews')
-      reviews.value = (await request<{ records: Review[] }>(base() + '/reviews')).records;
-    if (kind === 'audit')
-      audit.value = await request<typeof audit.value>(
-        platform.value ? '/platform/audit' : base() + '/audit',
-      );
+    if (kind === 'reviews') {
+      const path = base() + '/reviews';
+      const result = await readPages(async (beforeId, limit) =>
+        (await request<{ records: Review[] }>(path + historyQuery(emptyFilters(), beforeId, limit))).records,
+        pages, () => mounted && current === sequence);
+      if (current !== sequence) return;
+      reviews.value = result.items; hasMore.value = result.hasMore; loadedPages = pages;
+    }
+    if (kind === 'audit') {
+      const path = platform.value ? '/platform/audit' : base() + '/audit';
+      const selectedFilters = { ...applied.value };
+      const result = await readPages((beforeId, limit) =>
+        request<typeof audit.value>(path + historyQuery(selectedFilters, beforeId, limit)),
+        pages, () => mounted && current === sequence);
+      if (current !== sequence) return;
+      audit.value = result.items; hasMore.value = result.hasMore; loadedPages = pages;
+    }
   } catch (e) {
     if (current === sequence) notifyError(e);
   } finally {
@@ -124,11 +138,17 @@ async function search(clear = false) {
   try {
     if (clear) filters.value = emptyFilters();
     validateHistoryFilters(filters.value);
+    if (kind === 'audit') {
+      if (filters.value.actorId && !/^[1-9]\d*$/.test(filters.value.actorId.trim()))
+        throw new Error('操作人编号须为正整数');
+      if (filters.value.action && !/^[A-Z][A-Z0-9_]{0,47}$/.test(filters.value.action.trim()))
+        throw new Error('操作类型须为完整的操作代码');
+    }
     applied.value = { ...filters.value };
     sequence++;
     loading.value = false;
     loadedPages = 1;
-    aftersales.value = []; refunds.value = []; events.value = [];
+    aftersales.value = []; refunds.value = []; events.value = []; reviews.value = []; audit.value = [];
     hasMore.value = false;
     await load();
   } catch (e) { notifyError(e); }
@@ -292,11 +312,13 @@ onUnmounted(() => {
     </div>
     <el-button :loading="loading" @click="load()">刷新</el-button>
   </section>
-  <section class="panel" v-if="history" aria-label="历史记录筛选">
+  <section class="panel" v-if="history || kind === 'audit'" aria-label="历史记录筛选">
     <el-form inline @submit.prevent="search()">
-      <el-form-item label="状态"><el-select v-model="filters.state" placeholder="全部状态" clearable style="width: 150px"><el-option v-for="s in kind === 'aftersales' ? aftersaleStates : taskStates" :key="s" :value="s" :label="states[s] || s" /></el-select></el-form-item>
-      <el-form-item label="订单号"><el-input v-model="filters.orderNumber" placeholder="完整订单号" maxlength="64" /></el-form-item>
-      <el-form-item v-if="kind !== 'aftersales'" label="任务编号"><el-input v-model="filters.taskId" placeholder="完整任务编号" maxlength="19" /></el-form-item>
+      <el-form-item v-if="history" label="状态"><el-select v-model="filters.state" placeholder="全部状态" clearable style="width: 150px"><el-option v-for="s in kind === 'aftersales' ? aftersaleStates : taskStates" :key="s" :value="s" :label="states[s] || s" /></el-select></el-form-item>
+      <el-form-item v-if="history" label="订单号"><el-input v-model="filters.orderNumber" placeholder="完整订单号" maxlength="64" /></el-form-item>
+      <el-form-item v-if="history && kind !== 'aftersales'" label="任务编号"><el-input v-model="filters.taskId" placeholder="完整任务编号" maxlength="19" /></el-form-item>
+      <el-form-item v-if="kind === 'audit'" label="操作人编号"><el-input v-model="filters.actorId" placeholder="完整操作人编号" maxlength="19" /></el-form-item>
+      <el-form-item v-if="kind === 'audit'" label="操作类型"><el-input v-model="filters.action" placeholder="例如 STORE_SAVE" maxlength="48" /></el-form-item>
       <el-form-item label="上海日期"><el-date-picker v-model="filters.begin" type="date" value-format="YYYY-MM-DD" placeholder="开始日期" /><el-date-picker v-model="filters.end" type="date" value-format="YYYY-MM-DD" placeholder="结束日期" /></el-form-item>
       <el-form-item><el-button type="primary" native-type="submit" :disabled="loading">筛选</el-button><el-button :disabled="loading" @click="search(true)">清空筛选</el-button></el-form-item>
     </el-form>
@@ -395,7 +417,7 @@ onUnmounted(() => {
       ></el-table
     >
   </section>
-  <section v-if="history" class="toolbar">
+  <section v-if="paged" class="toolbar">
     <el-button v-if="hasMore" :loading="loading" @click="load(loadedPages + 1)">加载更早记录</el-button>
     <span v-else-if="!loading" class="muted">已展示全部匹配记录</span>
   </section>

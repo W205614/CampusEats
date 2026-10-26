@@ -17,6 +17,7 @@ public class AuthFilter extends OncePerRequestFilter {
   private final ErrorWriter errors;
   private final RateLimits limits;
   private final io.micrometer.core.instrument.MeterRegistry metrics;
+  private final OperationsAccess operations;
 
   @org.springframework.beans.factory.annotation.Value("${campus.legacy-api:false}")
   private boolean legacyApi;
@@ -32,10 +33,21 @@ public class AuthFilter extends OncePerRequestFilter {
       ErrorWriter errors,
       RateLimits limits,
       io.micrometer.core.instrument.MeterRegistry metrics) {
+    this(auth, errors, limits, metrics, new OperationsAccess(""));
+  }
+
+  @org.springframework.beans.factory.annotation.Autowired
+  public AuthFilter(
+      AuthService auth,
+      ErrorWriter errors,
+      RateLimits limits,
+      io.micrometer.core.instrument.MeterRegistry metrics,
+      OperationsAccess operations) {
     this.metrics = metrics;
     this.auth = auth;
     this.errors = errors;
     this.limits = limits;
+    this.operations = operations;
   }
 
   @Override
@@ -88,6 +100,12 @@ public class AuthFilter extends OncePerRequestFilter {
         if (!req.getMethod().equals("GET")
             && (path.contains("/orders") || path.contains("/checkouts") || path.contains("/claim")))
           limits.check("order:" + actor.type() + ":" + actor.id(), 30, 60);
+      } else {
+        Actor maintenance = operations.authenticate(req);
+        if (maintenance != null)
+          SecurityContextHolder.getContext().setAuthentication(
+              new UsernamePasswordAuthenticationToken(maintenance, null,
+                  List.of(new SimpleGrantedAuthority("ROLE_PLATFORM_ADMIN"))));
       }
       if (path.endsWith("/auth/login")
           || path.endsWith("/auth/demo")

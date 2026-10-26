@@ -8,8 +8,13 @@ if($a[0] -eq 'inspect'){'running healthy';exit}
 if($a -contains 'ps'){$a[-1];exit}
 if($a -notcontains 'exec'){throw 'Unexpected fixture command.'}
 $command=$a[-1]
+if($command -eq 'printf %s "$JWT_ADMIN_SECRET"'){'fixture-private-operations-secret-thirty-two-bytes-long';exit}
 if($command -like 'curl *'){
  if($command -notlike '*--max-time 5*' -or $command -notlike '*localhost:8080/actuator/health/operations*'){throw 'HTTP deadline or private health URL missing.'}
+ $inputConfig=[Console]::In.ReadToEnd()
+ $hmac=[Security.Cryptography.HMACSHA256]::new([Text.Encoding]::UTF8.GetBytes('fixture-private-operations-secret-thirty-two-bytes-long'))
+ try {$key=[Convert]::ToHexString($hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes('campuseats:operations-read:v1'))).ToLowerInvariant()}finally{$hmac.Dispose()}
+ if($command -notlike '*--config -*' -or $inputConfig.Trim() -ne ('header = "X-Campus-Operations-Key: '+$key+'"')){throw 'Scoped operations authentication missing.'}
  if($config.invalidHealth){'unparseable';exit}
  $jobs=[ordered]@{}
  foreach($name in @('checkoutExpiry','platformRefunds','legacyRefunds','outbox','legacyExpiry','deliveryOverdue','maintenance','metrics')){

@@ -18,6 +18,16 @@ function Read-Sql([string]$Sql) {
  Read-Docker -Arguments ($composeArgs+@('exec','-T','mysql','sh','-c','MYSQL_PWD="$MYSQL_PASSWORD" mysql -u campus sky_take_out -N')) -InputText $Sql
 }
 function Read-Server([string]$Command) { Read-Docker -Arguments ($composeArgs+@('exec','-T','server','sh','-c',$Command)) }
+function Read-OperationsHealth {
+ # The derived credential is scoped by the server to GET operations from container loopback.
+ # Keep both the source secret and curl header out of process arguments, reports and files.
+ $secretText=@(Read-Server 'printf %s "$JWT_ADMIN_SECRET"') -join ''
+ if($secretText.Length -lt 32){throw 'Operations credential unavailable.'}
+ $hmac=[Security.Cryptography.HMACSHA256]::new([Text.Encoding]::UTF8.GetBytes($secretText))
+ try {$key=[Convert]::ToHexString($hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes('campuseats:operations-read:v1'))).ToLowerInvariant()}
+ finally {$hmac.Dispose();$secretText=$null}
+ Read-Docker -Arguments ($composeArgs+@('exec','-T','server','sh','-c','curl --config - --silent --show-error --connect-timeout 2 --max-time 5 http://localhost:8080/actuator/health/operations')) -InputText ('header = "X-Campus-Operations-Key: '+$key+'"'+"`n")
+}
 Push-Location $taskRoot
 try {
  foreach($service in @('mysql','redis','server','web')){
@@ -56,7 +66,7 @@ SELECT COUNT(*) FROM orders WHERE status=4 AND delivery_started_at<DATE_SUB(NOW(
  } else {$checks.databaseOperationalState='unknown';$issues.Add('Database operational check unavailable')}
  if($checks.server -eq 'running healthy') {
   try {
-   $healthText=@(Read-Server 'curl --silent --show-error --connect-timeout 2 --max-time 5 http://localhost:8080/actuator/health/operations') -join "`n"
+   $healthText=@(Read-OperationsHealth) -join "`n"
    $health=$healthText | ConvertFrom-Json
    $runtime=$health.components.runtimeOperations
    $details=$runtime.details

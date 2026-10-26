@@ -857,8 +857,9 @@ class PlatformIntegrationTest {
 
   @Test
   void operationsHealthExposesDisabledJobsAndMetricsWithoutAffectingReadiness() throws Exception {
+    String adminToken = auth.login(new Commands.Login("admin", "TestAdmin!2026")).get("token").toString();
     operationalMetrics.sample();
-    mvc.perform(get("/actuator/health/operations"))
+    mvc.perform(get("/actuator/health/operations").header("Authorization", "Bearer " + adminToken))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.components.runtimeOperations.details.tasksEnabled").value(false))
         .andExpect(
@@ -874,7 +875,7 @@ class PlatformIntegrationTest {
     try {
       operations.run(
           "metrics", round -> round.failed(new IllegalStateException("test failure"), "test"));
-      mvc.perform(get("/actuator/health/operations")).andExpect(status().isServiceUnavailable());
+      mvc.perform(get("/actuator/health/operations").header("Authorization", "Bearer " + adminToken)).andExpect(status().isServiceUnavailable());
       String readiness =
           mvc.perform(get("/actuator/health/readiness"))
               .andExpect(status().isOk())

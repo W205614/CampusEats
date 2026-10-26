@@ -9,7 +9,7 @@ import com.sky.business.ImageStorage;
 import com.sky.common.BusinessException;
 import com.sky.infra.Db;
 import com.sky.security.Actor;
-import com.sky.web.PlatformController;
+import com.sky.web.PlatformAftersaleController;
 import com.sky.web.ApiAdvice;
 import jakarta.servlet.ServletOutputStream;
 import jakarta.servlet.WriteListener;
@@ -178,9 +178,8 @@ class EvidenceReadTest {
 
   private Path file() { return root.resolve(".private").resolve(ID + ".png"); }
 
-  private PlatformController controller() {
-    return new PlatformController(null, null, null, null, null, null, null, null,
-        service, null, null, null, null, null);
+  private PlatformAftersaleController controller() {
+    return new PlatformAftersaleController(null, service, null);
   }
 
   private static void act(long id, String role) {

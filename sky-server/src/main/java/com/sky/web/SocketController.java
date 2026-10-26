@@ -13,7 +13,7 @@ public class SocketController {
   }
 
   @PostMapping("/api/v1/admin/ws-ticket")
-  public Map<String, Object> ticket() {
-    return tickets.issue();
+  public Map<String, Object> ticket(jakarta.servlet.http.HttpServletRequest request) {
+    return tickets.issue(request.getRemoteAddr());
   }
 }

@@ -175,7 +175,7 @@ public class AftersaleService {
     args.add(query.pageLimit());
     var rows =
         db.rows(
-            "SELECT a.*,o.number FROM aftersale a JOIN orders o ON o.id=a.order_id WHERE 1=1"
+            "SELECT a.*,o.number,o.status order_status FROM aftersale a JOIN orders o ON o.id=a.order_id WHERE 1=1"
                 + filter
                 + " ORDER BY a.id DESC LIMIT ?",
             args.toArray());
@@ -308,6 +308,11 @@ public class AftersaleService {
         409,
         "APPEAL_STATE",
         "拒绝或超过48小时未处理时可介入");
+    require(
+        !r.get("kind").equals("CANCEL") || Db.integer(o, "status") == 3,
+        409,
+        "CANCELLATION_UNAVAILABLE",
+        "订单已不在备餐阶段，不能申请取消介入；完成后可在7天内申请退款");
     if (rejected) {
       require(
           db.count(

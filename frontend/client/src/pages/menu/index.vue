@@ -28,17 +28,24 @@ const session = useSession(),
   flavors = ref<Record<string, string>>({}),
   cart = ref<Cart>(),
   busy = ref(false),
-  reviews = ref<{ rating: number; content: string; reply?: string }[]>([]),
+  reviews = ref<{ id: string; rating: number; content: string; reply?: string }[]>([]),
+  reviewsMore = ref(false), reviewsLoading = ref(false),
   showReviews = ref(false),
   storesMore = ref(false), storesLoading = ref(false),
   searchMore = ref(false), matchedMore = ref(false), searchLoading = ref(false), matchedLoading = ref(false);
 let menuSequence = 0, storeSequence = 0, searchSequence = 0, loadSequence = 0, active = true;
 let storeCursor: string | null = null, searchCursor: string | null = null, matchedCursor: string | null = null;
 let loadedCampus = '', appliedSearch = '';
+let reviewSequence = 0;
 let loadingCampuses = false;
 const currentSession = () => session.session?.token || '';
+function closeReviews() {
+  reviewSequence++; showReviews.value = false; reviewsLoading.value = false;
+}
+watch(() => store.value?.id, () => { closeReviews(); reviews.value = []; reviewsMore.value = false; });
 function invalidate() {
   menuSequence++; storeSequence++; searchSequence++; loadSequence++;
+  closeReviews();
   storesLoading.value = false; searchLoading.value = false; matchedLoading.value = false;
 }
 watch(currentSession, token => {
@@ -255,15 +262,23 @@ async function moreSearch(shops = false) {
     if (active && sequence === searchSequence && token === currentSession()) loading.value = false;
   }
 }
-async function openReviews() {
-  if (!store.value) return;
+async function openReviews(more = false) {
+  if (!store.value || more && (reviewsLoading.value || !reviewsMore.value)) return;
+  const targetStore = store.value.id, token = currentSession(), sequence = ++reviewSequence;
+  reviewsLoading.value = true;
+  if (!more) { reviews.value = []; reviewsMore.value = false; }
   try {
-    reviews.value = (
-      await api<{ records: typeof reviews.value }>('/stores/' + store.value.id + '/reviews')
-    ).records;
+    const before = more ? reviews.value.at(-1)?.id : undefined;
+    const result = await api<{ records: typeof reviews.value }>('/stores/' + targetStore
+      + '/reviews?limit=100' + (before ? '&beforeId=' + encodeURIComponent(before) : ''));
+    if (!active || sequence !== reviewSequence || store.value?.id !== targetStore || token !== currentSession()) return;
+    reviews.value = more ? mergeRecords(reviews.value, result.records, row => row.id) : result.records;
+    reviewsMore.value = result.records.length === 100;
     showReviews.value = true;
   } catch (e) {
-    toast(e);
+    if (active && sequence === reviewSequence && store.value?.id === targetStore && token === currentSession()) toast(e);
+  } finally {
+    if (sequence === reviewSequence) reviewsLoading.value = false;
   }
 }
 async function searchPick(p: Product) {
@@ -343,7 +358,7 @@ onHide(() => { active = false; invalidate(); });
       ><text class="tap" @click="favorite('STORE', store.id)">收藏店铺</text></view
     ><view class="row" v-if="store" style="margin-bottom: 24rpx"
       ><text class="tap" @click="nav('/pages/account/index')">领券与我的收藏</text
-      ><text class="tap" @click="openReviews">店铺评价</text></view
+      ><text class="tap" @click="openReviews()">店铺评价</text></view
     ><template v-if="campusSearch"><view class="section-title">店铺搜索结果</view><view class="card row" v-for="s in matchedStores" :key="s.id"><view>{{ s.name }}<view class="muted">{{ s.accepting ? '营业中' : '休息中' }} · {{ s.hours.join(' / ') }}</view></view><text class="tap" @click="visitStore(s)">进入店铺</text></view><view v-if="!matchedStores.length && !matchedLoading" class="muted">没有匹配的店铺。</view><button v-if="matchedMore" class="secondary small-button" :loading="matchedLoading" :disabled="matchedLoading" @click="moreSearch(true)">加载更多匹配店铺</button><view class="section-title">餐品搜索结果</view></template
     ><view class="card menu-product" v-for="p in products" :key="p.storeId + p.itemType + p.id"
       ><view class="row"
@@ -390,15 +405,16 @@ onHide(() => { active = false; invalidate(); });
           ></view
         ><button class="primary" :loading="busy" @click="add">加入本店购物车</button></view
       ></view
-    ><view class="modal" v-if="showReviews" @click="showReviews = false"
+    ><view class="modal" v-if="showReviews" @click="closeReviews"
       ><view class="card" @click.stop
         ><view class="row"
-          ><text>店铺评价</text><text class="tap" @click="showReviews = false">关闭</text></view
+          ><text>店铺评价</text><text class="tap" @click="closeReviews">关闭</text></view
         ><scroll-view scroll-y style="max-height: 60vh"
-          ><view class="card" v-for="(r, i) in reviews" :key="i"
+          ><view class="card" v-for="r in reviews" :key="r.id"
             ><text>{{ r.rating }} 星</text><view>{{ r.content }}</view
             ><view class="muted" v-if="r.reply">商家回复：{{ r.reply }}</view></view
-          ><view v-if="!reviews.length" class="empty">暂无评价</view></scroll-view
+          ><view v-if="!reviews.length" class="empty">暂无评价</view>
+          <button v-if="reviewsMore" class="secondary" :loading="reviewsLoading" @click="openReviews(true)">加载更早评价</button></scroll-view
         ></view
       ></view
     ></view

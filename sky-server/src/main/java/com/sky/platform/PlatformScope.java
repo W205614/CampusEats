@@ -9,7 +9,7 @@ import org.springframework.stereotype.Service;
 
 @Service
 public class PlatformScope {
-  public final Db db;
+  private final Db db;
 
   public PlatformScope(Db db) {
     this.db = db;

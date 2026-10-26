@@ -104,6 +104,7 @@ public class DirectoryService {
   public long store(Long id, PlatformCommands.Store input) {
     if (id == null) scope.platform();
     else scope.merchant(id, true);
+    boolean platform = Actor.current().role().equals("PLATFORM_ADMIN");
     var campus = db.one("SELECT * FROM campus WHERE id=? FOR SHARE", input.campusId());
     require(campus != null, 400, "INVALID_CAMPUS", "校区不存在");
     for (String w : input.hours()) {
@@ -111,9 +112,10 @@ public class DirectoryService {
       require(minutes(x[0]) < minutes(x[1]), 400, "INVALID_HOURS", "营业时段开始须早于结束");
     }
     if (id != null) {
-      var old = scope.store(id, false);
+      var old = db.one("SELECT * FROM store WHERE id=? FOR UPDATE", id);
+      require(old != null, 404, "NOT_FOUND", "店铺不存在");
       require(Db.id(old, "campus_id") == input.campusId(), 409, "IMMUTABLE_CAMPUS", "店铺创建后不能迁移校区");
-      if (!Actor.current().role().equals("PLATFORM_ADMIN"))
+      if (!platform)
         require(Db.bool(old, "enabled") == input.enabled(), 403, "FORBIDDEN", "店铺启停由平台管理");
     }
     long target =
@@ -131,13 +133,26 @@ public class DirectoryService {
                 json.write(input.hours()),
                 input.phone() == null ? "" : input.phone())
             : id;
-    if (id != null)
+    if (id != null && platform)
       db.update(
           "UPDATE store SET"
               + " name=?,enabled=?,open=?,delivery_fee=?,packaging_fee=?,hours=?,phone=?,version=version+1"
               + " WHERE id=?",
           input.name(),
           input.enabled(),
+          input.open(),
+          Money.decimal(input.deliveryFeeCents()),
+          Money.decimal(input.packagingFeeCents()),
+          json.write(input.hours()),
+          input.phone() == null ? "" : input.phone(),
+          id);
+    else if (id != null)
+      // A merchant never writes platform-owned availability, even from a stale settings form.
+      db.update(
+          "UPDATE store SET"
+              + " name=?,open=?,delivery_fee=?,packaging_fee=?,hours=?,phone=?,version=version+1"
+              + " WHERE id=?",
+          input.name(),
           input.open(),
           Money.decimal(input.deliveryFeeCents()),
           Money.decimal(input.packagingFeeCents()),
@@ -184,6 +199,13 @@ public class DirectoryService {
           "楼栋不存在");
     scope.audit("BUILDING_SAVE", target, null, "更新楼栋");
     return target;
+  }
+
+  public List<Map<String, Object>> couriers(long store) {
+    scope.merchant(store, false);
+    return db.rows(
+        "SELECT id,name FROM employee WHERE role='DELIVERER' AND status=1 AND campus_id=? ORDER BY id",
+        scope.store(store, false).get("campus_id"));
   }
 
   public List<Map<String, Object>> staff(Long store) {

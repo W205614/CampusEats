@@ -27,9 +27,13 @@
 
 私有举证默认全局4、每账号2个并发读取，每账号120次/分钟，可用 `EVIDENCE_READ_CONCURRENCY`、`EVIDENCE_READ_ACCOUNT_CONCURRENCY`、`EVIDENCE_READS_PER_MINUTE` 配置；全局上限可设1—32，每账号并发不得高于全局。鉴权后检查文件再开始PNG响应，固定16KiB缓冲；断线会释放文件和名额。503 `EVIDENCE_BUSY` 表示稍后重试，429表示账号预算耗尽，403表示权限拒绝；不自动重放请求，工作台允许手动重试。响应保持 `no-store`，不转为公开图片。
 
-菜单同键并发请求合并回源，全局最多8个加载任务，协调等待最多1.5秒，繁忙返回 `503 MENU_BUSY`；数据库执行本身仍服从数据库超时。缓存失效等待旧填充完成后删除，每请求获得独立结果副本。维护清理数量与预算耗尽通过 `campus.maintenance.deleted`、`campus.maintenance.budget.exhausted` 和 `campus.maintenance.budget.exhaustions` 指标观察。
+菜单同键并发请求合并回源，全局最多8个加载任务，协调等待最多1.5秒，繁忙返回 `503 MENU_BUSY`；数据库执行本身仍服从数据库超时。缓存失效推进代际，旧回填即使晚到也不被新代际读取，每请求获得独立结果副本。维护清理数量与预算耗尽通过 `campus.maintenance.deleted`、`campus.maintenance.budget.exhausted` 和 `campus.maintenance.budget.exhaustions` 指标观察。
 
 V10新增 `mock_refund_receipt`，只保存模拟退款网关凭据；它与业务落账使用独立事务，进程丢失后按业务键重试仍复用回执，内容不同返回冲突。历史成功退款不会重做。该表随现有全表备份恢复，不自动清理金融业务记录。员工实时连接仍最多100个、每账号2个，通知是提示，订单查询负责补偿；不能以通知任务成功推断客户端已收到。
+
+实时票据签发增加每账号30次／分钟及每IP60次／分钟预算；握手每IP60次／分钟。票据Redis读写经过同一有界并发与熔断入口，故障不放行认证：无效票据401、超限429、依赖不可用503，订单查询仍可补偿通知。
+
+匿名健康读取仅保留根健康、readiness和liveness；operations详情需要平台身份。`ops-check.ps1` 在容器内派生端点专用维护凭证，通过curl标准输入传递，不写文件或输出凭据；服务只接受容器loopback上的GET精确operations路径，不能用于其他接口，也不替代普通Bearer认证。维护脚本保持只读，不额外建立登录会话。
 
 新增 `/api/v1/user/stores/page`、`/api/v1/merchant/stores/page`、`/api/v1/user/search/page` 返回 `records`、`nextCursor`、`hasMore`，默认50条、最多200条。后续请求携带不透明 `cursor` 并保持原筛选及账号；筛选或账号变化应从第一页开始，失效游标返回400。原数组接口保持最多200条的兼容行为，完整检索应使用分页接口。分页按稳定ID顺序前进，不提供跨请求数据库快照；营业状态或商品变化会影响后续结果。
 

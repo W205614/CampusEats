@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onBeforeUnmount } from 'vue';
 import { request, exportReport } from '../platform-api';
 import { notifyError } from '../api';
 import { useSession } from '../stores/session';
@@ -17,7 +17,11 @@ const session = useSession(),
   level = ref('STORE'),
   campus = ref(''),
   campuses = ref<Campus[]>([]),
-  report = ref<Report>();
+  report = ref<Report>(),
+  applied = ref<{ path: string; label: string }>(),
+  loading = ref(false);
+let sequence = 0, mounted = true;
+onBeforeUnmount(() => { mounted = false; sequence++; });
 const names: Record<string, string> = {
   paymentCount: '合单支付笔数',
   childOrderCount: '店铺子订单数',
@@ -41,15 +45,24 @@ function path() {
   );
 }
 async function load() {
+  const current = ++sequence;
+  const snapshot = { path: path(), label: begin.value + ' 至 ' + end.value };
+  loading.value = true;
   try {
-    report.value = await request<Report>(path());
+    const result = await request<Report>(snapshot.path);
+    if (!mounted || current !== sequence) return;
+    report.value = result;
+    applied.value = snapshot;
   } catch (e) {
-    notifyError(e);
+    if (mounted && current === sequence) notifyError(e);
+  } finally {
+    if (mounted && current === sequence) loading.value = false;
   }
 }
 async function download() {
   try {
-    const pathValue = path();
+    const pathValue = applied.value?.path;
+    if (!pathValue) return;
     await exportReport(pathValue.replace('/reports?', '/reports/export?'));
   } catch (e) {
     notifyError(e);
@@ -57,8 +70,9 @@ async function download() {
 }
 onMounted(async () => {
   if (session.session?.role === 'PLATFORM_ADMIN')
-    campuses.value = await request<Campus[]>('/platform/campuses');
-  await load();
+    try { campuses.value = await request<Campus[]>('/platform/campuses'); }
+    catch (e) { if (mounted) notifyError(e); }
+  if (mounted) await load();
 });
 </script>
 <template>
@@ -67,7 +81,7 @@ onMounted(async () => {
       <h1>经营统计</h1>
       <p class="muted">支付与退款按各自发生日期统计，合单支付按结算单去重。</p>
     </div>
-    <el-button @click="download">导出 Excel</el-button>
+    <el-button :disabled="!applied || loading" @click="download">导出 Excel</el-button>
   </section>
   <section class="panel">
     <div class="toolbar">
@@ -84,6 +98,7 @@ onMounted(async () => {
       ><input type="date" v-model="end" /><el-button type="primary" @click="load">查询</el-button>
     </div>
   </section>
+  <p v-if="applied" class="muted" data-testid="report-applied">当前结果：{{ applied.label }}；导出使用当前结果的筛选条件。</p>
   <div v-if="report" class="metrics">
     <section class="metric" v-for="(value, key) in report.metrics" :key="key">
       <span>{{ names[key] || key }}</span

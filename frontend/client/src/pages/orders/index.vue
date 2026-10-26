@@ -248,6 +248,7 @@ async function upload() {
 }
 function canAppeal(a: Aftersale) {
   if (a.appealed) return false;
+  if (a.kind === 'CANCEL' && a.orderStatus !== 3) return false;
   if (a.state === 'REJECTED') return true;
   if (a.state !== 'PENDING') return false;
   // Local server timestamps use Shanghai time; preserve explicit ISO offsets.
@@ -256,6 +257,7 @@ function canAppeal(a: Aftersale) {
   return Date.now() - Date.parse(createdAt) >= 48 * 60 * 60 * 1000;
 }
 async function appeal(a: Aftersale) {
+  if (!canAppeal(a)) return;
   await mutateOrder(() => api('/aftersales/' + a.id + '/appeal', 'POST', { version: a.version }));
 }
 async function withdraw(a: Aftersale) {
@@ -389,7 +391,9 @@ onUnload(stop);
         >
           申请平台介入
         </button></view
-      ><view v-if="a.state === 'PENDING' && !a.appealed && !canAppeal(a)" class="muted"
+      ><view v-if="a.kind === 'CANCEL' && a.orderStatus !== 3 && a.state === 'REJECTED' && !a.appealed" class="muted"
+        >订单已不在备餐阶段，无法介入取消；已完成订单可在7天内申请退款。</view
+      ><view v-else-if="a.state === 'PENDING' && !a.appealed && !canAppeal(a)" class="muted"
         >商家拒绝或超过48小时未处理时可申请平台介入</view
       ></view
     ><button v-if="requestsHaveMore" class="secondary" :disabled="requestsLoading" @click="loadRequests(requestPages + 1)">加载更早售后</button

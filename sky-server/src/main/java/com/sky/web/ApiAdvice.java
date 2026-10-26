@@ -138,6 +138,8 @@ public class ApiAdvice implements ResponseBodyAdvice<Object> {
       Map<String, Object> out = new LinkedHashMap<>();
       for (RecordComponent c : value.getClass().getRecordComponents())
         try {
+          if (value instanceof PlatformViews.Projected projected
+              && !projected.presentFields().contains(c.getName())) continue;
           out.put(c.getName(), wire(c.getAccessor().invoke(value)));
         } catch (Exception e) {
           throw new IllegalStateException(e);

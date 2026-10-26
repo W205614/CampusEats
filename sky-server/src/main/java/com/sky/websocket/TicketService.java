@@ -5,6 +5,7 @@ import static com.sky.common.BusinessException.require;
 import com.sky.common.BusinessException;
 import com.sky.infra.*;
 import com.sky.security.Actor;
+import com.sky.security.RateLimits;
 import java.time.*;
 import java.util.*;
 import org.springframework.data.redis.core.StringRedisTemplate;
@@ -16,20 +17,34 @@ public class TicketService {
   private final Json json;
   private final Db db;
   private final Clock clock;
+  private final RedisAccess access;
+  private final RateLimits limits;
 
-  public TicketService(StringRedisTemplate redis, Json json, Db db, Clock clock) {
+  public TicketService(StringRedisTemplate redis, Json json, Db db, Clock clock,
+      RedisAccess access, RateLimits limits) {
     this.redis = redis;
     this.json = json;
     this.db = db;
     this.clock = clock;
+    this.access = access;
+    this.limits = limits;
   }
 
   public Map<String, Object> issue() {
+    return issue("internal");
+  }
+
+  public Map<String, Object> issue(String sourceAddress) {
     Actor actor = Actor.employee();
     require(!actor.role().equals("DELIVERER"), 403, "FORBIDDEN", "配送员使用订单查询");
+    limits.check("ws-ticket-account:" + actor.id(), 30, 60);
+    limits.check("ws-ticket-ip:" + sourceAddress, 60, 60);
     String ticket = UUID.randomUUID().toString();
     try {
-      redis.opsForValue().set("campus:ws:" + ticket, json.write(actor), Duration.ofSeconds(30));
+      access.call(() -> {
+        redis.opsForValue().set("campus:ws:" + ticket, json.write(actor), Duration.ofSeconds(30));
+        return true;
+      });
     } catch (Exception ex) {
       throw new BusinessException(503, "REDIS_UNAVAILABLE", "实时通知暂不可用，请使用订单查询");
     }
@@ -37,8 +52,9 @@ public class TicketService {
   }
 
   public Actor consume(String ticket) {
+    if (ticket == null || !ticket.matches("[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}")) return null;
     try {
-      String data = redis.opsForValue().getAndDelete("campus:ws:" + ticket);
+      String data = access.call(() -> redis.opsForValue().getAndDelete("campus:ws:" + ticket));
       if (data == null) return null;
       var row = json.map(data);
       String jti = row.get("jti").toString();
@@ -52,6 +68,7 @@ public class TicketService {
               LocalDateTime.now(clock))
           != 1) return null;
       var employee = db.one("SELECT role,store_id,campus_id FROM employee WHERE id=?", id);
+      if (employee == null || employee.get("role").equals("DELIVERER")) return null;
       return new Actor(
           id,
           "ADMIN",
@@ -61,7 +78,7 @@ public class TicketService {
           employee.get("store_id") == null ? null : Db.id(employee, "store_id"),
           employee.get("campus_id") == null ? null : Db.id(employee, "campus_id"));
     } catch (Exception ex) {
-      return null;
+      throw new BusinessException(503, "NOTIFICATION_UNAVAILABLE", "实时通知暂不可用，请使用订单查询");
     }
   }
 }
