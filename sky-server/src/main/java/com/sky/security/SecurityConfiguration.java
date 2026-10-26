@@ -67,6 +67,19 @@ public class SecurityConfiguration {
                     .hasAnyRole("PLATFORM_ADMIN", "SHOP_MANAGER", "OPERATOR")
                     .requestMatchers("/api/v1/courier/**")
                     .hasRole("DELIVERER")
+                    .requestMatchers(
+                        org.springframework.http.HttpMethod.POST,
+                        "/api/v1/order-exceptions/{id:[0-9]+}/acknowledge")
+                    .hasAnyRole("PLATFORM_ADMIN", "SHOP_MANAGER", "OPERATOR")
+                    .requestMatchers(
+                        org.springframework.http.HttpMethod.GET,
+                        "/api/v1/me/messages/page",
+                        "/api/v1/me/messages/unread")
+                    .hasAnyRole("USER", "PLATFORM_ADMIN", "SHOP_MANAGER", "OPERATOR", "DELIVERER")
+                    .requestMatchers(
+                        org.springframework.http.HttpMethod.POST,
+                        "/api/v1/me/messages/{id:[0-9]+}/read")
+                    .hasAnyRole("USER", "PLATFORM_ADMIN", "SHOP_MANAGER", "OPERATOR", "DELIVERER")
                     .requestMatchers("/api/v1/evidence/**")
                     .authenticated()
                     .requestMatchers("/api/v1/admin/**")

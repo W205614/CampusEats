@@ -28,7 +28,8 @@ import org.testcontainers.mysql.MySQLContainer;
       "campus.demo-admin-password=TestAdmin!2026",
       "campus.tasks-enabled=false"
     })
-@org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
+@org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc(
+    print = org.springframework.boot.webmvc.test.autoconfigure.MockMvcPrint.NONE)
 @Testcontainers
 class OperationsIntegrationTest {
   @Container
@@ -516,5 +517,172 @@ class OperationsIntegrationTest {
       release.countDown();
       org.mockito.Mockito.reset(db);
     }
+  }
+
+  @Test
+  void newOperationsRoutesEnforceRolesOwnershipAndMethodsThroughRealSecurityChain()
+      throws Exception {
+    long shopManager = person("SHOP_MANAGER"), operator = person("OPERATOR");
+    long foreignManager = person("SHOP_MANAGER"), legacyAdmin = person("ADMIN");
+    long otherStore = db.insert("INSERT INTO store(campus_id,name) VALUES(?,'其他店铺')", campus);
+    db.update("UPDATE employee SET store_id=? WHERE id IN(?,?)", store, shopManager, operator);
+    db.update("UPDATE employee SET store_id=? WHERE id=?", otherStore, foreignManager);
+    db.update("UPDATE orders SET courier_id=? WHERE id=?", courier, order);
+    db.update("UPDATE delivery_task SET courier_id=?,state='ASSIGNED' WHERE id=?", courier, task);
+    event("ORDER_READY");
+    clock.value.updateAndGet(i -> i.plusSeconds(901));
+    operations.detect(order);
+    long exception =
+        db.count("SELECT id FROM order_exception WHERE order_id=? AND kind='STAGE_OVERDUE'", order);
+    event("ORDER_REFUNDED");
+    long refundEvent =
+        db.count(
+            "SELECT MAX(id) FROM outbox_event WHERE aggregate_id=? AND event_type='ORDER_REFUNDED'",
+            order);
+    // Even a misrouted historical row must not expose financial messages to a courier.
+    db.update(
+        "INSERT INTO"
+            + " inbox_message(event_id,recipient_type,recipient_id,order_id,store_id,event_type,summary,created_at)"
+            + " VALUES(?,'ADMIN',?,?,?,'ORDER_REFUNDED','不应向配送员展示的退款摘要',?)",
+        refundEvent,
+        courier,
+        order,
+        store,
+        LocalDateTime.now(clock));
+
+    String platformToken = auth.issue("ADMIN", 1).get("token").toString();
+    String managerToken = auth.issue("ADMIN", shopManager).get("token").toString();
+    String operatorToken = auth.issue("ADMIN", operator).get("token").toString();
+    String courierToken = auth.issue("ADMIN", courier).get("token").toString();
+    String userToken = auth.issue("USER", user).get("token").toString();
+    String foreignToken = auth.issue("ADMIN", foreignManager).get("token").toString();
+    String legacyToken = auth.issue("ADMIN", legacyAdmin).get("token").toString();
+    clear();
+    String ack = "/api/v1/order-exceptions/" + exception + "/acknowledge";
+    mvc.perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(ack)
+                .contentType("application/json")
+                .content("{\"version\":0,\"reason\":\"跟进异常\"}"))
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.status()
+                .isUnauthorized());
+    for (String denied : List.of(courierToken, userToken, foreignToken, legacyToken))
+      mvc.perform(
+              org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(ack)
+                  .header("Authorization", "Bearer " + denied)
+                  .contentType("application/json")
+                  .content("{\"version\":0,\"reason\":\"无权处理\"}"))
+          .andExpect(
+              org.springframework.test.web.servlet.result.MockMvcResultMatchers.status()
+                  .isForbidden());
+    int version = 0;
+    for (String allowed : List.of(platformToken, managerToken, operatorToken))
+      mvc.perform(
+              org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(ack)
+                  .header("Authorization", "Bearer " + allowed)
+                  .contentType("application/json")
+                  .content("{\"version\":" + version++ + ",\"reason\":\"已联系处理\"}"))
+          .andExpect(
+              org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk());
+
+    record Identity(String type, long id, String token) {}
+    for (var identity :
+        List.of(
+            new Identity("ADMIN", 1, platformToken),
+            new Identity("ADMIN", shopManager, managerToken),
+            new Identity("ADMIN", operator, operatorToken),
+            new Identity("ADMIN", courier, courierToken),
+            new Identity("USER", user, userToken))) {
+      String bearer = "Bearer " + identity.token();
+      long message =
+          db.count(
+              "SELECT id FROM inbox_message WHERE recipient_type=? AND recipient_id=?"
+                  + " AND order_id=? AND event_type='ORDER_EXCEPTION'",
+              identity.type(),
+              identity.id(),
+              order);
+      var response =
+          mvc.perform(
+                  org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
+                          "/api/v1/me/messages/page")
+                      .header("Authorization", bearer))
+              .andExpect(
+                  org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+              .andExpect(
+                  org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath(
+                          "$.data.records[0].orderId")
+                      .value(Long.toString(order)))
+              .andReturn()
+              .getResponse();
+      if (identity.id() == courier && identity.type().equals("ADMIN")) {
+        assertFalse(response.getContentAsString().contains("ORDER_REFUNDED"));
+        assertFalse(response.getContentAsString().contains("不应向配送员展示"));
+        assertFalse(response.getContentAsString().contains("退款"));
+        assertFalse(response.getContentAsString().contains("售后"));
+      }
+      mvc.perform(
+              org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
+                      "/api/v1/me/messages/unread")
+                  .header("Authorization", bearer))
+          .andExpect(
+              org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk());
+      mvc.perform(
+              org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
+                      "/api/v1/me/messages/" + message + "/read")
+                  .header("Authorization", bearer))
+          .andExpect(
+              org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk());
+    }
+    long userMessage =
+        db.count(
+            "SELECT id FROM inbox_message WHERE recipient_type='USER' AND recipient_id=?"
+                + " AND order_id=? AND event_type='ORDER_EXCEPTION'",
+            user,
+            order);
+    mvc.perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
+                    "/api/v1/me/messages/" + userMessage + "/read")
+                .header("Authorization", "Bearer " + managerToken))
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.status()
+                .isNotFound());
+    mvc.perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
+                    "/api/v1/me/messages/page")
+                .header("Authorization", "Bearer " + foreignToken))
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk())
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath(
+                    "$.data.records")
+                .isEmpty());
+    mvc.perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
+                "/api/v1/me/messages/page"))
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.status()
+                .isUnauthorized());
+    mvc.perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
+                    "/api/v1/me/messages/page")
+                .header("Authorization", "Bearer " + legacyToken))
+        .andExpect(
+            org.springframework.test.web.servlet.result.MockMvcResultMatchers.status()
+                .isForbidden());
+    for (var wrong :
+        List.of(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(ack),
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
+                "/api/v1/me/messages/page"),
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
+                "/api/v1/me/messages/" + userMessage + "/read"),
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put(
+                "/api/v1/me/messages/unread"),
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get(
+                "/api/v1/me/unregistered")))
+      mvc.perform(wrong.header("Authorization", "Bearer " + platformToken))
+          .andExpect(
+              org.springframework.test.web.servlet.result.MockMvcResultMatchers.status()
+                  .isForbidden());
   }
 }

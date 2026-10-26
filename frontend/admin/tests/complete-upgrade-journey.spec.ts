@@ -259,6 +259,22 @@ test('complete upgrade: four real roles use independent identity, delivery safeg
     await ui(manager,'/merchant/aftersales/'+aftersale.id+'/decision','POST',()=>aftersaleCard.getByRole('button',{name:'同意退款 / 取消',exact:true}).click());
     await expect.poll(async()=>(await call<Order>(request,'/user/orders/'+id,u)).refundedCents,{timeout:20000}).toBe('1000');
     const savedAftersale=(await call<Aftersale[]>(request,'/user/aftersales',u)).find(row=>row.id===aftersale.id)!;expect(savedAftersale.state).toBe('REFUNDED');
+    await manager.goto('/admin/messages');
+    const merchantMessage=manager.locator('.el-table__body tr').filter({has:manager.getByRole('cell',{name:id,exact:true})}).first();
+    await expect(merchantMessage).toContainText('模拟退款已完成');
+    await capture(manager,'04a-manager-authorized-workbench-messages');
+    await courier.goto('/admin/messages');
+    const courierRows=courier.locator('.el-table__body-wrapper');
+    const courierMessage=courier.locator('.el-table__body tr').filter({has:courier.getByRole('cell',{name:id,exact:true})}).first();
+    await expect(courierMessage).toBeVisible();
+    await expect(courierRows).not.toContainText('退款');await expect(courierRows).not.toContainText('售后');
+    const courierMessages=await call<CursorPage<{id:string;orderId:string;eventType:string;readAt?:string|null}>>(request,'/me/messages/page?limit=50',courierSession.token);
+    expect(courierMessages.records.every(row=>!/(REFUND|AFTERSALE|ORDER_PAID)/.test(row.eventType))).toBe(true);
+    const deliveredMessage=courierMessages.records.find(row=>row.orderId===id && row.eventType==='ORDER_COMPLETE')!;
+    expect(deliveredMessage).toBeTruthy();
+    await ui(courier,'/me/messages/'+deliveredMessage.id+'/read','POST',()=>courierMessage.getByRole('button',{name:'标记已读',exact:true}).click());
+    await expect(courierMessage.getByText('已读',{exact:true})).toBeVisible();
+    await capture(courier,'04b-replacement-courier-fulfillment-only-inbox');
 
     await customer.goto('/app/pages/messages/index');await expect(customer.getByText('站内消息',{exact:true})).toBeVisible();
     const unread=await call<{count:string}>(request,'/user/messages/unread',u);expect(Number(unread.count)).toBeGreaterThan(0);
@@ -298,7 +314,7 @@ test('complete upgrade: four real roles use independent identity, delivery safeg
     await expect.poll(async()=>{
       const resolved=await call<CursorPage<{id:string;state:string}>>(request,'/platform/order-exceptions/page?storeId='+store.id+'&state=RESOLVED',a);return resolved.records.some(row=>row.id===exceptionId);
     },{timeout:20000}).toBe(true);
-    checkpoints.push({name:'page partial refund, persisted unread messages, ledger preview, reconciliation and real one-minute exception followup',refundedCents:'1000',timeoutOrderId:timeoutOrder.id,exceptionId});
+    checkpoints.push({name:'page partial refund, manager/courier workbench inbox authorization, fulfillment-only courier summaries, persisted user unread messages, ledger preview, reconciliation and real one-minute exception followup',refundedCents:'1000',timeoutOrderId:timeoutOrder.id,exceptionId});
 
     await platform.goto('/admin/users');const userRow=platform.locator('.el-table__body tr').filter({hasText:names.user});
     await userRow.getByRole('button',{name:'重置密码',exact:true}).click();const reset=platform.getByRole('dialog',{name:'重置账号密码',exact:true});
