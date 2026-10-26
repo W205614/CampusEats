@@ -276,7 +276,7 @@ test('complete upgrade: four real roles use independent identity, delivery safeg
     await expect(courierMessage.getByText('已读',{exact:true})).toBeVisible();
     await capture(courier,'04b-replacement-courier-fulfillment-only-inbox');
 
-    await customer.goto('/app/pages/messages/index');await expect(customer.getByText('站内消息',{exact:true})).toBeVisible();
+    await customer.goto('/app/pages/messages/index');await expect(customer.locator('uni-page-body').getByText('站内消息',{exact:true})).toBeVisible();
     const unread=await call<{count:string}>(request,'/user/messages/unread',u);expect(Number(unread.count)).toBeGreaterThan(0);
     const messages=await call<CursorPage<{id:string;readAt?:string|null}>>(request,'/user/messages/page?limit=50',u);
     expect(messages.records.some(row=>!row.readAt)).toBe(true);
