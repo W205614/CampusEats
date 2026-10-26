@@ -10,7 +10,7 @@ async function workspace(page: Page, role = 'PLATFORM_ADMIN') {
   };
   const writes: { path: string; body: Record<string, unknown> }[] = [];
   const state = { failDetails: false, failWrites: false, conflict: false, release: undefined as (() => void) | undefined, hold: false,
-    holdList: false, releaseList: undefined as (() => void) | undefined };
+    holdList: false, releaseList: undefined as (() => void) | undefined, listReads: 0 };
   await page.addInitScript((role) => {
     sessionStorage.setItem('campus-admin', JSON.stringify({ token: 'ui-test', id: '1', name: '测试人员', role, mustChangePassword: false }));
     localStorage.setItem('campus-store', '1');
@@ -20,6 +20,7 @@ async function workspace(page: Page, role = 'PLATFORM_ADMIN') {
     const ok = (data: unknown) => route.fulfill({ json: { code: 'OK', data } });
     if (path === '/merchant/stores/page') return ok({ records: [{ id: '1', name: '测试店铺', campusName: '校区' }], nextCursor: null, hasMore: false });
     if (path === '/merchant/stores/1/orders') {
+      state.listReads++;
       if (state.holdList) await new Promise<void>(resolve => { state.releaseList = resolve; });
       return ok([order]);
     }
@@ -93,6 +94,34 @@ test('background synchronization does not swallow an exception dialog and still 
   await dialog.getByRole('button', { name: '确认操作' }).click();
   await expect.poll(() => writes.length).toBe(1);
   expect(writes[0]?.path).toBe('/platform/orders/501/exception-cancel');
+});
+
+test('exception confirmation pauses new background reads until submission closes the dialog', async ({ page }) => {
+  await page.clock.install();
+  const { writes, state } = await workspace(page);
+  const initialReads = state.listReads;
+  await page.getByRole('button', { name: '异常取消并退款', exact: true }).click();
+  const dialog = page.getByRole('dialog', { name: '异常取消订单' });
+  await dialog.getByPlaceholder('必填：操作原因').fill('保留确认期间的异常处理表单');
+  const submit = dialog.getByRole('button', { name: '确认操作' });
+  state.holdList = true;
+  await page.clock.fastForward(15000);
+  expect(state.listReads).toBe(initialReads);
+  expect(state.releaseList).toBeUndefined();
+  await expect(submit).toBeEnabled();
+  await submit.click();
+  await expect(dialog).not.toBeVisible();
+  expect(writes).toHaveLength(1);
+  expect(writes[0]).toEqual({
+    path: '/platform/orders/501/exception-cancel',
+    body: { version: '5', reason: '保留确认期间的异常处理表单' },
+  });
+  await page.clock.fastForward(15000);
+  await expect.poll(() => !!state.releaseList).toBeTruthy();
+  expect(state.listReads).toBe(initialReads + 1);
+  expect(writes).toHaveLength(1);
+  state.holdList = false;
+  state.releaseList!();
 });
 
 test('version conflict refreshes details before the next explicit operation', async ({ page }) => {

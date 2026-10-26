@@ -44,7 +44,7 @@ watch([() => session.session?.token, selectedStore], () => {
   if (mounted) void initialize();
 }, { flush: 'sync' });
 async function load(pages = loadedPages) {
-  if (!mounted || !session.session || loading.value || busy.value) return;
+  if (!mounted || !session.session || loading.value || busy.value || exceptionOrder.value) return;
   const current = ++sequence;
   const isCurrent = () => mounted && current === sequence;
   const isCourier = courier.value, store = selectedStore.value;
@@ -98,8 +98,8 @@ async function saveAvailability() {
   try {await request('/courier/dispatch-availability','PUT',{enabled:acceptingTasks.value});availabilityDialog.value=false;}
   catch(e){notifyError(e);}finally{availabilityBusy.value=false;}
 }
-async function perform(o: Order, operation: () => Promise<void>) {
-  if (!mounted || busy.value || loading.value || needsRefresh.value) return;
+async function perform(o: Order, operation: () => Promise<void>): Promise<boolean> {
+  if (!mounted || busy.value || loading.value || needsRefresh.value) return false;
   const current = sequence;
   const isCurrent = () => mounted && current === sequence;
   const path = courier.value ? '/courier' : '/merchant';
@@ -124,6 +124,7 @@ async function perform(o: Order, operation: () => Promise<void>) {
       if (isCurrent()) busy.value = false;
     }
   }
+  return true;
 }
 async function action(o: Order, name: string) {
   const current = sequence;
@@ -183,14 +184,14 @@ async function submitException() {
   const o = exceptionOrder.value, current = sequence;
   if (!o || !exceptionReason.value.trim() || exceptionReason.value.length > 200) return;
   if (exceptionKind.value === 'reassign' && (!exceptionCourier.value || (o.status === 4 && !handoverConfirmed.value))) return;
-  await perform(o, async () => {
+  const attempted = await perform(o, async () => {
     await request('/platform/orders/' + o.id + '/' + exceptionKind.value, 'POST', {
       version: o.version,
       reason: exceptionReason.value.trim(),
       ...(exceptionKind.value === 'reassign' ? { courierId: exceptionCourier.value } : {}),
     });
   });
-  if (mounted && current === sequence) exceptionOrder.value = undefined;
+  if (attempted && mounted && current === sequence) exceptionOrder.value = undefined;
 }
 async function initialize() {
   const owner = ++initialization;
