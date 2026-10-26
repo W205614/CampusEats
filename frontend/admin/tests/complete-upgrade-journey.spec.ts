@@ -12,6 +12,8 @@ test('complete upgrade: four real roles use independent identity, delivery safeg
   const names = { campus:'完整升级校区-'+suffix,store:'完整升级餐厅-'+suffix,building:'原始楼栋-'+suffix,
     renamed:'更名楼栋-'+suffix,product:'升级体验餐-'+suffix,coupon:'升级体验券-'+suffix,user:'upgrade_'+suffix };
   const contexts: BrowserContext[] = [], pageErrors: { role:string; message:string }[] = [];
+  const liveContexts=new Set<BrowserContext>(), browserRoles:string[]=[];
+  let maxConcurrentContexts=0;
   const unexpectedHttp: {role:string;method:string;path:string;status:number;code:string}[] = [];
   const expectedDenials: {role:string;method:string;path:string;status:number;code:string}[] = [];
   const networkChecks: Promise<void>[] = [], checkpoints: {name:string;[key:string]:unknown}[] = [];
@@ -21,7 +23,10 @@ test('complete upgrade: four real roles use independent identity, delivery safeg
   async function pageFor(role:string,mobile=false) {
     const context=await browser.newContext({baseURL:testInfo.project.use.baseURL,
       viewport:mobile?{width:390,height:844}:{width:1440,height:1000},timezoneId:'Asia/Shanghai'});
-    contexts.push(context);const page=await context.newPage();
+    contexts.push(context);browserRoles.push(role);liveContexts.add(context);
+    maxConcurrentContexts=Math.max(maxConcurrentContexts,liveContexts.size);
+    context.on('close',()=>liveContexts.delete(context));
+    const page=await context.newPage();
     page.on('pageerror',error=>pageErrors.push({role,message:error.message}));
     page.on('response',response=>{
       const url=new URL(response.url()); if(response.status()<400 || !url.pathname.startsWith('/api/v1/')) return;
@@ -98,13 +103,16 @@ test('complete upgrade: four real roles use independent identity, delivery safeg
     await call(request,'/merchant/stores/'+store.id+'/quotas?date='+businessDate,a,'PUT',{dishId:product.id,total:20,defaultQuota:true});
     const localTime=(value:number)=>new Date(value+8*3600000).toISOString().slice(0,19);
     const coupon=await call<{id:string}>(request,'/merchant/stores/'+store.id+'/coupons',a,'POST',{name:names.coupon,kind:'REDUCTION',thresholdCents:0,value:100,capCents:null,total:5,perUser:1,startsAt:localTime(Date.now()-3600000),endsAt:localTime(Date.now()+86400000),enabled:true});
-    const staff:Record<string,{id:string;username:string;initial:string}>={};
-    for(const [key,role] of [['manager','SHOP_MANAGER'],['courier','DELIVERER']]) {
+    const staff:Record<string,{id:string;username:string;initial:string;name:string}>={};
+    for(const [key,role] of [['manager','SHOP_MANAGER'],['courier','DELIVERER'],['replacement','DELIVERER']]) {
       const username='upgrade_'+key+'_'+suffix,initial='Upgrade-StaffInitial!'+randomUUID();
-      const result=await call<{id:string}>(request,'/platform/staff',a,'POST',{username,name:'升级'+(key==='manager'?'店长':'配送员')+suffix,role,storeId:key==='manager'?store.id:null,campusId:key==='courier'?campus.id:null,enabled:true,password:initial});
-      staff[key]={id:result.id,username,initial};
+      expect(username.length).toBeLessThanOrEqual(32);
+      const name='升级'+(key==='manager'?'店长':key==='replacement'?'替补配送员':'配送员')+suffix;
+      const result=await call<{id:string}>(request,'/platform/staff',a,'POST',{username,name,role,storeId:key==='manager'?store.id:null,campusId:role==='DELIVERER'?campus.id:null,enabled:true,password:initial});
+      staff[key]={id:result.id,username,initial,name};
     }
-    const platform=await pageFor('platform'),manager=await pageFor('manager'),courier=await pageFor('courier'),customer=await pageFor('customer',true);
+    const platform=await pageFor('platform'),manager=await pageFor('manager'),customer=await pageFor('customer',true);
+    let courier=await pageFor('courier');
     await staffLogin(platform,'admin',password());await platform.goto('/admin/users');
     await platform.getByRole('button',{name:'创建独立测试用户',exact:true}).click();
     const create=platform.getByRole('dialog',{name:'创建独立测试用户',exact:true});
@@ -125,7 +133,7 @@ test('complete upgrade: four real roles use independent identity, delivery safeg
     await firstStaff(manager,staff.manager.username,staff.manager.initial);
     await manager.goto('/admin/service-operations');await manager.getByRole('spinbutton').first().fill('1');
     await ui(manager,'/merchant/stores/'+store.id+'/service-policy','PUT',()=>manager.getByRole('button',{name:'保存服务时限',exact:true}).click());
-    const courierSession=await firstStaff(courier,staff.courier.username,staff.courier.initial);
+    let courierSession=await firstStaff(courier,staff.courier.username,staff.courier.initial);
 
     await customer.goto('/app/pages/addresses/index');await customer.getByText('新增地址',{exact:true}).click();
     await choose(customer,customer.getByText('校区：',{exact:false}),names.campus);await choose(customer,customer.getByText('楼栋：',{exact:false}),names.building);
@@ -175,11 +183,69 @@ test('complete upgrade: four real roles use independent identity, delivery safeg
     await courier.locator('.el-table__body tr').filter({hasText:deliveryOrder.number}).getByRole('button',{name:'处理订单',exact:true}).click();
     await expect(courier.getByText('升级验收用户 13800000000',{exact:false})).toBeVisible();
     await ui(courier,'/courier/orders/'+id+'/actions/pickup','POST',()=>courier.getByRole('button',{name:'确认取餐',exact:true}).click());
+    await capture(courier,'03a-original-courier-picked-before-emergency');
+    await courier.context().close();
+
+    async function findOriginalCourier() {
+      await platform.goto('/admin/operations/staff');
+      await platform.locator('section.panel .el-form').first().locator('input').first().fill(staff.courier.username);
+      await ui(platform,'/platform/staff/page','GET',()=>platform.getByRole('button',{name:'查询员工',exact:true}).click());
+      const row=platform.locator('.el-table__body tr').filter({hasText:staff.courier.username});
+      await expect(row).toBeVisible();return row;
+    }
+    const originalCourierRow=await findOriginalCourier();
+    await originalCourierRow.getByRole('button',{name:'紧急停用',exact:true}).click();
+    await platform.getByPlaceholder('填写紧急停用原因').fill('升级验收：取餐后临时离岗，由平台安排现场交接');
+    await ui(platform,'/platform/staff/'+staff.courier.id+'/emergency-disable','POST',()=>platform.getByRole('button',{name:'确认紧急停用',exact:true}).click());
+    const emergencyTasks=platform.getByRole('dialog',{name:'未完成配送任务 · '+staff.courier.name,exact:true});
+    await expect(emergencyTasks.getByText(deliveryOrder.number,{exact:true})).toBeVisible();
+    await capture(platform,'03b-platform-emergency-disabled-courier');
+    const retiredCourier=await request.get('/api/v1/admin/auth/me',{headers:{Authorization:'Bearer '+courierSession.token}});
+    expect(retiredCourier.status()).toBe(401);const retiredCourierCode=(await retiredCourier.json()).code;expect(retiredCourierCode).toBe('UNAUTHORIZED');
+    expectedDenials.push({role:'verification',method:'GET',path:'/api/v1/admin/auth/me',status:401,code:retiredCourierCode});
+
+    await platform.goto('/admin/service-operations');await selectStore(platform);
+    const unavailableRow=()=>platform.locator('.el-table__body tr').filter({hasText:deliveryOrder.number}).filter({hasText:'配送员不可用'});
+    await expect(async()=>{
+      await platform.getByRole('button',{name:'刷新',exact:true}).click();
+      await expect(unavailableRow()).toBeVisible({timeout:1000});
+    }).toPass({timeout:25000,intervals:[3000]});
+    const unavailable=await call<CursorPage<{id:string;orderId:string;kind:string}>>(request,'/platform/order-exceptions/page?storeId='+store.id+'&state=OPEN',a);
+    const unavailableId=unavailable.records.find(row=>row.orderId===id && row.kind==='COURIER_UNAVAILABLE')!.id;
+    await unavailableRow().getByRole('button',{name:'确认处理',exact:true}).click();
+    const emergencyFollowup=platform.getByRole('dialog',{name:'确认跟进异常',exact:true});
+    await emergencyFollowup.getByPlaceholder('说明已联系的人员和下一步处理安排').fill('已联系替补配送员，现场交接餐品后继续配送');
+    await ui(platform,'/order-exceptions/'+unavailableId+'/acknowledge','POST',()=>emergencyFollowup.getByRole('button',{name:'确认处理',exact:true}).click());
+
+    const disabledCourierRow=await findOriginalCourier();
+    await disabledCourierRow.getByRole('button',{name:'未完成任务',exact:true}).click();
+    const activeTasks=platform.getByRole('dialog',{name:'未完成配送任务 · '+staff.courier.name,exact:true});
+    const activeTask=activeTasks.locator('.el-table__body tr').filter({hasText:deliveryOrder.number});
+    await expect(activeTask).toContainText('配送中');
+    await activeTask.getByRole('button',{name:'查看订单并交接',exact:true}).click();
+    await expect(platform).toHaveURL(new RegExp('/admin/orders\\?orderId='+id+'$'));
+    await platform.getByRole('button',{name:'平台改派',exact:true}).click();
+    const handover=platform.getByRole('dialog',{name:'平台改派',exact:true});
+    await handover.locator('.el-select').click();await platform.getByRole('option',{name:staff.replacement.name,exact:true}).click();
+    await handover.getByPlaceholder('必填：操作原因').fill('升级验收：已现场交接餐品，由替补完成剩余配送');
+    await expect(handover.getByRole('button',{name:'确认操作',exact:true})).toBeDisabled();
+    await handover.getByText('我已安排餐品实际交接，配送计时及超时标记继续保留',{exact:true}).click();
+    await expect(handover.getByRole('checkbox')).toBeChecked();
+    await ui(platform,'/platform/orders/'+id+'/reassign','POST',()=>handover.getByRole('button',{name:'确认操作',exact:true}).click());
+    const reassigned=await call<Order>(request,'/user/orders/'+id,u);
+    expect(reassigned).toMatchObject({status:4,courierId:staff.replacement.id,delivery:{state:'PICKED'}});
+    await capture(platform,'03c-platform-confirmed-picked-meal-handover');
+
+    courier=await pageFor('courier-replacement');
+    courierSession=await firstStaff(courier,staff.replacement.username,staff.replacement.initial);
+    await courier.goto('/admin/orders?orderId='+id);
+    await expect(courier.getByRole('button',{name:'确认送达',exact:true})).toBeVisible();
+    await expect(courier.getByRole('button',{name:'确认取餐',exact:true})).toHaveCount(0);
     await ui(courier,'/courier/orders/'+id+'/actions/complete','POST',()=>courier.getByRole('button',{name:'确认送达',exact:true}).click());
     const privateAfterDelivery=await call<Record<string,unknown>>(request,'/courier/orders/'+id,courierSession.token);
     for(const field of ['phone','address','room','consignee','amount','paidCents','refundedCents','aftersales','refunds']) expect(privateAfterDelivery).not.toHaveProperty(field);
     await expect(courier.getByText('13800000000',{exact:false})).toHaveCount(0);await capture(courier,'03-courier-delivered-with-private-history');
-    checkpoints.push({name:'independent identity, page payment, building snapshot, paused assignment UI and courier privacy',userId:user.id,orderId:id,paidCents:deliveryOrder.paidCents});
+    checkpoints.push({name:'independent identity, page payment, building snapshot, paused assignment UI, emergency disable and picked-delivery handover with terminal privacy',userId:user.id,orderId:id,paidCents:deliveryOrder.paidCents,originalCourierId:staff.courier.id,replacementCourierId:staff.replacement.id,emergencyExceptionId:unavailableId,oldCourierSessionRevoked:true});
 
     // The second real order waits for its one-minute acceptance deadline while refund/message/finance UI runs.
     const timeoutOrder=await orderFromPages(1,false);
@@ -248,6 +314,7 @@ test('complete upgrade: four real roles use independent identity, delivery safeg
     await capture(customer,'07-user-password-reset-recovered');await capture(platform,'08-platform-user-reset-finished');
     checkpoints.push({name:'platform reset revokes prior session and customer changes password through real page'});
     await Promise.all(networkChecks);expect(pageErrors).toEqual([]);expect(unexpectedHttp).toEqual([]);
+    expect(contexts).toHaveLength(5);expect(maxConcurrentContexts).toBe(4);
     expect(expectedDenials.some(row=>row.code==='UNAUTHORIZED')).toBe(true);
   } catch(error) {
     for(let index=0;index<contexts.length;index++) {const page=contexts[index].pages()[0];if(page) await capture(page,'failure-role-'+index).catch(()=>{});}throw error;
@@ -255,8 +322,8 @@ test('complete upgrade: four real roles use independent identity, delivery safeg
     await Promise.all(networkChecks);
     const evidence=testInfo.outputPath('complete-upgrade-evidence.json');
     await fs.writeFile(evidence,JSON.stringify({sourceRevision:process.env.CANDIDATE_SHA||process.env.GITHUB_SHA||'local',
-      fixtureBoundary:'Only campus/store/building/product/quota/coupon/staff use setup APIs. User creation/login/passwords/coupon claim, cart/checkout/mock payment, service policy, building rename, delivery availability/claim/transitions, refund, message reads and exception acknowledgement use real pages. APIs otherwise verify read-only snapshots.',
-      browserContexts:contexts.length,pageErrors,unexpectedHttp,expectedDenials,checkpoints},null,2));
+      fixtureBoundary:'Only campus/store/building/product/quota/coupon/staff use setup APIs. User creation/login/passwords/coupon claim, cart/checkout/mock payment, service policy, building rename, delivery availability/claim/transitions, platform emergency disable/exception acknowledgement/physical handover and reassignment, refund and message reads use real pages. APIs otherwise verify read-only snapshots.',
+      browserContexts:contexts.length,maxConcurrentBrowserContexts:maxConcurrentContexts,browserRoles,pageErrors,unexpectedHttp,expectedDenials,checkpoints},null,2));
     await testInfo.attach('complete-upgrade-evidence',{path:evidence,contentType:'application/json'});
     for(const context of contexts) await context.close();
   }

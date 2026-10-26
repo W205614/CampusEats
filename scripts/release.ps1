@@ -27,6 +27,22 @@ try {
  if($LASTEXITCODE -ne 0){throw 'Cannot inventory project containers.'}
  if($Initialize){
   if($ProjectName -notmatch '^campuseats-(improvement|role-uat|perf)(-[a-z0-9]+)*$' -or $existing.Count){throw 'Initialization requires a fresh explicitly isolated acceptance project.'}
+  # Resolve names rather than assuming project labels exist. A manually created or foreign
+  # same-name volume must never be silently reused. Compose JSON includes credentials, so
+  # keep it in memory, extract only non-sensitive names/ports and never echo or persist it.
+  $configurationText=$null;$configuration=$null
+  try {
+   $configurationText=(& docker @compose config --format json) -join "`n"
+   if($LASTEXITCODE -ne 0){throw 'Configuration resolution failed.'}
+   $configuration=$configurationText | ConvertFrom-Json -ErrorAction Stop
+   $resolvedVolumeNames=@($configuration.volumes.PSObject.Properties | ForEach-Object {[string]$_.Value.name} | Sort-Object -Unique)
+   $publishedHostPorts=@($configuration.services.PSObject.Properties | ForEach-Object {$_.Value.ports} | Where-Object {$null -ne $_.published} | ForEach-Object {[string]$_.published} | Sort-Object -Unique)
+   if(!$resolvedVolumeNames.Count -or @($resolvedVolumeNames | Where-Object {$_ -notmatch '^[a-zA-Z0-9][a-zA-Z0-9_.-]*$'}).Count){throw 'Invalid resolved volume inventory.'}
+  }catch{throw 'Cannot safely resolve isolated volume names.'}
+  finally{$configurationText=$null;$configuration=$null}
+  $allExistingVolumeNames=@(& docker volume ls --format '{{.Name}}')
+  if($LASTEXITCODE -ne 0){throw 'Cannot inspect existing volume names.'}
+  if(@($resolvedVolumeNames | Where-Object {$_ -cin $allExistingVolumeNames}).Count){throw 'Initialization refuses an existing resolved volume name, regardless of ownership labels.'}
   $volumes=@(& docker volume ls --filter ('label=com.docker.compose.project='+$ProjectName) --format '{{.Name}}')
   if($LASTEXITCODE -ne 0 -or $volumes.Count){throw 'Initialization refuses existing project volumes.'}
  }elseif($existing.Count -ne 4){throw 'Daily release requires the existing four-service project.'}

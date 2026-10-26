@@ -52,7 +52,11 @@ function global:docker {
   @{Id=('sha256:'+($kind*64));Os='linux';Architecture='amd64';Config=@{Labels=@{'org.opencontainers.image.revision'=('a'*40)}}} | ConvertTo-Json -Depth 5 -AsArray
   return
  }
- if($a[0] -eq 'volume'){if($global:artifactFixtureCase -eq 'volume-exists'){return 'owned-existing-volume'};return}
+ if($a[0] -eq 'volume'){
+  if($global:artifactFixtureCase -eq 'volume-exists'){return 'owned-existing-volume'}
+  if($global:artifactFixtureCase -eq 'unlabeled-volume-exists' -and $a -notcontains '--filter'){return 'isolated-fixture-uploads'}
+  return
+ }
  if($a[0] -eq 'inspect'){
   $service=$a[-1] -replace '-container$',''
   if($a[2] -like '*TASKS_ENABLED=false*'){if(!$global:artifactFixtureTasksEnabled){return 'disabled'};return ''}
@@ -65,11 +69,14 @@ function global:docker {
   if($a[2] -like '*Image*'){return 'sha256:'+(@{server='1';web='2';mysql='3';redis='4'}[$service]*64)}
   throw 'Unexpected fixture inspection.'
  }
- if($a -contains 'config'){return}
+ if($a -contains 'config'){
+  if($a -contains '--format'){@{volumes=@{mysql=@{name='isolated-fixture-mysql'};redis=@{name='isolated-fixture-redis'};uploads=@{name='isolated-fixture-uploads'}};services=@{web=@{ports=@(@{published='28087'})}}} | ConvertTo-Json -Depth 6}
+  return
+ }
  if($a -contains 'ps'){
   $service=$a[-1]
   if($service -in @('mysql','redis','server','web')){return $service+'-container'}
-  if(!$global:artifactFixtureCase.StartsWith('init') -and $global:artifactFixtureCase -ne 'volume-exists'){return @('mysql-container','redis-container','server-container','web-container')}
+  if(!$global:artifactFixtureCase.StartsWith('init') -and $global:artifactFixtureCase -notin @('volume-exists','unlabeled-volume-exists')){return @('mysql-container','redis-container','server-container','web-container')}
   return
  }
  if($a -contains 'stop' -or $a -contains 'start'){
@@ -93,16 +100,16 @@ function global:docker {
  throw 'Unexpected Docker mutation in artifact release.'
 }
 try {
- foreach($case in @('init-success','volume-exists','backup-failed','data-changed','upload-changed','mount-changed','daily-success')){
+ foreach($case in @('init-success','volume-exists','unlabeled-volume-exists','backup-failed','data-changed','upload-changed','mount-changed','daily-success')){
   $global:artifactFixtureCase=$case;$global:artifactFixtureLoads=0;$global:artifactFixtureCandidateStarts=0
   $global:artifactFixtureRunning=@{mysql=$true;redis=$true;server=$true;web=$true}
   if($case.StartsWith('init')){$global:artifactFixtureRunning.server=$false;$global:artifactFixtureRunning.web=$false}
   $global:artifactFixtureTasksEnabled=$true
   $envPath=Join-Path $fixture '.env';Write-SecureTextFile -Path $envPath -Content "MYSQL_PASSWORD=fixture-only`nWEB_PORT=28087`n"
   $failed=$false
-  try {& (Join-Path $fixtureScripts 'release.ps1') -BundleDirectory $bundle -ExpectedSourceSha $sha -ExpectedRunId '12345' -ExpectedManifestSha256 $hash -ProjectName 'campuseats-improvement-artifactfixture' -EnvFile $envPath -Initialize:($case.StartsWith('init') -or $case -eq 'volume-exists')}catch{$failed=$true}
-  if($failed -ne ($case -in @('volume-exists','backup-failed','data-changed','upload-changed','mount-changed'))){throw "Unexpected artifact release result: $case"}
-  if($case -eq 'volume-exists' -and ($global:artifactFixtureLoads -or $global:artifactFixtureCandidateStarts)){throw 'Initialization reused old volumes.'}
+  try {& (Join-Path $fixtureScripts 'release.ps1') -BundleDirectory $bundle -ExpectedSourceSha $sha -ExpectedRunId '12345' -ExpectedManifestSha256 $hash -ProjectName 'campuseats-improvement-artifactfixture' -EnvFile $envPath -Initialize:($case.StartsWith('init') -or $case -in @('volume-exists','unlabeled-volume-exists'))}catch{$failed=$true}
+  if($failed -ne ($case -in @('volume-exists','unlabeled-volume-exists','backup-failed','data-changed','upload-changed','mount-changed'))){throw "Unexpected artifact release result: $case"}
+  if($case -in @('volume-exists','unlabeled-volume-exists') -and ($global:artifactFixtureLoads -or $global:artifactFixtureCandidateStarts)){throw 'Initialization reused old or unlabeled volumes.'}
   if($case -eq 'backup-failed' -and ($global:artifactFixtureCandidateStarts -or !$global:artifactFixtureRunning.server -or !$global:artifactFixtureRunning.web)){throw 'Backup failure crossed the migration gate or failed to request original writer restoration.'}
   if($case -in @('data-changed','upload-changed','mount-changed') -and ($global:artifactFixtureRunning.server -or $global:artifactFixtureRunning.web -or $global:artifactFixtureCandidateStarts -ne 1)){throw 'Failed post-migration data/upload/mount verification opened traffic.'}
   if($case -eq 'daily-success'){
