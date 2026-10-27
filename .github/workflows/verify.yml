@@ -27,10 +27,17 @@ jobs:
         run: ./scripts/ops-schedule.ps1 -OutputDirectory .local/ci-schedule-preview
   verify:
     needs: windows-permissions
-    runs-on: ubuntu-latest
+    # The release verifier deliberately supports direct OCI manifests/raw layers.
+    # Keep the runner family used by the accepted artifact instead of an OS rollout.
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+      - name: Verify supported Docker image store
+        shell: pwsh
+        run: |
+          $driver=(& docker info --format '{{.Driver}}') -join ''
+          if($LASTEXITCODE -ne 0 -or $driver -cne 'overlay2'){throw 'CI image-store format changed; verify archive compatibility before testing or publishing.'}
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -74,6 +81,28 @@ jobs:
           ./scripts/test-artifact-release.ps1
           ./scripts/test-restore-ownership.ps1
           ./scripts/start.ps1 -SkipVerify
+      - name: Verify real image archive before browser regression
+        shell: pwsh
+        run: |
+          . ./scripts/image-identity.ps1
+          $references=@()
+          foreach($service in @('server','web')){
+            $reference='campuseats-'+$service+':sha-'+$env:GITHUB_SHA
+            & docker image tag ('campuseats-'+$service+':v1') $reference
+            if($LASTEXITCODE -ne 0){throw 'Cannot reference the source-built image.'}
+            $references+=$reference
+          }
+          $archive=Join-Path $PWD '.local/ci-image-layout.tar'
+          if(Test-Path -LiteralPath $archive){throw 'Refuse to reuse a previous CI layout archive.'}
+          & docker image save --output $archive @references
+          if($LASTEXITCODE -ne 0){throw 'Cannot inspect the actual source-built archive.'}
+          foreach($identity in @(Read-ReleaseImageGraph -Archive $archive -SourceSha $env:GITHUB_SHA)){
+            $raw=(& docker image inspect $identity.reference) -join "`n"
+            if($LASTEXITCODE -ne 0){throw 'Cannot inspect the source-built runtime identity.'}
+            $actual=@($raw|ConvertFrom-Json)[0]
+            $identity|Add-Member -NotePropertyName sourceRuntimeId -NotePropertyValue $actual.Id
+            [void](Resolve-ReleaseImageIdentity -Expected $identity -Actual $actual)
+          }
       - name: Compare live API schema
         run: node scripts/generate-contracts.mjs --fetch && git diff --exit-code -- frontend/contracts/openapi.json frontend/contracts/openapi.ts
       - name: Check deployment smoke and root redirect
