@@ -53,11 +53,11 @@ pwsh -NoProfile -File ./scripts/release.ps1 -BundleDirectory .local/releases/dow
 
 备份和回滚材料保存在受保护的本机 `.local`。清理重复镜像前可先用 `docker image save` 导出匹配备份的镜像，并记录 SHA-256；需要回滚时先 `docker image load`。只清理明确归属 CampusEats 的冗余容器、镜像和本轮验收专用卷，禁止全局 prune。
 
-本机维护采用“只保留最新版”的策略：新版健康、业务数据及文件一致、镜像安全门禁和最新备份独立恢复均通过后，删除明确归属本项目且无当前引用的旧应用镜像；旧验证、旧日常恢复集、历史验收备份和旧镜像导出包按明确清单移入回收站。当前恢复集为 `.local/backups/current-artifact-5a9a9bc359674827af7a6dd0ebfa70f8/`，同CI应用制品、四服务镜像包和配套恢复清单位于 `.local/verification/current/delivery/`；范围见[当前版本记录](verification/current.md)。未来升级过程中的临时留底仍用于防止发布失败丢失数据，成功后按新版本结果替换，不继续累计旧版回滚材料。此策略不授权清理其它项目、日常业务卷或归属不明的匿名卷。
+本机维护采用“只保留最新版”的策略：新版健康、业务数据及文件一致、镜像安全门禁和最新备份独立恢复均通过后，删除明确归属本项目且无当前引用的旧应用镜像；旧验证、旧日常恢复集、历史验收备份和旧镜像导出包按明确清单移入回收站。当前恢复集以 `.local/backups/LATEST.json` 和 `LATEST.txt` 为准；同CI应用制品、四服务镜像包和配套恢复清单的位置见[当前版本记录](verification/current.md)，这些材料须配套保留。未来升级过程中的临时留底仍用于防止发布失败丢失数据，成功后按新版本结果替换，不继续累计旧版回滚材料。此策略不授权清理其它项目、日常业务卷或归属不明的匿名卷。
 
 源码构建可能复用旧系统包层：Dockerfile里有更新命令不代表实际执行了更新。源码开发环境应刷新过期运行层并扫描实际镜像。已采用CI制品的环境应修复CI构建并重新获取通过门禁的包，不以本机重建替代同一制品，不在运行容器中手改包或放宽门禁。
 
-菜单缓存属于可重建数据，不包含在数据库／上传恢复集内。本轮缓存值增加epoch和代际封装；跨缓存格式回滚到旧镜像时，应在暂停Web／Java、恢复匹配数据库与上传文件后，仅清理本项目Redis中的菜单键，再启动应用。保留限流等其它Redis状态，不能用全库清空替代。以下命令只针对日常项目的派生菜单键，不能在仍接受业务写入时执行：
+菜单缓存属于可重建数据，不包含在数据库／上传恢复集内。缓存使用epoch和代际封装；跨缓存格式回滚到旧镜像时，应在暂停Web／Java、恢复匹配数据库与上传文件后，仅清理本项目Redis中的菜单键，再启动应用。保留限流等其它Redis状态，不能用全库清空替代。以下命令只针对日常项目的派生菜单键，不能在仍接受业务写入时执行：
 
 ```powershell
 docker compose -p campuseats-v1 exec -T redis sh -c 'export REDISCLI_AUTH="$REDIS_PASSWORD"; redis-cli --scan --pattern "campus:store:*:catalog" | while IFS= read -r key; do redis-cli UNLINK "$key" >/dev/null; done'
