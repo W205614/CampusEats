@@ -3,9 +3,10 @@ $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 . (Join-Path $PSScriptRoot 'secure-files.ps1')
 . (Join-Path $PSScriptRoot 'release-bundle.ps1')
+. (Join-Path $PSScriptRoot 'oci-image-fixture.ps1')
 $fixture=New-SecureDirectory -Path (Join-Path $root ('.local/artifact-release-test-'+[guid]::NewGuid().ToString('N')))
 $fixtureScripts=New-SecureDirectory -Path (Join-Path $fixture 'scripts')
-foreach($name in @('release.ps1','release-bundle.ps1','secure-files.ps1','operations-lock.ps1')){Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination $fixtureScripts}
+foreach($name in @('release.ps1','release-bundle.ps1','image-identity.ps1','secure-files.ps1','operations-lock.ps1')){Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination $fixtureScripts}
 # Only the GitHub network boundary is replaced; actual source/run/file hashes stay enforced.
 Add-Content -LiteralPath (Join-Path $fixtureScripts 'release-bundle.ps1') -Value @'
 function Confirm-ReleaseWorkflow {param($SourceSha,$RunId,$RunAttempt);if($SourceSha -cne ('a'*40) -or $RunId -cne '12345' -or $RunAttempt -ne 1){throw 'Unexpected workflow request.'}}
@@ -35,21 +36,22 @@ $migration=New-SecureDirectory -Path (Join-Path $fixture 'sky-server/src/main/re
 $bundle=New-SecureDirectory -Path (Join-Path $fixture '.local/bundle')
 New-SecureDirectory -Path (Join-Path $bundle 'security') | Out-Null
 $sha='a'*40
-$images=@(@{service='server';id=('sha256:'+('1'*64));reference=('campuseats-server:sha-'+$sha);revision=$sha},@{service='web';id=('sha256:'+('2'*64));reference=('campuseats-web:sha-'+$sha);revision=$sha})
-[IO.File]::WriteAllText((Join-Path $bundle 'application-images.tar'),'isolated-docker-fixture')
-@($images | ForEach-Object {@{service=$_.service;status='passed';imageId=$_.id}}) | ConvertTo-Json -AsArray | Set-Content -LiteralPath (Join-Path $bundle 'security/summary.json')
+$images=@(New-ReleaseOciFixture -Path (Join-Path $bundle 'application-images.tar') -SourceSha $sha)
+$global:artifactFixtureImages=@{};foreach($image in $images){$global:artifactFixtureImages[$image.service]=$image}
+@($images | ForEach-Object {@{service=$_.service;status='passed';imageId=$_.sourceRuntimeId}}) | ConvertTo-Json -AsArray | Set-Content -LiteralPath (Join-Path $bundle 'security/summary.json')
 '{}' | Set-Content -LiteralPath (Join-Path $bundle 'security/server-runtime-sbom.cdx.json')
 $files=@(Get-ChildItem -LiteralPath $bundle -Recurse -File | ForEach-Object {@{path=[IO.Path]::GetRelativePath($bundle,$_.FullName).Replace('\','/');bytes=$_.Length;sha256=(Get-FileHash -LiteralPath $_.FullName).Hash}})
 $migrationHash=Get-ReleaseMigrationHash -Path (Join-Path $migration 'V1__fixture.sql')
-$manifest=@{schemaVersion=1;repository='W205614/CampusEats';sourceSha=$sha;runId='12345';runAttempt=1;platform='linux/amd64';archive='application-images.tar';images=$images;files=$files;migrationHashFormat='utf8-lf-v1';migrations=@(@{name='V1__fixture.sql';version=1;sha256=$migrationHash})}
+$manifest=@{schemaVersion=2;imageIdentityFormat='oci-uncompressed-v1';repository='W205614/CampusEats';sourceSha=$sha;runId='12345';runAttempt=1;platform='linux/amd64';archive='application-images.tar';images=$images;files=$files;migrationHashFormat='utf8-lf-v1';migrations=@(@{name='V1__fixture.sql';version=1;sha256=$migrationHash})}
 $manifest | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath (Join-Path $bundle 'release-manifest.json')
 $hash=(Get-FileHash -LiteralPath (Join-Path $bundle 'release-manifest.json')).Hash
 function global:docker {
  $global:LASTEXITCODE=0;$a=@($args)
  if($a[0] -eq 'image' -and $a[1] -eq 'load'){$global:artifactFixtureLoads++;return}
  if($a[0] -eq 'image' -and $a[1] -eq 'inspect'){
-  $kind=if($a[2] -like 'campuseats-server:*'){'1'}else{'2'}
-  @{Id=('sha256:'+($kind*64));Os='linux';Architecture='amd64';Config=@{Labels=@{'org.opencontainers.image.revision'=('a'*40)}}} | ConvertTo-Json -Depth 5 -AsArray
+  $kind=if($a[2] -like 'campuseats-server:*'){'server'}else{'web'};$image=$global:artifactFixtureImages[$kind]
+  $runtimeId=if($global:artifactFixtureCase -eq 'init-classic'){$image.configDigest}else{$image.platformManifestDigest}
+  @{Id=$runtimeId;Os='linux';Architecture='amd64';Config=@{Labels=@{'org.opencontainers.image.revision'=('a'*40)}};RootFS=@{Type='layers';Layers=@($image.diffIds)}} | ConvertTo-Json -Depth 5 -AsArray
   return
  }
  if($a[0] -eq 'volume'){
@@ -59,6 +61,13 @@ function global:docker {
  }
  if($a[0] -eq 'inspect'){
   $service=$a[-1] -replace '-container$',''
+  if($a[2] -ceq '{{json .}}'){
+   $image=$global:artifactFixtureImages[$service];$runtimeId=if($global:artifactFixtureCase -eq 'init-classic'){$image.configDigest}else{$image.platformManifestDigest}
+   $containerId=if($global:artifactFixtureCase -eq 'container-substitution'){'sha256:'+('f'*64)}else{$runtimeId}
+   $configuredId=if($global:artifactFixtureCase -eq 'container-tag'){$image.reference}else{$runtimeId}
+   @{Image=$containerId;Config=@{Image=$configuredId}} | ConvertTo-Json -Depth 4
+   return
+  }
   if($a[2] -like '*TASKS_ENABLED=false*'){if(!$global:artifactFixtureTasksEnabled){return 'disabled'};return ''}
   if($a[2] -like '*Mounts*'){
    $name=if($global:artifactFixtureCase -eq 'mount-changed' -and $global:artifactFixtureCandidateStarts -gt 0){'incorrect-uploads'}else{'original-uploads'}
@@ -100,7 +109,7 @@ function global:docker {
  throw 'Unexpected Docker mutation in artifact release.'
 }
 try {
- foreach($case in @('init-success','volume-exists','unlabeled-volume-exists','backup-failed','data-changed','upload-changed','mount-changed','daily-success')){
+ foreach($case in @('init-success','init-classic','volume-exists','unlabeled-volume-exists','backup-failed','data-changed','upload-changed','mount-changed','container-substitution','container-tag','daily-success')){
   $global:artifactFixtureCase=$case;$global:artifactFixtureLoads=0;$global:artifactFixtureCandidateStarts=0
   $global:artifactFixtureRunning=@{mysql=$true;redis=$true;server=$true;web=$true}
   if($case.StartsWith('init')){$global:artifactFixtureRunning.server=$false;$global:artifactFixtureRunning.web=$false}
@@ -108,10 +117,10 @@ try {
   $envPath=Join-Path $fixture '.env';Write-SecureTextFile -Path $envPath -Content "MYSQL_PASSWORD=fixture-only`nWEB_PORT=28087`n"
   $failed=$false
   try {& (Join-Path $fixtureScripts 'release.ps1') -BundleDirectory $bundle -ExpectedSourceSha $sha -ExpectedRunId '12345' -ExpectedManifestSha256 $hash -ProjectName 'campuseats-improvement-artifactfixture' -EnvFile $envPath -Initialize:($case.StartsWith('init') -or $case -in @('volume-exists','unlabeled-volume-exists'))}catch{$failed=$true}
-  if($failed -ne ($case -in @('volume-exists','unlabeled-volume-exists','backup-failed','data-changed','upload-changed','mount-changed'))){throw "Unexpected artifact release result: $case"}
+  if($failed -ne ($case -in @('volume-exists','unlabeled-volume-exists','backup-failed','data-changed','upload-changed','mount-changed','container-substitution','container-tag'))){throw "Unexpected artifact release result: $case"}
   if($case -in @('volume-exists','unlabeled-volume-exists') -and ($global:artifactFixtureLoads -or $global:artifactFixtureCandidateStarts)){throw 'Initialization reused old or unlabeled volumes.'}
   if($case -eq 'backup-failed' -and ($global:artifactFixtureCandidateStarts -or !$global:artifactFixtureRunning.server -or !$global:artifactFixtureRunning.web)){throw 'Backup failure crossed the migration gate or failed to request original writer restoration.'}
-  if($case -in @('data-changed','upload-changed','mount-changed') -and ($global:artifactFixtureRunning.server -or $global:artifactFixtureRunning.web -or $global:artifactFixtureCandidateStarts -ne 1)){throw 'Failed post-migration data/upload/mount verification opened traffic.'}
+  if($case -in @('data-changed','upload-changed','mount-changed','container-substitution','container-tag') -and ($global:artifactFixtureRunning.server -or $global:artifactFixtureRunning.web -or $global:artifactFixtureCandidateStarts -ne 1)){throw 'Failed post-migration data/upload/mount verification opened traffic.'}
   if($case -eq 'daily-success'){
    $config=[IO.File]::ReadAllText($envPath)
    if($config -notmatch ('SERVER_IMAGE=campuseats-server:sha-'+$sha) -or $config -notmatch ('MYSQL_IMAGE=sha256:'+('3'*64)) -or !(Test-Path -LiteralPath (Join-Path $fixture '.local/backups/LATEST.json')) -or $global:artifactFixtureCandidateStarts -ne 2 -or !$global:artifactFixtureTasksEnabled){throw 'Successful artifact release did not persist image/recovery references and restore tasks.'}
@@ -120,5 +129,5 @@ try {
  Write-Host 'Artifact release orchestration: fresh isolation, existing-volume rejection, backup gate, failed-data pause and persistent immutable references passed.'
 }finally{
  Remove-Item Function:\docker -ErrorAction SilentlyContinue
- Remove-Variable artifactFixtureCase,artifactFixtureLoads,artifactFixtureCandidateStarts,artifactFixtureRunning,artifactFixtureTasksEnabled -Scope Global -ErrorAction SilentlyContinue
+ Remove-Variable artifactFixtureCase,artifactFixtureLoads,artifactFixtureCandidateStarts,artifactFixtureRunning,artifactFixtureTasksEnabled,artifactFixtureImages -Scope Global -ErrorAction SilentlyContinue
 }

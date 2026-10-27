@@ -2,6 +2,7 @@ param([Parameter(Mandatory)][string]$RunId,[Parameter(Mandatory)][string]$Source
 $ErrorActionPreference='Stop'
 $root=Split-Path $PSScriptRoot -Parent
 . (Join-Path $PSScriptRoot 'release-bundle.ps1')
+. (Join-Path $PSScriptRoot 'github-artifact-transfer.ps1')
 if($RunId -notmatch '^[0-9]+$' -or $SourceSha -notmatch '^[a-f0-9]{40}$' -or $ManifestSha256 -notmatch '^[a-fA-F0-9]{64}$'){throw 'Exact trusted release identifiers are required.'}
 $destinationPath=[IO.Path]::GetFullPath($Destination,$root)
 $local=[IO.Path]::GetFullPath((Join-Path $root '.local'))+[IO.Path]::DirectorySeparatorChar
@@ -33,7 +34,7 @@ $token=$null;$client=$null;$handler=$null;$response=$null
 try {
  $token=Read-GitHubReleaseToken
  $handler=[Net.Http.HttpClientHandler]::new();$handler.AllowAutoRedirect=$false
- $client=[Net.Http.HttpClient]::new($handler);$client.Timeout=[TimeSpan]::FromMinutes(10)
+ $client=[Net.Http.HttpClient]::new($handler);$client.Timeout=[TimeSpan]::FromSeconds(90)
  $client.DefaultRequestHeaders.UserAgent.ParseAdd('CampusEats-release/1.0')
  $client.DefaultRequestHeaders.Accept.ParseAdd('application/vnd.github+json')
  $client.DefaultRequestHeaders.Authorization=[Net.Http.Headers.AuthenticationHeaderValue]::new('Bearer',$token)
@@ -51,10 +52,8 @@ try {
  if(!$location.IsAbsoluteUri -or $location.Scheme -cne 'https' -or $location.UserInfo){throw 'Invalid artifact storage redirect.'}
  $parent=New-SecureDirectory -Path (Split-Path $destinationPath -Parent)
  $zip=Join-Path $parent ('download-'+[guid]::NewGuid().ToString('N')+'.zip')
- Write-SecureTextFile -Path $zip -Content ''
  # The signed storage URL is fetched WITHOUT the GitHub authorization header.
- $storage=[Net.Http.HttpClient]::new();$storage.Timeout=[TimeSpan]::FromMinutes(10)
- try {$stream=$storage.GetStreamAsync($location).GetAwaiter().GetResult();$out=[IO.File]::Open($zip,[IO.FileMode]::Create);try{$stream.CopyTo($out)}finally{$out.Dispose();$stream.Dispose()}}finally{$storage.Dispose()}
+ Receive-GitHubArtifactRanges -StorageUri $location -Path $zip -ExpectedBytes ([long]$artifact.size_in_bytes) -ExpectedSha256 $artifact.digest.Substring(7) -ReportProgress
  if((Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant() -cne $artifact.digest.Substring(7)){throw 'Downloaded GitHub artifact digest mismatch.'}
  New-SecureDirectory -Path $destinationPath | Out-Null
  $archive=[IO.Compression.ZipFile]::OpenRead($zip)

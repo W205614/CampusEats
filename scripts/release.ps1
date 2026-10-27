@@ -48,14 +48,15 @@ try {
  }elseif($existing.Count -ne 4){throw 'Daily release requires the existing four-service project.'}
  & docker image load --input (Join-Path ([IO.Path]::GetFullPath($BundleDirectory)) $manifest.archive)
  if($LASTEXITCODE -ne 0){throw 'Cannot import the tested image archive.'}
- Assert-LoadedReleaseImages -Manifest $manifest
+ $resolvedImages=@(Assert-LoadedReleaseImages -Manifest $manifest)
  $id=[guid]::NewGuid().ToString('N');$releaseRoot=New-SecureDirectory -Path (Join-Path $root ('.local/releases/artifact-'+$id))
  $override=Join-Path $releaseRoot 'candidate.json'
  $gateOverride=Join-Path $releaseRoot 'migration-gate.json'
- $imageMap=@{};foreach($image in $manifest.images){$imageMap[$image.service]=$image.id}
+ $imageMap=@{};$identityMap=@{};foreach($image in $resolvedImages){$imageMap[$image.service]=$image.runtimeId;$identityMap[$image.service]=$image}
  Write-OperationsJson -Path $override -Value @{services=@{server=@{image=$imageMap.server};web=@{image=$imageMap.web}}}
  Write-OperationsJson -Path $gateOverride -Value @{services=@{server=@{image=$imageMap.server;environment=@{TASKS_ENABLED='false'}}}}
  $record=[ordered]@{project=$ProjectName;sourceSha=$ExpectedSourceSha;ciRun=$ExpectedRunId;manifestSha256=$ExpectedManifestSha256;images=$imageMap;startedAt=[DateTimeOffset]::UtcNow.ToString('o');mode=$(if($Initialize){'isolated-initialization'}else{'existing-daily-release'});outcome='preparing';dependencies=@{};dependencyImages=@{};beforeBackup=$null;currentBackup=$null}
+ $record['imageIdentities']=$resolvedImages
  if(!$Initialize){
   $previousServer=(& docker @compose ps -a -q server) -join ''
   $record['uploadsMount']=Get-ReleaseUploadsMount -ContainerId $previousServer
@@ -113,8 +114,7 @@ try {
   & docker @compose -f compose.yaml -f $gateOverride up -d --no-build --no-deps --wait --wait-timeout 300 server
   if($LASTEXITCODE -ne 0){throw 'Migration gate did not become healthy.'}
   $container=(& docker @compose ps -a -q server) -join ''
-  $actual=(& docker inspect --format '{{.Image}}' $container) -join ''
-  if($LASTEXITCODE -ne 0 -or $actual -cne $imageMap.server){throw 'Migration image differs from the validated artifact.'}
+  Assert-ReleaseContainerImage -ContainerId $container -Image $identityMap.server
   $disabled=(& docker inspect --format '{{range .Config.Env}}{{if eq . "TASKS_ENABLED=false"}}disabled{{end}}{{end}}' $container) -join ''
   if($LASTEXITCODE -ne 0 -or $disabled -cne 'disabled'){throw 'Migration gate did not disable background tasks.'}
   if(!$Initialize){Assert-ReleaseUploadsMount -Expected $record.uploadsMount -ContainerId $container}
@@ -141,8 +141,7 @@ try {
   if($LASTEXITCODE -ne 0){throw 'Verified artifact did not become healthy with normal task settings.'}
   foreach($service in @('server','web')){
    $container=(& docker @compose ps -a -q $service) -join ''
-   $actual=(& docker inspect --format '{{.Image}}' $container) -join ''
-   if($LASTEXITCODE -ne 0 -or $actual -cne $imageMap[$service]){throw 'Deployed image differs from the validated artifact.'}
+   Assert-ReleaseContainerImage -ContainerId $container -Image $identityMap[$service]
    if(!$Initialize -and $service -ceq 'server'){Assert-ReleaseUploadsMount -Expected $record.uploadsMount -ContainerId $container;$record['uploadsMountVerification']='passed'}
   }
   $record.outcome='healthy';$record.completedAt=[DateTimeOffset]::UtcNow.ToString('o')

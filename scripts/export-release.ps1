@@ -20,11 +20,17 @@ foreach($pair in @(@{service='server';image=$ServerImage},@{service='web';image=
  $reference='campuseats-'+$pair.service+':sha-'+$SourceSha
  & docker image tag $image.Id $reference
  if($LASTEXITCODE -ne 0){throw 'Cannot assign immutable source reference.'}
- $images+=@{service=$pair.service;reference=$reference;id=$image.Id;revision=$SourceSha}
+ $images+=@{service=$pair.service;reference=$reference;sourceRuntimeId=$image.Id;revision=$SourceSha}
 }
 $archive=Join-Path $output 'application-images.tar'
 & docker image save --output $archive @($images.reference)
 if($LASTEXITCODE -ne 0){throw 'Tested image export failed.'}
+$graph=@(Read-ReleaseImageGraph -Archive $archive -SourceSha $SourceSha)
+foreach($image in $images){
+ $identity=@($graph | Where-Object service -CEQ $image.service)[0]
+ if($image.sourceRuntimeId -cnotin @($identity.configDigest,$identity.platformManifestDigest)){throw 'Scanned runtime image differs from the exported OCI graph.'}
+ foreach($field in @('configDigest','platformManifestDigest','layerDigests','diffIds')){$image[$field]=$identity.$field}
+}
 $securityOutput=New-SecureDirectory -Path (Join-Path $output 'security')
 # Explicit whitelist: no logs, .env, credentials, source backup or extracted JAR enters the artifact.
 foreach($name in @('summary.json','server-runtime-sbom.cdx.json','server-runtime-manifest.sha256','server-runtime-provenance.json','server-os-sbom.cdx.json','web-os-sbom.cdx.json','server-os-fixable-high-critical.json','web-os-fixable-high-critical.json','server-java-fixable-high-critical.json')){
@@ -32,7 +38,7 @@ foreach($name in @('summary.json','server-runtime-sbom.cdx.json','server-runtime
 }
 $migrations=@(Get-ChildItem -LiteralPath (Join-Path $root 'sky-server/src/main/resources/db/migration') -Filter 'V*.sql' | Sort-Object Name | ForEach-Object {if($_.Name -notmatch '^V(\d+)__'){throw 'Unexpected migration name.'};@{name=$_.Name;version=[int]$Matches[1];sha256=(Get-ReleaseMigrationHash -Path $_.FullName);fileSha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash}})
 $files=@(Get-ChildItem -LiteralPath $output -File -Recurse | ForEach-Object {@{path=[IO.Path]::GetRelativePath($output,$_.FullName).Replace('\','/');bytes=$_.Length;sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash}})
-$manifest=@{schemaVersion=1;repository='W205614/CampusEats';sourceSha=$SourceSha;runId=$RunId;runAttempt=[int]$env:GITHUB_RUN_ATTEMPT;createdAt=[DateTimeOffset]::UtcNow.ToString('o');platform='linux/amd64';archive='application-images.tar';images=$images;migrationHashFormat='utf8-lf-v1';migrations=$migrations;files=$files}
+$manifest=@{schemaVersion=2;imageIdentityFormat='oci-uncompressed-v1';repository='W205614/CampusEats';sourceSha=$SourceSha;runId=$RunId;runAttempt=[int]$env:GITHUB_RUN_ATTEMPT;createdAt=[DateTimeOffset]::UtcNow.ToString('o');platform='linux/amd64';archive='application-images.tar';images=$images;migrationHashFormat='utf8-lf-v1';migrations=$migrations;files=$files}
 $path=Join-Path $output 'release-manifest.json';Write-OperationsJson -Path $path -Value $manifest
 $hash=(Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash
 [void](Read-VerifiedReleaseBundle -Directory $output -ExpectedSourceSha $SourceSha -ExpectedRunId $RunId -ExpectedManifestSha256 $hash)

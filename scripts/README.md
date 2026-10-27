@@ -5,12 +5,13 @@
 | 用途 | 脚本 | 说明 |
 |---|---|---|
 | 首次启动、源码升级 | `start.ps1` | 生成本机配置、构建镜像并等待健康；已有数据会先暂停写入、备份和独立验证，详见[升级说明](../docs/platform-deployment.md) |
-| CI制品下载 | `download-release.ps1` | 核对成功run、来源SHA、归档及清单摘要，不保存GitHub令牌 |
+| CI制品下载 | `download-release.ps1` | 4 MiB有界分段，核对成功run、来源SHA及完整归档／清单摘要，不保存GitHub令牌 |
 | CI制品发布 | `release.ps1` | 不构建镜像；停写迁移、原字段及上传核对、独立恢复后开放，保留原依赖及卷 |
 | CI制品导出 | `export-release.ps1` | CI末尾导出已测试扫描的两应用镜像、SBOM及来源清单 |
 | 加密副本与解密 | `encrypted-backups.ps1`、`decrypt-backup.ps1` | 固定age，缺公钥拒绝对外副本；私钥单独保管 |
 | 调度预览 | `ops-schedule.ps1` | 生成和校验Windows任务XML，不实际注册 |
 | 凭据权限 | `secure-files.ps1` | 写前限制权限并核验，失败中止；普通临时文件使用回收站清理 |
+| 制品身份核验 | `image-identity.ps1` | 发布内部辅助：验证OCI内容图及配置／平台清单身份，不能凭标签或revision代替内容校验 |
 | 前端源码构建 | `build-frontends.ps1` | 安装依赖，检查兼容层和类型，构建管理端、H5、小程序 |
 | 基础可用性 | `smoke.ps1` | HTTP 就绪与入口检查 |
 | 运维只读检查 | `ops-check.ps1` | 任务、积压、图片、空间及验证备份；发现异常返回非零 |
@@ -30,5 +31,7 @@
 | 有限性能测量 | `measure-performance.mjs` | 使用隔离身份夹具，测量1／5／10并发下的核心链路；操作说明见运维指南 |
 
 `docker-read.ps1` 是运维读取的超时辅助文件；`test-ops-check.ps1`、`test-release-safety.ps1`、`check-client-audit.test.mjs` 及 `tests/ops-docker-fixture.ps1` 是脚本回归与夹具，不是日常启动入口。
+
+`test-image-identity.ps1` 和 `test-github-artifact-transfer.ps1` 验证镜像身份及分段传输的拒绝边界，CI在Windows及Linux执行。`github-artifact-transfer.ps1` 由正式下载入口调用，不能将单段传输成功当作整个制品校验成功。
 
 涉及写入的业务、迁移和浏览器验收应使用独立项目、端口与数据卷。[日常维护](../docs/operations.md)列出备份与检查命令；完整自动验证入口是 [GitHub Actions](../.github/workflows/verify.yml)。

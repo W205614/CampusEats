@@ -14,6 +14,11 @@ jobs:
       - name: Verify release bundle provenance rejection without Docker
         shell: pwsh
         run: ./scripts/test-release-bundle.ps1
+      - name: Verify OCI image identity and bounded artifact transfer
+        shell: pwsh
+        run: |
+          ./scripts/test-image-identity.ps1
+          ./scripts/test-github-artifact-transfer.ps1
       - name: Verify cross-platform migration hash normalization
         shell: pwsh
         run: ./scripts/test-migration-hash.ps1
@@ -62,6 +67,8 @@ jobs:
           ./scripts/test-secure-files.ps1
           ./scripts/test-encrypted-backup.ps1
           ./scripts/test-release-bundle.ps1
+          ./scripts/test-image-identity.ps1
+          ./scripts/test-github-artifact-transfer.ps1
           ./scripts/test-platform-data-manifest.ps1
           ./scripts/test-migration-hash.ps1
           ./scripts/test-artifact-release.ps1
