@@ -213,6 +213,7 @@ class OperationsIntegrationTest {
 
   @Test
   void disabledNewTasksAndNormalHandoverAreEnforced() {
+    platform = auth.authenticate(auth.issue("ADMIN", platform.id()).get("token").toString());
     act(rider());
     operations.availability(courier, false);
     assertEquals(
@@ -455,6 +456,7 @@ class OperationsIntegrationTest {
 
   @Test
   void staffDisableSerializesWithConcurrentClaim() throws Exception {
+    platform = auth.authenticate(auth.issue("ADMIN", platform.id()).get("token").toString());
     var counted = new java.util.concurrent.CountDownLatch(1);
     var release = new java.util.concurrent.CountDownLatch(1);
     var claimStarted = new java.util.concurrent.CountDownLatch(1);

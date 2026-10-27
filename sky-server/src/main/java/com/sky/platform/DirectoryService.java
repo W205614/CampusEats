@@ -222,17 +222,27 @@ public class DirectoryService {
   @Transactional
   public long staff(Long id, PlatformCommands.Staff input) {
     Actor a = Actor.employee();
+    require(
+        Set.of("PLATFORM_ADMIN", "SHOP_MANAGER").contains(a.role()),
+        403, "FORBIDDEN", "无员工管理权限");
     boolean platform = a.role().equals("PLATFORM_ADMIN");
-    // Serialize administrator changes before locking the edited employee. Two admins
-    // must not each disable the other using sessions authenticated before either commit.
+    // All low-frequency staff management uses the same hierarchy: administrator set,
+    // then caller/target employees by id. Managers must not introduce the reverse order.
     List<Map<String, Object>> administrators =
-        platform
-            ? db.rows(
-                "SELECT id,status FROM employee WHERE role='PLATFORM_ADMIN' ORDER BY id FOR UPDATE")
-            : List.of();
+        db.rows(
+            "SELECT id,status FROM employee WHERE role='PLATFORM_ADMIN' ORDER BY id FOR UPDATE");
+    var employees =
+        db.rows(
+            "SELECT * FROM employee WHERE id IN (?,?) ORDER BY id FOR UPDATE",
+            a.id(),
+            id == null ? a.id() : id);
+    var caller = employees.stream().filter(e -> Db.id(e, "id") == a.id()).findFirst().orElse(null);
+    // Authentication can precede a committed disable, transfer or password reset while
+    // this transaction waits for the locks. Revalidate before any personnel write.
+    auth.requireCurrentEmployee(a, caller);
     if (id != null)
       require(
-          db.one("SELECT id FROM employee WHERE id=? FOR UPDATE", id) != null,
+          employees.stream().anyMatch(e -> Db.id(e, "id") == id),
           404,
           "NOT_FOUND",
           "员工不存在");

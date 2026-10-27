@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import { onBeforeUnmount, onMounted, ref, watch } from 'vue';
+import { ElCheckbox } from 'element-plus';
 import { useRouter } from 'vue-router';
 import { request } from '../platform-api';
 import { notifyError } from '../api';
 import { useSession } from '../stores/session';
 import { usePagedList } from '../paged-list';
+import { selectedStore } from '../context';
 interface Message { id: string; orderId: string; storeId: string; eventType: string; summary: string; createdAt: string; readAt?: string | null }
 const session = useSession(), router = useRouter(), unreadOnly = ref(false), unread = ref<string>(), busy = ref(false);
 const list = usePagedList<Message>(() => '/me/messages/page' + (unreadOnly.value ? '?unread=true' : ''), row => row.id);
@@ -23,17 +25,24 @@ async function mark(row: Message, open = false) {
   if (busy.value) return;
   busy.value = true; const token = session.session?.token;
   try {
+    const targetStore = String(row.storeId ?? '');
+    const selectsStore = session.session?.role !== 'DELIVERER';
+    if (open && selectsStore && !/^[1-9][0-9]*$/.test(targetStore))
+      throw new Error('消息店铺信息无效，请刷新后重试');
     if (!row.readAt) await request('/me/messages/' + row.id + '/read', 'POST');
     if (!alive || token !== session.session?.token) return;
     row.readAt = row.readAt || new Date().toISOString();
     await count();
-    if (open && alive && token === session.session?.token) await router.push({ path: '/orders', query: { orderId: row.orderId } });
+    if (open && alive && token === session.session?.token) {
+      if (selectsStore) selectedStore.value = targetStore;
+      await router.push({ path: '/orders', query: { orderId: row.orderId } });
+    }
     else if (unreadOnly.value) await list.load();
   } catch (e) { if (alive && token === session.session?.token) notifyError(e); }
   finally { if (alive && token === session.session?.token) busy.value = false; }
 }
 watch(unreadOnly, () => void list.load());
-watch(() => session.session?.token, () => { sequence++; unread.value = undefined; if (session.session) void refresh(); });
+watch(() => session.session?.token, () => { sequence++; busy.value = false; unread.value = undefined; if (session.session) void refresh(); });
 onMounted(refresh);
 </script>
 <template>

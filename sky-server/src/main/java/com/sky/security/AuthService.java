@@ -256,6 +256,43 @@ public class AuthService {
     db.update("UPDATE auth_session SET revoked=true WHERE jti=?", actor.jti());
   }
 
+  /** Caller must hold the employee row lock until its privileged write commits. */
+  @Transactional(propagation = org.springframework.transaction.annotation.Propagation.MANDATORY)
+  public void requireCurrentEmployee(Actor actor, Map<String, Object> employee) {
+    require(
+        "ADMIN".equals(actor.type())
+            && employee != null
+            && Db.id(employee, "id") == actor.id()
+            && Db.integer(employee, "status") == 1
+            && Objects.equals(employee.get("role"), actor.role())
+            && Objects.equals(optionalId(employee, "store_id"), actor.storeId())
+            && Objects.equals(optionalId(employee, "campus_id"), actor.campusId())
+            && Db.bool(employee, "must_change_password") == actor.mustChangePassword()
+            && actor.jti() != null
+            && !actor.jti().isBlank(),
+        401,
+        "UNAUTHORIZED",
+        "登录权限已变化，请重新登录");
+    var session =
+        db.one(
+            "SELECT subject_type,subject_id,auth_version FROM auth_session"
+                + " WHERE jti=? AND revoked=false AND expires_at>? FOR UPDATE",
+            actor.jti(),
+            now());
+    require(
+        session != null
+            && "ADMIN".equals(session.get("subject_type"))
+            && Db.id(session, "subject_id") == actor.id()
+            && Db.id(session, "auth_version") == Db.id(employee, "auth_version"),
+        401,
+        "UNAUTHORIZED",
+        "登录权限已变化，请重新登录");
+  }
+
+  private static Long optionalId(Map<String, Object> row, String field) {
+    return row.get(field) == null ? null : Db.id(row, field);
+  }
+
   @Transactional
   public void change(Actor actor, Password input) {
     var row = db.one("SELECT * FROM employee WHERE id=? FOR UPDATE", actor.id());

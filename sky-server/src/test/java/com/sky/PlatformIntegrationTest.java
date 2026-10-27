@@ -548,13 +548,14 @@ class PlatformIntegrationTest {
 
   @Test
   void administratorsCannotConcurrentlyDisableEachOther() throws Exception {
+    platform = auth.authenticate(auth.issue("ADMIN", platform.id()).get("token").toString());
     act(platform);
     long second =
         directory.staff(
             null,
             new PlatformCommands.Staff(
                 "scope-test-admin", "第二管理员", "PLATFORM_ADMIN", null, null, true, "TestAdmin!2026"));
-    Actor other = new Actor(second, "ADMIN", "PLATFORM_ADMIN", "", false);
+    Actor other = auth.authenticate(auth.issue("ADMIN", second).get("token").toString());
     try {
       var result =
           race(
@@ -573,7 +574,7 @@ class PlatformIntegrationTest {
                         null));
               });
       assertEquals(1, result.successes());
-      assertEquals(List.of("LAST_PLATFORM_ADMIN"), result.failures());
+      assertEquals(List.of("UNAUTHORIZED"), result.failures());
       assertEquals(
           1, db.count("SELECT COUNT(*) FROM employee WHERE role='PLATFORM_ADMIN' AND status=1"));
     } finally {
