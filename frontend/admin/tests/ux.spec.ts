@@ -170,18 +170,32 @@ for (const user of [true, false]) {
       const before = Number(query.get('beforeId') || Number.MAX_SAFE_INTEGER);
       const limit = Number(query.get('limit') || 100);
       if (limit > 100) olderReads++;
-      return route.fulfill({ json: { code: 'OK', data: records.filter(row => Number(row.id) < before).slice(0, limit) } });
+      const data = records.filter(row => Number(row.id) < before).slice(0, limit)
+        .map(row => row.id === records[100].id ? { ...row, storeName: '历史同步已更新-' + olderReads } : row);
+      return route.fulfill({ json: { code: 'OK', data } });
     });
-    if (user) await page.route('**/api/v1/user/checkouts*', route => route.fulfill({ json: { code: 'OK', data: [] } }));
+    if (user) {
+      await page.route('**/api/v1/user/checkouts*', route => route.fulfill({ json: { code: 'OK', data: [] } }));
+      await page.route('**/api/v1/user/aftersales*', route => route.fulfill({ json: { code: 'OK', data: [] } }));
+    }
     await page.goto(user ? '/app/pages/orders/index' : '/admin/orders');
     const older = page.getByText(user ? 'UX-HISTORY-100 · 自取' : 'UX-HISTORY-100', { exact: true });
     await expect(older).toHaveCount(0);
     await page.getByText(user ? '加载更早订单与结算单' : '加载更早订单', { exact: true }).click();
     await expect(older).toBeVisible();
+    const readsBeforePoll = olderReads;
     await page.clock.fastForward(16000);
-    await expect.poll(() => olderReads).toBeGreaterThan(1);
+    await expect.poll(() => olderReads).toBeGreaterThan(readsBeforePoll);
+    // Receiving the route is not enough: the page waits for all related reads before
+    // clearing loading. Wait for the refreshed oldest row to render before clicking.
+    await expect(page.getByText((user ? '默认校区 · ' : '') + '历史同步已更新-' + olderReads, { exact: true })).toBeVisible();
     await expect(older).toBeVisible();
+    const refreshed = page.waitForResponse(response => {
+      const url = new URL(response.url());
+      return url.pathname === '/api/v1' + listPath && url.searchParams.get('limit') === '100' && !url.searchParams.has('beforeId');
+    });
     await page.getByText(user ? '重新加载' : '刷新', { exact: true }).click();
+    expect((await refreshed).ok()).toBe(true);
     await expect(older).toHaveCount(0);
   });
 }
