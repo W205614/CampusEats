@@ -97,8 +97,23 @@ test('authorization and inbox context: real staff revocation and cross-campus me
     expect(renewed.mustChangePassword).toBe(false); return renewed;
   }
   async function option(page: Page, dialog: Locator, label: string, choice: string) {
-    await dialog.getByLabel(label, { exact: true }).click();
-    await page.getByRole('option', { name: choice, exact: true }).click();
+    // Element Plus overlays the labelled input with its displayed selection or
+    // placeholder. Click the containing visible control as a user would.
+    const select = dialog.locator('.el-select').filter({ has: page.getByLabel(label, { exact: true }) });
+    await expect(select).toHaveCount(1);
+    for (let pageNumber = 0; pageNumber < 30; pageNumber++) {
+      await select.click();
+      await expect(page.getByRole('listbox')).toBeVisible();
+      await expect(page.getByRole('option')).not.toHaveCount(0);
+      const candidate = page.getByRole('option', { name: choice, exact: true });
+      if (await candidate.count()) { await candidate.click(); return; }
+      // The staff form has its own paged store list, separate from the topbar.
+      const more = dialog.getByRole('button', { name: '加载更多归属店铺', exact: true });
+      expect(label === '归属店铺' && await more.isVisible(), 'Staff option must be reachable: ' + choice).toBe(true);
+      await page.keyboard.press('Escape');
+      await ui(page, '/merchant/stores/page', 'GET', () => more.click());
+    }
+    throw new Error('Staff option exceeded the real store page budget: ' + choice);
   }
   async function selectStore(page: Page, label: string) {
     for (let count = 0; count < 30; count++) {
