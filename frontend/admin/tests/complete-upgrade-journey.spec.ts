@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import { test, expect, call, password } from './helpers';
+import { selectAuthorizedStore } from './journey-selectors';
 import type { Page, BrowserContext, Locator } from '@playwright/test';
 import type { Session } from '../../contracts/models';
 import type { Checkout, Order, CursorPage, Aftersale } from '../../contracts/platform';
@@ -85,12 +86,7 @@ test('complete upgrade: four real roles use independent identity, delivery safeg
     await expect(page.getByRole('button',{name:'登录独立账号',exact:true})).toBeVisible();
   }
   async function selectStore(page:Page) {
-    const select=page.locator('.topbar .el-select').first();
-    for(let round=0;round<20;round++) {
-      await select.click();const option=page.getByRole('option',{name:names.campus+' / '+names.store,exact:true});
-      if(await option.count()) {await option.click();return;}
-      await page.keyboard.press('Escape');await page.getByRole('button',{name:'加载更多店铺',exact:true}).click();
-    }throw new Error('Target store was not reachable through store pagination');
+    await selectAuthorizedStore(page,names.campus+' / '+names.store,20);
   }
   try {
     // API writes prepare only catalog, campus, building, quota and staff fixtures.

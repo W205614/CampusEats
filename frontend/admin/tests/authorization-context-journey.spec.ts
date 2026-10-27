@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import { test, expect, call, password } from './helpers';
+import { selectAuthorizedStore, selectStaffOption } from './journey-selectors';
 import type { BrowserContext, Locator, Page } from '@playwright/test';
 import type { Session } from '../../contracts/models';
 import type { Checkout, CursorPage, Order } from '../../contracts/platform';
@@ -97,32 +98,10 @@ test('authorization and inbox context: real staff revocation and cross-campus me
     expect(renewed.mustChangePassword).toBe(false); return renewed;
   }
   async function option(page: Page, dialog: Locator, label: string, choice: string) {
-    // Element Plus overlays the labelled input with its displayed selection or
-    // placeholder. Click the containing visible control as a user would.
-    const select = dialog.locator('.el-select').filter({ has: page.getByLabel(label, { exact: true }) });
-    await expect(select).toHaveCount(1);
-    for (let pageNumber = 0; pageNumber < 30; pageNumber++) {
-      await select.click();
-      await expect(page.getByRole('listbox')).toBeVisible();
-      await expect(page.getByRole('option')).not.toHaveCount(0);
-      const candidate = page.getByRole('option', { name: choice, exact: true });
-      if (await candidate.count()) { await candidate.click(); return; }
-      // The staff form has its own paged store list, separate from the topbar.
-      const more = dialog.getByRole('button', { name: '加载更多归属店铺', exact: true });
-      expect(label === '归属店铺' && await more.isVisible(), 'Staff option must be reachable: ' + choice).toBe(true);
-      await page.keyboard.press('Escape');
-      await ui(page, '/merchant/stores/page', 'GET', () => more.click());
-    }
-    throw new Error('Staff option exceeded the real store page budget: ' + choice);
+    await selectStaffOption(page, dialog, label, choice);
   }
   async function selectStore(page: Page, label: string) {
-    for (let count = 0; count < 30; count++) {
-      await page.locator('.topbar .el-select').click();
-      const choice = page.getByRole('option', { name: label, exact: true });
-      if (await choice.count()) { await choice.click(); await expect(page.locator('.topbar')).toContainText(label); return; }
-      await page.keyboard.press('Escape'); await page.getByRole('button', { name: '加载更多店铺', exact: true }).click();
-    }
-    throw new Error('Fixture store was not reachable through the real store selector');
+    await selectAuthorizedStore(page, label);
   }
   async function createStaff(page: Page, key: string, role: string, placement?: { store?: string; campus?: string }) {
     const person: Person = { id: '', username: 'auth_' + key + '_' + suffix, name: '权限' + key + '-' + suffix,
