@@ -53,15 +53,16 @@ SELECT COUNT(*) FROM refund_request WHERE (state='REQUESTED' AND next_attempt_at
 SELECT COUNT(*) FROM refund_task WHERE (state='REQUESTED' AND next_attempt_at<DATE_SUB(NOW(),INTERVAL 120 SECOND)) OR (state='PROCESSING' AND (lease_until IS NULL OR lease_until<DATE_SUB(NOW(),INTERVAL 120 SECOND)));
 SELECT COUNT(*) FROM outbox_event WHERE (state='REQUESTED' AND next_attempt_at<DATE_SUB(NOW(),INTERVAL 120 SECOND)) OR (state='PROCESSING' AND (lease_until IS NULL OR lease_until<DATE_SUB(NOW(),INTERVAL 120 SECOND)));
 SELECT COUNT(*) FROM orders o LEFT JOIN employee e ON e.id=o.courier_id WHERE o.status IN (3,4) AND o.fulfillment='DELIVERY' AND (o.courier_id IS NOT NULL OR o.status=4) AND (e.id IS NULL OR e.status<>1 OR e.role<>'DELIVERER' OR e.campus_id IS NULL OR e.campus_id<>o.campus_id);
-SELECT COUNT(*) FROM orders WHERE status=4 AND delivery_started_at<DATE_SUB(NOW(),INTERVAL 60 MINUTE);
+SELECT COUNT(*) FROM orders o LEFT JOIN order_stage s ON s.order_id=o.id WHERE o.status=4 AND ((o.checkout_id IS NULL AND o.delivery_started_at<DATE_SUB(NOW(),INTERVAL 60 MINUTE)) OR (o.checkout_id IS NOT NULL AND s.stage='DELIVERING' AND s.deadline_at<=NOW()));
+SELECT COUNT(*) FROM orders o LEFT JOIN order_stage s ON s.order_id=o.id WHERE o.checkout_id IS NOT NULL AND o.status=4 AND (s.order_id IS NULL OR s.stage<>'DELIVERING' OR s.deadline_at IS NULL);
 '@
-  $names=@('refundFailed','outboxBacklog','outboxFailed','unboundEvidence','legacyRefundFailed','checkoutOverdue','legacyOrderOverdue','refundOverdue','legacyRefundOverdue','outboxOverdue','invalidActiveCourier','deliveryOverdue')
+  $names=@('refundFailed','outboxBacklog','outboxFailed','unboundEvidence','legacyRefundFailed','checkoutOverdue','legacyOrderOverdue','refundOverdue','legacyRefundOverdue','outboxOverdue','invalidActiveCourier','deliveryOverdue','missingDeliveryStage')
   $counts=@(Read-Sql $sql)
   if($counts.Count -ne $names.Count -or @($counts | Where-Object {$_ -notmatch '^\d+$'}).Count){throw 'Invalid database counts.'}
   for($i=0;$i -lt $names.Count;$i++){$checks[$names[$i]]=[long]$counts[$i]}
   if($checks.refundFailed -gt 0 -or $checks.legacyRefundFailed -gt 0){$issues.Add('Failed refund requests need attention')}
   if($checks.outboxFailed -gt 0 -or $checks.outboxBacklog -gt $MaxOutboxBacklog){$issues.Add('Notification backlog needs attention')}
-  foreach($name in $names[5..11]){if($checks[$name] -gt 0){$issues.Add("$name needs attention")}}
+  foreach($name in $names[5..12]){if($checks[$name] -gt 0){$issues.Add("$name needs attention")}}
   } catch {$checks.databaseOperationalState='unknown';$issues.Add('Database operational check failed')}
  } else {$checks.databaseOperationalState='unknown';$issues.Add('Database operational check unavailable')}
  if($checks.server -eq 'running healthy') {

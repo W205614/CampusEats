@@ -138,12 +138,17 @@ public class MarketingService {
   }
 
   public List<Map<String, Object>> wallet() {
-    return db.rows(
-        "SELECT u.id,u.state,u.checkout_id,c.id"
-            + " coupon_template_id,c.store_id,c.name,c.kind,c.threshold_cents,c.value,c.cap_cents,c.starts_at,c.ends_at"
-            + " FROM user_coupon u JOIN coupon c ON c.id=u.coupon_id WHERE u.user_id=? ORDER BY"
-            + " u.id DESC LIMIT 200",
-        Actor.user().id());
+    var at = now();
+    var rows =
+        db.rows(
+            "SELECT u.id,u.state,u.checkout_id,c.id"
+                + " coupon_template_id,c.store_id,c.name,c.kind,c.threshold_cents,c.value,c.cap_cents,c.starts_at,c.ends_at"
+                + " FROM user_coupon u JOIN coupon c ON c.id=u.coupon_id WHERE u.user_id=? ORDER BY"
+                + " u.id DESC LIMIT 200",
+            Actor.user().id());
+    rows.forEach(
+        r -> r.put("state", WalletState.display(r.get("state").toString(), Db.time(r.get("ends_at")), at)));
+    return rows;
   }
 
   public long discount(long user, Long ownedCoupon, Long store, long subtotal) {

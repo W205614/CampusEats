@@ -36,15 +36,21 @@ public class OperationsJobs {
         round ->
             sweep.run(
                 round,
-                cursor ->
-                    db.rows(
+                cursor -> {
+                  var at = LocalDateTime.now(clock);
+                  return db.rows(
                         "SELECT o.id FROM orders o JOIN order_stage s ON s.order_id=o.id LEFT JOIN"
                             + " employee p ON p.id=o.courier_id WHERE o.id>? AND o.status IN(2,3,4)"
-                            + " AND (s.deadline_at<=? OR (o.courier_id IS NOT NULL AND (p.id IS"
+                            + " AND (s.deadline_at<=? OR (o.checkout_id IS NOT NULL AND"
+                            + " o.delivery_overdue=true AND (o.status<>4 OR s.stage<>'DELIVERING'"
+                            + " OR s.deadline_at IS NULL OR s.deadline_at>?))"
+                            + " OR (o.courier_id IS NOT NULL AND (p.id IS"
                             + " NULL OR p.status<>1 OR p.role<>'DELIVERER' OR"
                             + " p.campus_id<>o.campus_id))) ORDER BY o.id LIMIT 200",
                         cursor,
-                        LocalDateTime.now(clock)),
+                        at,
+                        at);
+                },
                 service::detect));
   }
 }

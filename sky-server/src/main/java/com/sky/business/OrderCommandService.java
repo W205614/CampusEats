@@ -319,7 +319,7 @@ public class OrderCommandService {
   @Transactional
   public void markOverdue(long id) {
     if (db.update(
-            "UPDATE orders SET delivery_overdue=true,version=version+1 WHERE id=? AND status=4 AND"
+            "UPDATE orders SET delivery_overdue=true,version=version+1 WHERE id=? AND checkout_id IS NULL AND status=4 AND"
                 + " delivery_started_at<? AND delivery_overdue=false",
             id,
             LocalDateTime.now(clock).minusMinutes(60))

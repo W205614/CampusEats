@@ -171,13 +171,27 @@ public class OperationsService {
   public void detect(long order) {
     var o = db.one("SELECT * FROM orders WHERE id=? FOR UPDATE", order);
     if (o == null) return;
+    int status = Db.integer(o, "status");
     stages.sync(order);
     var stage = db.one("SELECT * FROM order_stage WHERE order_id=?", order);
+    var at = LocalDateTime.now(clock);
+    // This compatibility field is derived from the frozen stage, not a second
+    // timer. Correct old premature flags without changing the order's business
+    // version or emitting the former fixed-60-minute event as well.
+    if (o.get("checkout_id") != null && status >= 2 && status <= 4) {
+      boolean overdue =
+          status == 4
+              && "DELIVERING".equals(stage.get("stage"))
+              && stage.get("deadline_at") != null
+              && !Db.time(stage.get("deadline_at")).isAfter(at);
+      if (Db.bool(o, "delivery_overdue") != overdue)
+        db.update("UPDATE orders SET delivery_overdue=? WHERE id=?", overdue, order);
+    }
     if (stage.get("deadline_at") != null
-        && !Db.time(stage.get("deadline_at")).isAfter(LocalDateTime.now(clock)))
+        && !Db.time(stage.get("deadline_at")).isAfter(at))
       create(o, stage, "STAGE_OVERDUE");
-    if (Db.integer(o, "status") >= 3
-        && Db.integer(o, "status") <= 4
+    if (status >= 3
+        && status <= 4
         && o.get("courier_id") != null
         && db.count(
                 "SELECT COUNT(*) FROM employee WHERE id=? AND role='DELIVERER' AND status=1 AND"

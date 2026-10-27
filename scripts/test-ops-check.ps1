@@ -62,9 +62,11 @@ $missing=Check-Fixture @{evidenceRefs=@('missing.png');productRefs=@('/uploads/p
 if($missing.report.checks.missingEvidence -ne 1 -or $missing.report.checks.missingProductImages -ne 1 -or $missing.report.checks.suspectedOrphanEvidence -ne 1 -or $missing.report.checks.temporaryFiles -ne 1){throw 'Image references were not checked in both directions.'}
 $present=Check-Fixture @{evidenceRefs=@('exists.png');productRefs=@('/uploads/product.png');files=@("EVIDENCE`texists.png","PRODUCT`tproduct.png")}
 if($present.report.issues.Count){throw 'Referenced existing images appeared missing.'}
-$overdue=Check-Fixture @{counts=@(0,0,0,0,1,1,1,1,1,1,1,1)}
-foreach($name in @('legacyRefundFailed','checkoutOverdue','legacyOrderOverdue','refundOverdue','legacyRefundOverdue','outboxOverdue','invalidActiveCourier','deliveryOverdue')){
+$overdue=Check-Fixture @{counts=@(0,0,0,0,1,1,1,1,1,1,1,1,1)}
+foreach($name in @('legacyRefundFailed','checkoutOverdue','legacyOrderOverdue','refundOverdue','legacyRefundOverdue','outboxOverdue','invalidActiveCourier','deliveryOverdue','missingDeliveryStage')){
  if($overdue.report.checks.$name -ne 1){throw "Missing operational count: $name"}
 }
 if(!$overdue.report.issues.Count){throw 'Overdue records not reported.'}
 Write-Host 'Operations checks: bounded subprocess, disabled/failed/stale jobs, unknown checks, overdue counts, and bidirectional images passed.'
+# Rejected fixtures deliberately return 1; a successful assertion run itself must return 0.
+$global:LASTEXITCODE=0

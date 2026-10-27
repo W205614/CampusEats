@@ -84,7 +84,7 @@ public class PlatformJobs {
                 round,
                 cursor ->
                     db.rows(
-                        "SELECT id FROM orders WHERE status=4 AND delivery_overdue=false"
+                        "SELECT id FROM orders WHERE checkout_id IS NULL AND status=4 AND delivery_overdue=false"
                             + " AND delivery_started_at<? AND id>? ORDER BY id LIMIT 100",
                         now().minusMinutes(60),
                         cursor),

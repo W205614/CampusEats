@@ -137,7 +137,7 @@ onHide(() => { active = false; sequence++; storeSequence++; couponSequence++; st
     ><button v-if="storeCouponMore" class="secondary small-button" :loading="storeCouponLoading" :disabled="storeCouponLoading" @click="storeCouponPage.load(false)">加载更多店铺券</button
     ><view v-if="couponsLoaded && !coupons.length" class="empty">当前暂无可领取的优惠券，可以切换店铺看看。</view
     ><view class="section-title">我的优惠券</view
-    ><picker :range="['全部状态','可用','已锁定','已使用']" :value="['','AVAILABLE','LOCKED','USED'].indexOf(walletState)" @change="walletState = ['','AVAILABLE','LOCKED','USED'][Number($event.detail.value)] || ''; walletPage.load()"><view class="card tap">筛选优惠券：{{ states[walletState] || '全部状态' }} ▾</view></picker
+    ><picker :range="['全部状态','可用','已锁定','已使用','已过期']" :value="['','AVAILABLE','LOCKED','USED','EXPIRED'].indexOf(walletState)" @change="walletState = ['','AVAILABLE','LOCKED','USED','EXPIRED'][Number($event.detail.value)] || ''; walletPage.load()"><view class="card tap">筛选优惠券：{{ states[walletState] || '全部状态' }} ▾</view></picker
     ><view class="card" v-for="c in wallet" :key="c.id"
       ><view class="row"
         ><text>{{ c.name }}</text

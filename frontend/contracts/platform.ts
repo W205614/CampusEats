@@ -206,6 +206,7 @@ export const states: Record<string, string> = {
   PAID: '已支付',
   CANCELLED: '已取消',
   AVAILABLE: '可使用',
+  EXPIRED: '已过期',
   LOCKED: '已锁定',
   USED: '已使用',
   ESCALATED: '平台介入中',

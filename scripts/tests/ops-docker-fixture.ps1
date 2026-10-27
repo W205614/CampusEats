@@ -42,7 +42,8 @@ if($command.StartsWith('set -eu')){
 $sql=[Console]::In.ReadToEnd()
 if($sql -like '*SELECT COUNT(*) FROM refund_request*'){
  if($config.invalidCounts){'unknown';exit}
- if($config.counts){$config.counts}else{1..12 | ForEach-Object {'0'}}
+ if($sql -notlike '*o.checkout_id IS NULL*INTERVAL 60 MINUTE*o.checkout_id IS NOT NULL*s.deadline_at<=NOW()*' -or $sql -notlike "*s.order_id IS NULL OR s.stage<>'DELIVERING' OR s.deadline_at IS NULL*"){throw 'Delivery deadline authority or missing-stage integrity check is absent.'}
+ if($config.counts){$config.counts}else{1..13 | ForEach-Object {'0'}}
  exit
 }
 if($sql -like '*SELECT DISTINCT path FROM evidence*'){if($config.evidenceRefs){$config.evidenceRefs};exit}

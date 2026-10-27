@@ -264,6 +264,8 @@ public class AuthService {
         400,
         "BAD_PASSWORD",
         "原密码错误");
+    require(
+        !input.oldPassword().equals(input.password()), 400, "PASSWORD_UNCHANGED", "新密码不能与原密码相同");
     db.update(
         "UPDATE employee SET password=?,must_change_password=false,auth_version=auth_version+1"
             + " WHERE id=?",

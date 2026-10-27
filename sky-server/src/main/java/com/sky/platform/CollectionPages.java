@@ -196,6 +196,7 @@ public class CollectionPages {
 
   public CursorPages.Page<Wallet> wallet(CursorPages.Request q) {
     long user = Actor.user().id();
+    var at = LocalDateTime.now(clock);
     state(q.state(), "AVAILABLE", "LOCKED", "USED", "EXPIRED");
     String range = pages.scope("wallet", q.state(), q.text());
     var filter = new StringBuilder(" WHERE u.user_id=?");
@@ -204,13 +205,13 @@ public class CollectionPages {
     if (q.state() != null) {
       if (q.state().equals("EXPIRED")) {
         filter.append(" AND u.state='AVAILABLE' AND c.ends_at<=?");
-        args.add(LocalDateTime.now(clock));
+        args.add(at);
       } else {
         filter.append(" AND u.state=?");
         args.add(q.state());
         if (q.state().equals("AVAILABLE")) {
           filter.append(" AND c.ends_at>?");
-          args.add(LocalDateTime.now(clock));
+          args.add(at);
         }
       }
     }
@@ -231,7 +232,7 @@ public class CollectionPages {
                 r ->
                     new Wallet(
                         s(r, "id"),
-                        s(r, "state"),
+                        WalletState.display(s(r, "state"), Db.time(r.get("ends_at")), at),
                         s(r, "checkout_id"),
                         s(r, "coupon_template_id"),
                         s(r, "store_id"),
