@@ -40,13 +40,20 @@ function Invoke-VulnerabilityScan([string]$Kind,[string]$Target,[string]$Report,
 function Test-VulnerabilityGate([string]$Report,[string]$Gate,[string]$ExpectedClass){
  $data=Get-Content -LiteralPath $Report -Raw | ConvertFrom-Json
  if($null -eq $data.Results -or !@($data.Results | Where-Object {$_.Class -eq $ExpectedClass}).Count){throw 'Required package class is missing from the full scan report.'}
+ if($ExpectedClass -eq 'os-pkgs' -and !@($data.Results | Where-Object Class -EQ 'os-pkgs' | ForEach-Object {$_.Packages} | Where-Object {$null -ne $_}).Count){throw 'Required OS package inventory is missing from the full scan report.'}
  $findings=@(foreach($result in $data.Results){foreach($finding in @($result.Vulnerabilities)){
   if($finding -and ($finding -is [string] -or !$finding.VulnerabilityID -or $finding.Severity -notin @('UNKNOWN','LOW','MEDIUM','HIGH','CRITICAL'))){throw 'Invalid vulnerability record.'}
   if($finding){
    [ordered]@{target=$result.Target;class=$result.Class;type=$result.Type;id=$finding.VulnerabilityID;package=$finding.PkgName;severity=$finding.Severity;installedVersion=$finding.InstalledVersion;fixedVersion=$finding.FixedVersion}
   }
+ }
+ # Upstream still lists all Expat releases as affected; some distribution feeds omit this CVE.
+ foreach($package in @($result.Packages)){
+  if($result.Class -eq 'os-pkgs' -and $package.Name -in @('expat','libexpat','libexpat1') -and !@($result.Vulnerabilities | Where-Object VulnerabilityID -CEQ 'CVE-2025-66382').Count){
+   [ordered]@{target=$result.Target;class=$result.Class;type=$result.Type;id='CVE-2025-66382';package=$package.Name;severity='MEDIUM';installedVersion=$package.Version;fixedVersion='';source='https://github.com/libexpat/libexpat/issues/1076'}
+  }
  }})
- [ordered]@{policy='All reported vulnerabilities, including unfixed';count=$findings.Count;findings=$findings} | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $Gate -Encoding utf8
+ [ordered]@{policy='All reported vulnerabilities, including unfixed, plus unresolved Expat CVE-2025-66382 inventory';count=$findings.Count;findings=$findings} | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $Gate -Encoding utf8
  if($findings.Count){return 1};return 0
 }
 

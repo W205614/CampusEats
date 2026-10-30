@@ -22,7 +22,8 @@ if($args[0] -in @('image','sbom')){
  $severity=if($mode -eq 'medium-unfixed'){'MEDIUM'}elseif($mode -eq 'low-fixable'){'LOW'}else{'CRITICAL'}
  $vulnerabilities=if($affected){@(@{VulnerabilityID='FIXTURE-VULNERABILITY';Severity=$severity;FixedVersion=$fixed})}else{@()}
  $class=if($kind -eq 'image'){'os-pkgs'}else{'lang-pkgs'}
- @{Results=@(@{Class=$class;Type=$(if($kind -eq 'image'){'alpine'}else{'jar'});Vulnerabilities=@($vulnerabilities)})} | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $output
+ $packages=if($kind -eq 'image' -and $mode -eq 'unreported-expat'){@(@{Name='libexpat';Version='2.9.0-r0'})}elseif($mode -eq 'missing-package-inventory'){@()}else{@(@{Name='fixture-clean-package';Version='1.0'})}
+ @{Results=@(@{Class=$class;Type=$(if($kind -eq 'image'){'alpine'}else{'jar'});Vulnerabilities=@($vulnerabilities);Packages=@($packages)})} | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $output
  exit 0
 }
 if($args -contains 'cyclonedx'){'{"bomFormat":"CycloneDX","specVersion":"1.6","components":[]}' | Set-Content -LiteralPath $output;exit 0}
@@ -66,7 +67,7 @@ function global:docker {
  throw 'Unexpected Docker operation in SBOM extraction fixture.'
 }
 try {
- foreach($mode in @('clean','unfixed-only','os-fixable-high','java-fixable-high','medium-unfixed','low-fixable','mysql-unfixed','redis-unfixed','scanner-failed','java-scanner-failed','invalid-report','missing-bom','tampered-bom','wrong-image')){
+ foreach($mode in @('clean','unfixed-only','os-fixable-high','java-fixable-high','medium-unfixed','low-fixable','mysql-unfixed','redis-unfixed','unreported-expat','missing-package-inventory','scanner-failed','java-scanner-failed','invalid-report','missing-bom','tampered-bom','wrong-image')){
   $env:CAMPUS_TRIVY_FIXTURE_MODE=$mode
   $out=Join-Path $fixture $mode
   $failed=$false
@@ -74,6 +75,10 @@ try {
   if($failed -ne ($mode -ne 'clean')){throw ('Scanner accepted a vulnerability/failure or rejected a clean report: '+$mode)}
   $summary=@(Get-Content -LiteralPath (Join-Path $out 'summary.json') -Raw | ConvertFrom-Json)
   if(($summary.service -join ',') -cne 'server,web,mysql,redis'){throw 'Scanner did not report all four service images.'}
+  if($mode -eq 'unreported-expat'){
+   $gate=Get-Content -LiteralPath (Join-Path $out 'server-os-gate.json') -Raw | ConvertFrom-Json
+   if($gate.count -ne 1 -or $gate.findings[0].id -cne 'CVE-2025-66382'){throw 'Known unresolved upstream Expat vulnerability was hidden by an empty vendor report.'}
+  }
   if($mode -eq 'unfixed-only'){
    foreach($service in @('server','web','mysql','redis')){
     if((Get-Content -LiteralPath (Join-Path $out ($service+'-os-vulnerabilities.json')) -Raw) -notmatch 'FIXTURE-VULNERABILITY' -or !(Test-Path -LiteralPath (Join-Path $out ($service+'-os-sbom.cdx.json')))){throw 'Full unfixed OS report or SBOM was missing.'}
