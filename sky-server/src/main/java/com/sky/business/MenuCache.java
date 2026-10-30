@@ -118,8 +118,10 @@ public class MenuCache {
             || value.longValue() != generation) return null;
         if (!(envelope.get("items") instanceof List<?> items)) return null;
         var out = new ArrayList<Map<String, Object>>();
-        for (var item : items)
+        for (var item : items) {
+          if (!(item instanceof Map<?, ?>)) return null;
           out.add((Map<String, Object>) item);
+        }
         return out;
       }
     } catch (Exception ignored) {

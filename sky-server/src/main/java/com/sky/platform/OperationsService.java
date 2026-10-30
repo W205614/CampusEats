@@ -249,11 +249,6 @@ public class OperationsService {
   @Transactional
   public void emergency(long staff, String reason) {
     scope.platform();
-    require(
-        reason != null && !reason.isBlank() && reason.length() <= 200,
-        400,
-        "INVALID_REASON",
-        "请填写停用原因");
     var p = db.one("SELECT * FROM employee WHERE id=? FOR UPDATE", staff);
     require(p != null && "DELIVERER".equals(p.get("role")), 404, "NOT_FOUND", "配送员不存在");
     db.update(

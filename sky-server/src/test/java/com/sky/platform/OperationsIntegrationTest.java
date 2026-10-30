@@ -212,6 +212,32 @@ class OperationsIntegrationTest {
   }
 
   @Test
+  void emergencyReasonIsValidatedAtTheHttpBoundaryBeforeDisablingTheCourier() throws Exception {
+    String token = auth.issue("ADMIN", 1).get("token").toString();
+    long version = db.count("SELECT auth_version FROM employee WHERE id=?", courier);
+    clear();
+    String endpoint = "/api/v1/platform/staff/" + courier + "/emergency-disable";
+    for (String payload : List.of(
+        "{\"reason\":null}", "{\"reason\":\"   \"}",
+        "{\"reason\":\"" + "x".repeat(201) + "\"}")) {
+      mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(endpoint)
+              .header("Authorization", "Bearer " + token)
+              .contentType("application/json").content(payload))
+          .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isBadRequest())
+          .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath("$.code")
+              .value("INVALID_INPUT"));
+      assertEquals(1, db.count("SELECT status FROM employee WHERE id=?", courier));
+      assertEquals(version, db.count("SELECT auth_version FROM employee WHERE id=?", courier));
+    }
+    mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(endpoint)
+            .header("Authorization", "Bearer " + token)
+            .contentType("application/json").content("{\"reason\":\"" + "x".repeat(200) + "\"}"))
+        .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isOk());
+    assertEquals(0, db.count("SELECT status FROM employee WHERE id=?", courier));
+    assertEquals(version + 1, db.count("SELECT auth_version FROM employee WHERE id=?", courier));
+  }
+
+  @Test
   void disabledNewTasksAndNormalHandoverAreEnforced() {
     platform = auth.authenticate(auth.issue("ADMIN", platform.id()).get("token").toString());
     act(rider());

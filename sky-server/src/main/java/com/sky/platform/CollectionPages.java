@@ -99,7 +99,8 @@ public class CollectionPages {
     if (store == null) scope.platform();
     else scope.merchant(store, true);
     state(q.state(), "ENABLED", "DISABLED");
-    String range = pages.scope("staff", store, q.state(), q.text());
+    String text = q.text();
+    String range = pages.scope("staff", store, q.state(), text);
     var filter = new StringBuilder(" WHERE 1=1");
     var args = new ArrayList<Object>();
     if (store != null) {
@@ -110,9 +111,10 @@ public class CollectionPages {
       filter.append(" AND status=?");
       args.add(q.state().equals("ENABLED") ? 1 : 0);
     }
-    search(q.text(), "CONCAT(username,' ',name)", filter, args);
+    search(text, "CONCAT(username,' ',name)", filter, args);
     args.add(pages.before(q.cursor(), range));
-    args.add(q.size() + 1);
+    int size = q.size();
+    args.add(size + 1);
     var rows =
         db.rows(
             "SELECT"
@@ -136,7 +138,7 @@ public class CollectionPages {
                         Db.bool(r, "must_change_password"),
                         Db.bool(r, "accepting_tasks")))
             .toList(),
-        q.size(),
+        size,
         range,
         r -> Long.parseLong(r.id()));
   }
@@ -150,7 +152,8 @@ public class CollectionPages {
       if (store != null) scope.store(store, true);
     }
     state(q.state(), "ENABLED", "DISABLED");
-    String range = pages.scope("coupons", store, admin, q.state(), q.text());
+    String text = q.text();
+    String range = pages.scope("coupons", store, admin, q.state(), text);
     var filter = new StringBuilder(store == null ? " WHERE store_id IS NULL" : " WHERE store_id=?");
     var args = new ArrayList<Object>();
     if (store != null) args.add(store);
@@ -164,9 +167,10 @@ public class CollectionPages {
       filter.append(" AND enabled=?");
       args.add(q.state().equals("ENABLED"));
     }
-    search(q.text(), "name", filter, args);
+    search(text, "name", filter, args);
     args.add(pages.before(q.cursor(), range));
-    args.add(q.size() + 1);
+    int size = q.size();
+    args.add(size + 1);
     var rows =
         db.rows(
             "SELECT * FROM coupon" + filter + " AND id<? ORDER BY id DESC LIMIT ?", args.toArray());
@@ -189,7 +193,7 @@ public class CollectionPages {
                         Db.time(r.get("ends_at")),
                         Db.bool(r, "enabled")))
             .toList(),
-        q.size(),
+        size,
         range,
         r -> Long.parseLong(r.id()));
   }
@@ -198,7 +202,8 @@ public class CollectionPages {
     long user = Actor.user().id();
     var at = LocalDateTime.now(clock);
     state(q.state(), "AVAILABLE", "LOCKED", "USED", "EXPIRED");
-    String range = pages.scope("wallet", q.state(), q.text());
+    String text = q.text();
+    String range = pages.scope("wallet", q.state(), text);
     var filter = new StringBuilder(" WHERE u.user_id=?");
     var args = new ArrayList<Object>();
     args.add(user);
@@ -215,9 +220,10 @@ public class CollectionPages {
         }
       }
     }
-    search(q.text(), "c.name", filter, args);
+    search(text, "c.name", filter, args);
     args.add(pages.before(q.cursor(), range));
-    args.add(q.size() + 1);
+    int size = q.size();
+    args.add(size + 1);
     var rows =
         db.rows(
             "SELECT u.id,u.state,u.checkout_id,c.id"
@@ -244,7 +250,7 @@ public class CollectionPages {
                         Db.time(r.get("starts_at")),
                         Db.time(r.get("ends_at"))))
             .toList(),
-        q.size(),
+        size,
         range,
         r -> Long.parseLong(r.id()));
   }
@@ -252,7 +258,8 @@ public class CollectionPages {
   public CursorPages.Page<Promotion> promotions(long store, CursorPages.Request q) {
     scope.merchant(store, true);
     state(q.state(), "ENABLED", "DISABLED");
-    String range = pages.scope("promotions", store, q.state(), q.text());
+    String text = q.text();
+    String range = pages.scope("promotions", store, q.state(), text);
     var filter = new StringBuilder(" WHERE store_id=?");
     var args = new ArrayList<Object>();
     args.add(store);
@@ -261,17 +268,18 @@ public class CollectionPages {
       args.add(q.state().equals("ENABLED"));
     }
     // Item type is a controlled filter; product text lookup stays inside the same store.
-    if (!q.text().isBlank()) {
+    if (!text.isBlank()) {
       filter.append(
           " AND ((item_type='DISH' AND EXISTS(SELECT 1 FROM dish d WHERE d.id=promotion.item_id AND"
               + " d.store_id=promotion.store_id AND LOCATE(?,d.name)>0)) OR (item_type='SETMEAL'"
               + " AND EXISTS(SELECT 1 FROM setmeal m WHERE m.id=promotion.item_id AND"
               + " m.store_id=promotion.store_id AND LOCATE(?,m.name)>0)))");
-      args.add(q.text());
-      args.add(q.text());
+      args.add(text);
+      args.add(text);
     }
     args.add(pages.before(q.cursor(), range));
-    args.add(q.size() + 1);
+    int size = q.size();
+    args.add(size + 1);
     var rows =
         db.rows(
             "SELECT * FROM promotion" + filter + " AND id<? ORDER BY id DESC LIMIT ?",
@@ -290,7 +298,7 @@ public class CollectionPages {
                         Db.time(r.get("ends_at")),
                         Db.bool(r, "enabled")))
             .toList(),
-        q.size(),
+        size,
         range,
         r -> Long.parseLong(r.id()));
   }
@@ -298,7 +306,8 @@ public class CollectionPages {
   public CursorPages.Page<Favorite> favorites(CursorPages.Request q) {
     Actor.user();
     require(q.state() == null, 400, "INVALID_STATE", "收藏不支持状态筛选");
-    String range = pages.scope("favorites", q.text());
+    String text = q.text();
+    String range = pages.scope("favorites", text);
     var pos = pages.position(q.cursor(), range);
     String afterType = pos.rank() == 0 ? "DISH" : pos.rank() == 1 ? "SETMEAL" : "STORE";
     long afterId = pos.id();
@@ -311,13 +320,14 @@ public class CollectionPages {
               + " f.target_id>?))))";
       Collections.addAll(args, pos.storeId(), pos.storeId(), afterType, afterType, afterId);
     }
-    if (!q.text().isBlank()) {
+    if (!text.isBlank()) {
       filter +=
           " AND LOCATE(?,COALESCE(CASE WHEN f.target_type='STORE' THEN s.name WHEN"
               + " f.target_type='DISH' THEN d.name ELSE m.name END,''))>0";
-      args.add(q.text());
+      args.add(text);
     }
-    args.add(q.size() + 1);
+    int size = q.size();
+    args.add(size + 1);
     var rows =
         db.rows(
             "SELECT f.*,s.name store_name,CASE WHEN f.target_type='STORE' THEN s.name WHEN"
@@ -329,8 +339,8 @@ public class CollectionPages {
                 + filter
                 + " ORDER BY f.store_id,f.target_type,f.target_id LIMIT ?",
             args.toArray());
-    boolean more = rows.size() > q.size();
-    var selected = rows.subList(0, Math.min(q.size(), rows.size()));
+    boolean more = rows.size() > size;
+    var selected = rows.subList(0, Math.min(size, rows.size()));
     String next = null;
     if (more) {
       var last = selected.getLast();

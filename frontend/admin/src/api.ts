@@ -50,17 +50,3 @@ export const body = (value: unknown) => JSON.stringify(value);
 export function notifyError(error: unknown) {
   ElMessage.error(error instanceof Error ? error.message : "操作失败");
 }
-export async function download(path: string) {
-  const store = useSession();
-  const response = await fetch("/api/v1/admin" + path, {
-    headers: { Authorization: "Bearer " + store.session?.token },
-    signal: AbortSignal.timeout(25000),
-  });
-  if (!response.ok) throw new Error("导出失败");
-  const url = URL.createObjectURL(await response.blob());
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = "campus-report.xlsx";
-  a.click();
-  URL.revokeObjectURL(url);
-}

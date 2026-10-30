@@ -13,13 +13,11 @@ import org.springframework.transaction.annotation.Transactional;
 public class AftersaleService {
   private final Db db;
   private final PlatformScope scope;
-  private final FulfillmentService fulfillment;
   private final Clock clock;
 
-  public AftersaleService(Db db, PlatformScope scope, FulfillmentService fulfillment, Clock clock) {
+  public AftersaleService(Db db, PlatformScope scope, Clock clock) {
     this.db = db;
     this.scope = scope;
-    this.fulfillment = fulfillment;
     this.clock = clock;
   }
 

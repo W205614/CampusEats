@@ -21,7 +21,7 @@ import tools.jackson.databind.ObjectMapper;
 
 class MenuCacheTest {
   @ParameterizedTest
-  @ValueSource(strings = {"missing", "null", "string", "object", "empty"})
+  @ValueSource(strings = {"missing", "null", "string", "object", "null-element", "non-map-element", "empty"})
   @SuppressWarnings("unchecked")
   void malformedItemsReloadFromSourceWhileAnEmptyListRemainsACacheHit(String shape) {
     var stored = new ConcurrentHashMap<String, String>();
@@ -41,6 +41,8 @@ class MenuCacheTest {
       case "null" -> envelope.put("items", null);
       case "string" -> envelope.put("items", "invalid");
       case "object" -> envelope.put("items", Map.of());
+      case "null-element" -> envelope.put("items", Collections.singletonList(null));
+      case "non-map-element" -> envelope.put("items", List.of("invalid"));
       case "empty" -> envelope.put("items", List.of());
     }
     stored.put("campus:shape", json.write(envelope));
