@@ -16,9 +16,13 @@ if($args[0] -in @('image','sbom')){
  $expected=if($kind -eq 'image'){'os'}else{'library'}
  if($args -contains '--ignore-unfixed' -or $args -contains '--java-db-repository' -or $args -notcontains '--list-all-pkgs' -or $args[$packageIndex+1] -ne $expected){throw 'Required full OS/SBOM package scope is incorrect.'}
  if($env:CAMPUS_TRIVY_FIXTURE_MODE -eq 'invalid-report'){'{}' | Set-Content -LiteralPath $output;exit 0}
- $fixed=if(($kind -eq 'image' -and $env:CAMPUS_TRIVY_FIXTURE_MODE -eq 'os-fixable-high') -or ($kind -eq 'sbom' -and $env:CAMPUS_TRIVY_FIXTURE_MODE -eq 'java-fixable-high')){'2.0.0'}else{''}
+ $mode=$env:CAMPUS_TRIVY_FIXTURE_MODE
+ $affected=$mode -eq 'unfixed-only' -or ($kind -eq 'image' -and $mode -in @('os-fixable-high','medium-unfixed','low-fixable')) -or ($kind -eq 'sbom' -and $mode -eq 'java-fixable-high') -or ($kind -eq 'image' -and (($mode -eq 'mysql-unfixed' -and $output -like '*mysql-os-*') -or ($mode -eq 'redis-unfixed' -and $output -like '*redis-os-*')))
+ $fixed=if($mode -in @('os-fixable-high','java-fixable-high','low-fixable')){'2.0.0'}else{''}
+ $severity=if($mode -eq 'medium-unfixed'){'MEDIUM'}elseif($mode -eq 'low-fixable'){'LOW'}else{'CRITICAL'}
+ $vulnerabilities=if($affected){@(@{VulnerabilityID='FIXTURE-VULNERABILITY';Severity=$severity;FixedVersion=$fixed})}else{@()}
  $class=if($kind -eq 'image'){'os-pkgs'}else{'lang-pkgs'}
- @{Results=@(@{Class=$class;Type=$(if($kind -eq 'image'){'alpine'}else{'jar'});Vulnerabilities=@(@{VulnerabilityID='FIXTURE-UNFIXED';Severity='CRITICAL';FixedVersion=$fixed})})} | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $output
+ @{Results=@(@{Class=$class;Type=$(if($kind -eq 'image'){'alpine'}else{'jar'});Vulnerabilities=@($vulnerabilities)})} | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $output
  exit 0
 }
 if($args -contains 'cyclonedx'){'{"bomFormat":"CycloneDX","specVersion":"1.6","components":[]}' | Set-Content -LiteralPath $output;exit 0}
@@ -62,21 +66,21 @@ function global:docker {
  throw 'Unexpected Docker operation in SBOM extraction fixture.'
 }
 try {
- foreach($mode in @('unfixed-only','os-fixable-high','java-fixable-high','scanner-failed','java-scanner-failed','invalid-report','missing-bom','tampered-bom','wrong-image')){
+ foreach($mode in @('clean','unfixed-only','os-fixable-high','java-fixable-high','medium-unfixed','low-fixable','mysql-unfixed','redis-unfixed','scanner-failed','java-scanner-failed','invalid-report','missing-bom','tampered-bom','wrong-image')){
   $env:CAMPUS_TRIVY_FIXTURE_MODE=$mode
   $out=Join-Path $fixture $mode
   $failed=$false
-  try {& (Join-Path $PSScriptRoot 'scan-images.ps1') -ServerImage 'fixture:server' -WebImage 'fixture:web' -OutputDirectory $out -TrivyExecutable $fake 6>$null} catch {$failed=$true}
-  if($failed -ne ($mode -ne 'unfixed-only')){throw 'Scanner orchestrator accepted a failed scan or rejected unfixed-only findings.'}
+  try {& (Join-Path $PSScriptRoot 'scan-images.ps1') -ServerImage 'fixture:server' -WebImage 'fixture:web' -MySqlImage 'fixture:mysql' -RedisImage 'fixture:redis' -OutputDirectory $out -TrivyExecutable $fake 6>$null} catch {$failed=$true}
+  if($failed -ne ($mode -ne 'clean')){throw ('Scanner accepted a vulnerability/failure or rejected a clean report: '+$mode)}
   $summary=@(Get-Content -LiteralPath (Join-Path $out 'summary.json') -Raw | ConvertFrom-Json)
-  if($summary.Count -ne 2){throw 'Scanner did not report both application images.'}
+  if(($summary.service -join ',') -cne 'server,web,mysql,redis'){throw 'Scanner did not report all four service images.'}
   if($mode -eq 'unfixed-only'){
-   foreach($service in @('server','web')){
-    if((Get-Content -LiteralPath (Join-Path $out ($service+'-os-vulnerabilities.json')) -Raw) -notmatch 'FIXTURE-UNFIXED' -or !(Test-Path -LiteralPath (Join-Path $out ($service+'-os-sbom.cdx.json')))){throw 'Full unfixed OS report or SBOM was missing.'}
+   foreach($service in @('server','web','mysql','redis')){
+    if((Get-Content -LiteralPath (Join-Path $out ($service+'-os-vulnerabilities.json')) -Raw) -notmatch 'FIXTURE-VULNERABILITY' -or !(Test-Path -LiteralPath (Join-Path $out ($service+'-os-sbom.cdx.json')))){throw 'Full unfixed OS report or SBOM was missing.'}
    }
-   if((Get-Content -LiteralPath (Join-Path $out 'server-java-vulnerabilities.json') -Raw) -notmatch 'FIXTURE-UNFIXED' -or !(Test-Path -LiteralPath (Join-Path $out 'server-runtime-provenance.json'))){throw 'Mandatory Java SBOM report or actual-image provenance was missing.'}
+   if((Get-Content -LiteralPath (Join-Path $out 'server-java-vulnerabilities.json') -Raw) -notmatch 'FIXTURE-VULNERABILITY' -or !(Test-Path -LiteralPath (Join-Path $out 'server-runtime-provenance.json'))){throw 'Mandatory Java SBOM report or actual-image provenance was missing.'}
   }
  }
  if($global:fixtureRemoved -lt 7){throw 'Owned extraction containers were not cleaned after both success and failure.'}
- Write-Host 'Image scan gate: full OS/Java reports, exact-image BOM/JAR hashes, unfixed preservation, both fixable gates, scanner/report/missing/tampered BOM failures, and scoped non-running cleanup passed.'
+ Write-Host 'Image scan gate: four services, clean acceptance, all severities and unfixed rejection, exact-image BOM/JAR hashes, scanner/report/missing/tampered BOM failures, and scoped non-running cleanup passed.'
 } finally {$env:CAMPUS_TRIVY_FIXTURE_MODE=$originalMode;Remove-Item Function:\docker -ErrorAction SilentlyContinue;Remove-Variable fixtureSbomImage,fixtureSbomContainer,fixtureSbomRoot,fixtureRemoved -Scope Global -ErrorAction SilentlyContinue}

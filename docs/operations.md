@@ -93,12 +93,13 @@ pwsh -NoProfile -File ./scripts/ops-run.ps1 -Action Backup
 ```powershell
 pwsh -NoProfile -File ./scripts/scan-images.ps1 `
   -ServerImage campuseats-server:v1 -WebImage campuseats-web:v1 `
+  -MySqlImage <当前MySQL镜像ID> -RedisImage <当前Redis镜像ID> `
   -OutputDirectory .local/security
 ```
 
-入口下载固定版本并验证官方归档SHA-256，分别扫描两镜像的系统包与后端Java运行时依赖。后端构建时由CycloneDX按实际解析的compile／runtime依赖生成清单，排除test／provided／system范围；JAR、清单及同次构建的SHA-256清单一起进入镜像。扫描器从指定镜像ID创建不启动的临时容器提取这些文件，核对JAR和清单哈希，再用Trivy扫描依赖清单；临时容器只按本次创建ID移除，不删除卷或操作运行服务。
+入口下载固定版本并验证官方归档SHA-256，扫描应用、Web及显式指定的MySQL／Redis镜像系统包与后端Java运行时依赖。CI从实际测试容器解析MySQL／Redis镜像ID并强制扫描四服务。后端构建时由CycloneDX按实际解析的compile／runtime依赖生成清单，排除test／provided／system范围；JAR、清单及同次构建的SHA-256清单一起进入镜像。扫描器从指定镜像ID创建不启动的临时容器提取这些文件，核对JAR和清单哈希，再用Trivy扫描依赖清单；临时容器只按本次创建ID移除，不删除卷或操作运行服务。
 
-该方式不依赖近1GiB的Java识别库，也不跳过Java依赖检查。完整系统包／Java漏洞JSON、CycloneDX清单、镜像与JAR／清单来源证据、可修复高危／严重漏洞门禁结果分别保留。缺失或不匹配的运行时清单、数据库下载、扫描或转换失败都会失败；未修复漏洞和其它等级仍在完整报告中，不代表全项目零漏洞或安全认证。首次使用需要联网，报告保存在 `.local`，CI保留相应产物。
+该方式不依赖近1GiB的Java识别库，也不跳过Java依赖检查。完整系统包／Java漏洞JSON、CycloneDX清单、镜像与JAR／清单来源证据和门禁结果分别保留。任意等级的已知漏洞均阻断，包括未提供修复版本的条目；缺失或不匹配的运行时清单、数据库下载、扫描或转换失败也会失败。通过仅说明当前漏洞库及扫描覆盖范围内未检出，不代表未知漏洞不存在或安全认证。首次使用需要联网，报告保存在 `.local`，CI制品同时保留四服务扫描证据。
 
 ## 有限性能测量
 

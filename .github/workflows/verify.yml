@@ -117,9 +117,14 @@ jobs:
           ./scripts/safe-backup.ps1 -Destination (Join-Path $PWD '.local/backups/ci-restore')
           ./scripts/smoke.ps1
           ./scripts/ops-check.ps1
-      - name: Scan source-built application images and retain SBOMs
+      - name: Scan all four service images and retain SBOMs
         shell: pwsh
-        run: ./scripts/scan-images.ps1 -ServerImage campuseats-server:v1 -WebImage campuseats-web:v1 -OutputDirectory '.local/security'
+        run: |
+          $mysql=(& docker inspect --format '{{.Image}}' (& docker compose ps -q mysql)) -join ''
+          if($LASTEXITCODE -ne 0 -or !$mysql){throw 'Cannot resolve the tested MySQL image.'}
+          $redis=(& docker inspect --format '{{.Image}}' (& docker compose ps -q redis)) -join ''
+          if($LASTEXITCODE -ne 0 -or !$redis){throw 'Cannot resolve the tested Redis image.'}
+          ./scripts/scan-images.ps1 -ServerImage campuseats-server:v1 -WebImage campuseats-web:v1 -MySqlImage $mysql -RedisImage $redis -OutputDirectory '.local/security'
       - name: Export the same tested and scanned application images
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         shell: pwsh

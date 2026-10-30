@@ -7,7 +7,7 @@ x-logging: &bounded-logging
 services:
   mysql:
     logging: *bounded-logging
-    image: ${MYSQL_IMAGE:-mysql:8.4}
+    image: ${MYSQL_IMAGE:-mysql:8.4.13@sha256:a0225d1ea6631c8bc2385dc4c2faba17bbf1834ecf369e1659a9a382bd8d5dd7}
     restart: unless-stopped
     environment:
       MYSQL_DATABASE: sky_take_out
@@ -25,7 +25,7 @@ services:
     mem_limit: 768m
   redis:
     logging: *bounded-logging
-    image: ${REDIS_IMAGE:-redis:7.4-alpine}
+    image: ${REDIS_IMAGE:-redis:7.4.12-alpine@sha256:8da19c7399dca900c6822a1cf30f9d2285585e2c4b457ff4095b0f4500054d3f}
     restart: unless-stopped
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD:?Run scripts/start.ps1}

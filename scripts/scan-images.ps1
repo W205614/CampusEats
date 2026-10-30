@@ -1,5 +1,6 @@
 param(
  [Parameter(Mandatory)][string]$ServerImage,[Parameter(Mandatory)][string]$WebImage,
+ [string]$MySqlImage='',[string]$RedisImage='',
  [string]$OutputDirectory='.local/security',[string]$TrivyExecutable='',
  [ValidateSet('Both','Server','Web')][string]$Service='Both'
 )
@@ -41,11 +42,11 @@ function Test-VulnerabilityGate([string]$Report,[string]$Gate,[string]$ExpectedC
  if($null -eq $data.Results -or !@($data.Results | Where-Object {$_.Class -eq $ExpectedClass}).Count){throw 'Required package class is missing from the full scan report.'}
  $findings=@(foreach($result in $data.Results){foreach($finding in @($result.Vulnerabilities)){
   if($finding -and ($finding -is [string] -or !$finding.VulnerabilityID -or $finding.Severity -notin @('UNKNOWN','LOW','MEDIUM','HIGH','CRITICAL'))){throw 'Invalid vulnerability record.'}
-  if($finding -and $finding.Severity -in @('HIGH','CRITICAL') -and ![string]::IsNullOrWhiteSpace([string]$finding.FixedVersion)){
+  if($finding){
    [ordered]@{target=$result.Target;class=$result.Class;type=$result.Type;id=$finding.VulnerabilityID;package=$finding.PkgName;severity=$finding.Severity;installedVersion=$finding.InstalledVersion;fixedVersion=$finding.FixedVersion}
   }
  }})
- [ordered]@{policy='HIGH/CRITICAL with a nonempty FixedVersion';count=$findings.Count;findings=$findings} | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $Gate -Encoding utf8
+ [ordered]@{policy='All reported vulnerabilities, including unfixed';count=$findings.Count;findings=$findings} | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $Gate -Encoding utf8
  if($findings.Count){return 1};return 0
 }
 
@@ -89,7 +90,10 @@ function Export-ImageRuntimeBom([string]$ImageId,[string]$Log){
 
 $failed=$false
 $summary=[Collections.Generic.List[object]]::new()
-foreach($item in @(@{name='server';image=$ServerImage},@{name='web';image=$WebImage})){
+$images=@(@{name='server';image=$ServerImage},@{name='web';image=$WebImage})
+if($MySqlImage){$images+=@{name='mysql';image=$MySqlImage}}
+if($RedisImage){$images+=@{name='redis';image=$RedisImage}}
+foreach($item in $images){
  if($Service -ne 'Both' -and $item.name -ine $Service){continue}
  $name=$item.name
  $log=Join-Path $outputRoot ($name+'-scan.log')
@@ -103,16 +107,16 @@ foreach($item in @(@{name='server';image=$ServerImage},@{name='web';image=$WebIm
   if($record.osScanExit -eq 0){
    & $TrivyExecutable convert --format cyclonedx --output (Join-Path $outputRoot ($name+'-os-sbom.cdx.json')) $osReport *>> $log
    $record.osSbomExit=$LASTEXITCODE
-   $record.osGateExit=Test-VulnerabilityGate -Report $osReport -Gate (Join-Path $outputRoot ($name+'-os-fixable-high-critical.json')) -ExpectedClass 'os-pkgs'
+   $record.osGateExit=Test-VulnerabilityGate -Report $osReport -Gate (Join-Path $outputRoot ($name+'-os-gate.json')) -ExpectedClass 'os-pkgs'
   }
   # Java scanning is mandatory for server, even when the OS gate fails. A missing BOM is failure.
   if($name -eq 'server'){
    $runtimeBom=Export-ImageRuntimeBom -ImageId $imageId -Log $log
    $javaReport=Join-Path $outputRoot 'server-java-vulnerabilities.json'
    $record.javaScanExit=Invoke-VulnerabilityScan -Kind 'sbom' -Target $runtimeBom -Report $javaReport -Log $log
-   if($record.javaScanExit -eq 0){$record.javaGateExit=Test-VulnerabilityGate -Report $javaReport -Gate (Join-Path $outputRoot 'server-java-fixable-high-critical.json') -ExpectedClass 'lang-pkgs'}
+   if($record.javaScanExit -eq 0){$record.javaGateExit=Test-VulnerabilityGate -Report $javaReport -Gate (Join-Path $outputRoot 'server-java-gate.json') -ExpectedClass 'lang-pkgs'}
   }
-  if($record.osScanExit -eq 0 -and $record.osSbomExit -eq 0 -and $record.osGateExit -eq 0 -and ($name -eq 'web' -or ($record.javaScanExit -eq 0 -and $record.javaGateExit -eq 0))){$record.status='passed'}
+  if($record.osScanExit -eq 0 -and $record.osSbomExit -eq 0 -and $record.osGateExit -eq 0 -and ($name -ne 'server' -or ($record.javaScanExit -eq 0 -and $record.javaGateExit -eq 0))){$record.status='passed'}
  } catch {'Image resolution, required SBOM extraction, report validation or scan failed; inspect local evidence.' | Add-Content -LiteralPath $log}
  if($record.status -ne 'passed'){$failed=$true}
  $summary.Add($record)

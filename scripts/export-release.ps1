@@ -33,7 +33,7 @@ foreach($image in $images){
 }
 $securityOutput=New-SecureDirectory -Path (Join-Path $output 'security')
 # Explicit whitelist: no logs, .env, credentials, source backup or extracted JAR enters the artifact.
-foreach($name in @('summary.json','server-runtime-sbom.cdx.json','server-runtime-manifest.sha256','server-runtime-provenance.json','server-os-sbom.cdx.json','web-os-sbom.cdx.json','server-os-fixable-high-critical.json','web-os-fixable-high-critical.json','server-java-fixable-high-critical.json')){
+foreach($name in @('summary.json','server-runtime-sbom.cdx.json','server-runtime-manifest.sha256','server-runtime-provenance.json','server-os-sbom.cdx.json','web-os-sbom.cdx.json','mysql-os-sbom.cdx.json','redis-os-sbom.cdx.json','server-os-gate.json','web-os-gate.json','mysql-os-gate.json','redis-os-gate.json','server-java-gate.json','server-os-vulnerabilities.json','web-os-vulnerabilities.json','mysql-os-vulnerabilities.json','redis-os-vulnerabilities.json','server-java-vulnerabilities.json')){
  Copy-Item -LiteralPath (Join-Path $security $name) -Destination $securityOutput -ErrorAction Stop
 }
 $migrations=@(Get-ChildItem -LiteralPath (Join-Path $root 'sky-server/src/main/resources/db/migration') -Filter 'V*.sql' | Sort-Object Name | ForEach-Object {if($_.Name -notmatch '^V(\d+)__'){throw 'Unexpected migration name.'};@{name=$_.Name;version=[int]$Matches[1];sha256=(Get-ReleaseMigrationHash -Path $_.FullName);fileSha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash}})

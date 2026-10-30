@@ -13,14 +13,11 @@ RUN --mount=type=cache,target=/root/.m2 mvn -s /workspace/maven-settings.xml -Dm
 RUN cd /workspace/sky-server/target && test -s bom.json && \
     sha256sum sky-server-1.0-SNAPSHOT.jar bom.json | \
     sed 's/sky-server-1.0-SNAPSHOT.jar/app.jar/; s/bom.json/sbom.cdx.json/' > runtime-manifest.sha256
-FROM eclipse-temurin:21-jre AS runtime
+FROM eclipse-temurin:21.0.13_9-jre-alpine-3.24@sha256:82cf3d9ccbe1ed46252008d51b2f2329e6b9e8a2f4394c4bebefc3ea7f4b1372 AS runtime
 ARG RUNTIME_REFRESH=initial
 ARG SOURCE_REVISION=unknown
 LABEL org.opencontainers.image.revision=$SOURCE_REVISION
-RUN test -n "$RUNTIME_REFRESH" && sed -i 's|http://archive.ubuntu.com/ubuntu|https://archive.ubuntu.com/ubuntu|g; s|http://security.ubuntu.com/ubuntu|https://security.ubuntu.com/ubuntu|g' /etc/apt/sources.list.d/ubuntu.sources && \
-    apt-get -o Acquire::Retries=3 update && \
-    apt-get -o Acquire::Retries=3 install -y --no-install-recommends curl && \
-    rm -rf /var/lib/apt/lists/*
+RUN test -n "$RUNTIME_REFRESH" && apk upgrade --no-cache && apk add --no-cache curl
 WORKDIR /app
 RUN mkdir -p /app/uploads && chown -R 10001:10001 /app
 COPY --from=build --chown=10001:10001 /workspace/sky-server/target/sky-server-1.0-SNAPSHOT.jar /app/app.jar

@@ -26,7 +26,7 @@
 | 接口类型 | `generate-contracts.mjs` | 默认从已有快照生成；`--fetch` 会登录指定后端并刷新快照，不是纯本地生成 |
 | 通知验收 | `check-websocket.mjs` | 连接实际后端校验票据与会话边界，需要正确环境 |
 | 用户端依赖审计 | `check-client-audit.mjs` | 检查 `.local/audit-client.json`，发现漏洞或无效报告即失败 |
-| 后端与镜像安全 | `scan-images.ps1` | 固定版本 Trivy，扫描两应用镜像的系统包及运行时依赖，保留完整报告和 CycloneDX 清单 |
+| 后端与镜像安全 | `scan-images.ps1` | 固定版本Trivy，扫描应用镜像及显式指定的MySQL／Redis镜像系统包、Java运行依赖；任意已知漏洞阻断，保留完整报告和CycloneDX清单 |
 | 性能身份夹具 | `prepare-performance.mjs` | 仅允许明确隔离的项目、端口与配置，准备独立数据库用户和有效会话；不测登录容量 |
 | 有限性能测量 | `measure-performance.mjs` | 使用隔离身份夹具，测量1／5／10并发下的核心链路；操作说明见运维指南 |
 
