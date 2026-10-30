@@ -644,7 +644,7 @@ class PlatformIntegrationTest {
   }
 
   @Test
-  void platformReassignBeforePickupValidatesRoleCampusStatusReasonAndVersion() {
+  void platformReassignBeforePickupValidatesRoleCampusStatusReasonAndVersion() throws Exception {
     long id = assignedDelivery(false);
     long replacement = staff("courier1b").id();
     for (Actor actor : List.of(staff("manager1"), staff("courier1"), user(user))) {
@@ -677,20 +677,20 @@ class PlatformIntegrationTest {
     } finally {
       db.update("UPDATE employee SET status=1 WHERE id=?", replacement);
     }
-    assertEquals(
-        "REASON_REQUIRED",
-        assertThrows(
-                BusinessException.class,
-                () -> fulfillment.reassign(id, new PlatformCommands.Reassign(4, replacement, "  ")))
-            .code());
-    assertEquals(
-        "INVALID_REASON",
-        assertThrows(
-                BusinessException.class,
-                () ->
-                    fulfillment.reassign(
-                        id, new PlatformCommands.Reassign(4, replacement, "改".repeat(201))))
-            .code());
+    String token = auth.issue("ADMIN", platform.id()).get("token").toString();
+    for (String action : List.of("reassign", "exception-cancel"))
+      for (String reason : new String[] {null, "  ", "改".repeat(201)}) {
+        Object input = action.equals("reassign")
+            ? new PlatformCommands.Reassign(4, replacement, reason)
+            : new PlatformCommands.ExceptionCancel(4, reason);
+        mvc.perform(post("/api/v1/platform/orders/" + id + "/" + action)
+                .header("Authorization", "Bearer " + token)
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content(json.write(input)))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
+      }
+    act(platform);
     assertEquals(
         "VERSION_CONFLICT",
         assertThrows(

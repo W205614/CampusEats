@@ -310,7 +310,7 @@ public class FulfillmentService {
   public Map<String, Object> reassign(long id, PlatformCommands.Reassign input) {
     scope.platform();
     lockOrderCouriers(id, input.courierId());
-    String reason = exceptionReason(input.reason());
+    String reason = input.reason().trim();
     var order = scope.order(id, true);
     require(Db.id(order, "version") == input.version(), 409, "VERSION_CONFLICT", "订单状态已变化，请刷新");
     int status = Db.integer(order, "status");
@@ -362,7 +362,7 @@ public class FulfillmentService {
   @Transactional
   public Map<String, Object> exceptionCancel(long id, PlatformCommands.ExceptionCancel input) {
     scope.platform();
-    String reason = exceptionReason(input.reason());
+    String reason = input.reason().trim();
     var order = scope.order(id, true);
     require(Db.id(order, "version") == input.version(), 409, "VERSION_CONFLICT", "订单状态已变化，请刷新");
     int status = Db.integer(order, "status");
@@ -404,12 +404,6 @@ public class FulfillmentService {
             + "->6");
     scope.event(id, "ORDER_EXCEPTION_CANCELLED");
     return detail(id);
-  }
-
-  private String exceptionReason(String value) {
-    require(value != null && !value.isBlank(), 400, "REASON_REQUIRED", "请填写操作原因");
-    require(value.length() <= 200, 400, "INVALID_REASON", "操作原因不能超过200字");
-    return value.trim();
   }
 
   /** Return failures normally so the failed-attempt counter is committed. */

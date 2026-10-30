@@ -159,7 +159,7 @@ public class AftersaleService {
     if (platform) scope.platform();
     else if (store != null) scope.merchant(store, false);
     else Actor.user();
-    query.validate(
+    int pageLimit = query.validate(
         Set.of("PENDING", "ESCALATED", "APPROVED", "REJECTED", "WITHDRAWN", "REFUNDED"), false);
     var args = new ArrayList<Object>();
     String filter = "";
@@ -172,7 +172,7 @@ public class AftersaleService {
       filter += " AND o.number=?";
       args.add(query.orderNumber());
     }
-    args.add(query.pageLimit());
+    args.add(pageLimit);
     var rows =
         db.rows(
             "SELECT a.*,o.number,o.status order_status FROM aftersale a JOIN orders o ON o.id=a.order_id WHERE 1=1"

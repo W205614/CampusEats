@@ -31,8 +31,6 @@ public class UploadService {
       String id = image.publish(false);
       image.accept();
       return "/uploads/" + id + ".png";
-    } catch (BusinessException ex) {
-      throw ex;
     } catch (java.io.IOException ex) {
       throw new BusinessException(503, "UPLOAD_UNAVAILABLE", "图片存储暂不可用");
     }

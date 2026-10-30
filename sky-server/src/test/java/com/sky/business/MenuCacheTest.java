@@ -20,6 +20,41 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
 import tools.jackson.databind.ObjectMapper;
 
 class MenuCacheTest {
+  @ParameterizedTest
+  @ValueSource(strings = {"missing", "null", "string", "object", "empty"})
+  @SuppressWarnings("unchecked")
+  void malformedItemsReloadFromSourceWhileAnEmptyListRemainsACacheHit(String shape) {
+    var stored = new ConcurrentHashMap<String, String>();
+    var redis = mock(StringRedisTemplate.class);
+    ValueOperations<String, String> values = mock(ValueOperations.class);
+    when(redis.opsForValue()).thenReturn(values);
+    when(values.get(anyString())).thenAnswer(call -> stored.get(call.getArgument(0)));
+    doAnswer(call -> { stored.put(call.getArgument(0), call.getArgument(1)); return null; })
+        .when(values).set(anyString(), anyString(), any(Duration.class));
+    var json = new Json(new ObjectMapper());
+    var cache = new MenuCache(redis, json, mock(Db.class), Clock.systemUTC(),
+        mock(PlatformTransactionManager.class));
+    cache.load("shape", List::of);
+    var envelope = json.map(stored.get("campus:shape"));
+    switch (shape) {
+      case "missing" -> envelope.remove("items");
+      case "null" -> envelope.put("items", null);
+      case "string" -> envelope.put("items", "invalid");
+      case "object" -> envelope.put("items", Map.of());
+      case "empty" -> envelope.put("items", List.of());
+    }
+    stored.put("campus:shape", json.write(envelope));
+    var reads = new AtomicInteger();
+    var expected = shape.equals("empty") ? List.<Map<String, Object>>of()
+        : List.<Map<String, Object>>of(Map.of("name", "current menu"));
+    assertEquals(expected, cache.load("shape", () -> {
+      reads.incrementAndGet();
+      return expected;
+    }));
+    assertEquals(shape.equals("empty") ? 0 : 1, reads.get());
+    assertEquals(expected, cache.load("shape", () -> fail("Expected repaired cache hit")));
+  }
+
   @Test
   @SuppressWarnings("unchecked")
   void concurrentMissesShareOneFillAndNeverShareMutableResults() throws Exception {
@@ -36,11 +71,12 @@ class MenuCacheTest {
         Clock.systemUTC(), mock(PlatformTransactionManager.class));
     var entered = new CountDownLatch(1);
     var release = new CountDownLatch(1);
-    var attempts = new CountDownLatch(12);
+    // Stay within Redis admission; bypass behavior is covered by the Redis failure test.
+    var attempts = new CountDownLatch(4);
     var count = new AtomicInteger();
-    try (var pool = Executors.newFixedThreadPool(12)) {
+    try (var pool = Executors.newFixedThreadPool(4)) {
       var results = new ArrayList<Future<List<Map<String, Object>>>>();
-      for (int i = 0; i < 12; i++) results.add(pool.submit(() -> {
+      for (int i = 0; i < 4; i++) results.add(pool.submit(() -> {
         attempts.countDown();
         return cache.load("shared", () -> {
           count.incrementAndGet();

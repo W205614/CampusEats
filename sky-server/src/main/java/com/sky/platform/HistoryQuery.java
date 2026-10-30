@@ -24,17 +24,13 @@ public record HistoryQuery(
     this(beforeId, state, orderNumber, begin, end, taskId, null);
   }
 
-  public int pageLimit() {
-    return ListLimit.resolve(limit);
-  }
-
   public HistoryQuery {
     state = state == null || state.isBlank() ? null : state.strip();
     orderNumber = orderNumber == null || orderNumber.isBlank() ? null : orderNumber.strip();
   }
 
-  public void validate(Set<String> states, boolean tasks) {
-    pageLimit();
+  public int validate(Set<String> states, boolean tasks) {
+    int pageLimit = ListLimit.resolve(limit);
     require(beforeId == null || beforeId > 0, 400, "INVALID_CURSOR", "分页游标须为正整数");
     require(taskId == null || taskId > 0, 400, "INVALID_TASK", "任务编号须为正整数");
     require(orderNumber == null || orderNumber.length() <= 64, 400, "INVALID_QUERY", "订单号过长");
@@ -51,6 +47,7 @@ public record HistoryQuery(
         "请同时提供起止日期，范围最多366天");
     require(state == null || states.contains(state), 400, "INVALID_STATE", "筛选状态不正确");
     require(tasks || taskId == null, 400, "INVALID_TASK", "售后列表不支持任务编号");
+    return pageLimit;
   }
 
   /** The alias is an internal SQL identifier, never request input. */

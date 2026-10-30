@@ -214,7 +214,7 @@ public class PlatformJobs {
   public List<Map<String, Object>> refunds(Long store, HistoryQuery query) {
     if (store == null) scope.platform();
     else scope.merchant(store, false);
-    query.validate(Set.of("REQUESTED", "PROCESSING", "FAILED", "SUCCEEDED"), true);
+    int pageLimit = query.validate(Set.of("REQUESTED", "PROCESSING", "FAILED", "SUCCEEDED"), true);
     var args = new ArrayList<Object>();
     String filter = "";
     if (store != null) {
@@ -226,7 +226,7 @@ public class PlatformJobs {
       filter += " AND EXISTS (SELECT 1 FROM orders o WHERE o.id=r.order_id AND o.number=?)";
       args.add(query.orderNumber());
     }
-    args.add(query.pageLimit());
+    args.add(pageLimit);
     var rows =
         db.rows(
             "SELECT r.* FROM refund_request r WHERE 1=1" + filter + " ORDER BY r.id DESC LIMIT ?",
@@ -264,7 +264,7 @@ public class PlatformJobs {
   public List<Map<String, Object>> events(Long store, HistoryQuery query) {
     if (store == null) scope.platform();
     else scope.merchant(store, true);
-    query.validate(Set.of("REQUESTED", "PROCESSING", "FAILED", "SUCCEEDED"), true);
+    int pageLimit = query.validate(Set.of("REQUESTED", "PROCESSING", "FAILED", "SUCCEEDED"), true);
     var args = new ArrayList<Object>();
     String filter = "";
     if (store != null) {
@@ -278,7 +278,7 @@ public class PlatformJobs {
               + " (SELECT 1 FROM orders o WHERE o.id=e.aggregate_id AND o.number=?)";
       args.add(query.orderNumber());
     }
-    args.add(query.pageLimit());
+    args.add(pageLimit);
     return db.rows(
         "SELECT e.id,e.event_type,e.aggregate_id,e.state,e.attempts,e.last_error,"
             + "e.next_attempt_at,e.store_id,e.created_at FROM outbox_event e WHERE 1=1"

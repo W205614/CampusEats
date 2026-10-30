@@ -4,8 +4,6 @@ export async function readPages<T extends { id: string }>(
   pages: number,
   isCurrent: () => boolean = () => true,
 ) {
-  if (!Number.isSafeInteger(pages) || pages < 1 || !Number.isSafeInteger(pages * 100))
-    throw new Error('Invalid history page count');
   const items: T[] = [];
   const target = pages * 100;
   let hasMore = false;

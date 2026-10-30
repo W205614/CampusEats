@@ -116,9 +116,9 @@ public class MenuCache {
         if (!epoch.equals(envelope.get("epoch"))
             || !(envelope.get("generation") instanceof Number value)
             || value.longValue() != generation) return null;
+        if (!(envelope.get("items") instanceof List<?> items)) return null;
         var out = new ArrayList<Map<String, Object>>();
-        for (var item :
-            envelope.get("items") instanceof List<?> l ? l : List.of())
+        for (var item : items)
           out.add((Map<String, Object>) item);
         return out;
       }

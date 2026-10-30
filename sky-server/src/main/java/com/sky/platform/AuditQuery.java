@@ -19,12 +19,8 @@ public record AuditQuery(
     action = action == null || action.isBlank() ? null : action.strip();
   }
 
-  public int pageLimit() {
-    return limit == null ? 200 : ListLimit.resolve(limit);
-  }
-
-  public void validate() {
-    pageLimit();
+  public int validate() {
+    int pageLimit = limit == null ? 200 : ListLimit.resolve(limit);
     require(beforeId == null || beforeId > 0, 400, "INVALID_CURSOR", "分页游标须为正整数");
     require(actorId == null || actorId > 0, 400, "INVALID_ACTOR", "操作人编号须为正整数");
     require(action == null || action.matches("[A-Z][A-Z0-9_]{0,47}"),
@@ -34,6 +30,7 @@ public record AuditQuery(
                 && begin.getYear() >= 2000 && end.getYear() <= 2100
                 && ChronoUnit.DAYS.between(begin, end) < 366,
         400, "INVALID_RANGE", "请同时提供起止日期，范围最多366天");
+    return pageLimit;
   }
 
   public String conditions(List<Object> args) {

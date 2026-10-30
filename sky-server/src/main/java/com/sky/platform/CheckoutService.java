@@ -138,7 +138,6 @@ public class CheckoutService {
       for (var item : raw) {
         String type = item.get("item_type").toString();
         long id = Db.id(item, "item_id");
-        catalog.product(store, type, id, true);
         @SuppressWarnings("unchecked")
         var flavor = (Map<String, String>) item.get("flavors");
         String canonical = validation.validate(type, id, flavor);

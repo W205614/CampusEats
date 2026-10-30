@@ -55,6 +55,36 @@ class ImageStorageTest {
   }
 
   @Test
+  void stagingStorageFailureReportsUnavailableAndReleasesAdmission() throws Exception {
+    Files.writeString(root.resolve(".tmp"), "occupied directory name");
+    var storage = storage(100000, 0);
+    var failure = assertThrows(BusinessException.class, () -> storage.stage(image()));
+    assertEquals(503, failure.status());
+    assertEquals("UPLOAD_UNAVAILABLE", failure.code());
+    Files.move(root.resolve(".tmp"), root.resolve("retained-file"));
+    try (var staged = storage.stage(image())) {
+      staged.publish(false);
+      staged.accept();
+    }
+    assertEquals("occupied directory name", Files.readString(root.resolve("retained-file")));
+  }
+
+  @Test
+  void truncatedPngRemainsAnInputErrorAndReleasesAdmission() throws Exception {
+    var broken = new MockMultipartFile("file", "truncated.png", "image/png",
+        java.util.Arrays.copyOf(image().getBytes(), 33));
+    var storage = storage(100000, 0);
+    var failure = assertThrows(BusinessException.class, () -> storage.stage(broken));
+    assertEquals(400, failure.status());
+    assertEquals("INVALID_IMAGE", failure.code());
+    try (var staged = storage.stage(image())) {
+      staged.publish(false);
+      staged.accept();
+    }
+    assertLedgerMatchesFiles(storage);
+  }
+
+  @Test
   void admissionIsSharedUntilCommitAndRollbackRemovesPublishedFile() throws Exception {
     var storage = storage(100000, 0);
     try (var staged = storage.stage(image())) {

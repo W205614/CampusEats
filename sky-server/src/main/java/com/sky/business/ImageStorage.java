@@ -4,6 +4,7 @@ import static com.sky.common.BusinessException.require;
 
 import com.sky.common.BusinessException;
 import io.micrometer.core.instrument.MeterRegistry;
+import java.awt.image.BufferedImage;
 import java.io.*;
 import java.nio.file.*;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -74,35 +75,21 @@ public class ImageStorage {
         checkSpace();
         temp = Files.createTempFile(root.resolve(".tmp"), "image-", ".part");
       }
-      try (var input = ImageIO.createImageInputStream(file.getInputStream())) {
-        var readers = ImageIO.getImageReaders(input);
-        require(readers.hasNext(), 400, "INVALID_IMAGE", "图片无法解码");
-        var reader = readers.next();
+      var image = decode(file);
+      try (var out = new BoundedOutput(Files.newOutputStream(temp))) {
         try {
-          reader.setInput(input);
-          String format = reader.getFormatName().toLowerCase(Locale.ROOT);
-          int w = reader.getWidth(0), h = reader.getHeight(0);
-          require(
-              Set.of("png", "jpeg", "jpg").contains(format)
-                  && w > 0
-                  && h > 0
-                  && w <= 4096
-                  && h <= 4096,
-              400,
-              "INVALID_IMAGE",
-              "仅支持边长不超过4096的PNG或JPEG");
-          var image = reader.read(0);
-          try (var out = new BoundedOutput(Files.newOutputStream(temp))) {
-            require(ImageIO.write(image, "png", out), 400, "INVALID_IMAGE", "图片编码失败");
-          } finally {
-            image.flush();
-          }
-        } finally {
-          reader.dispose();
+          require(ImageIO.write(image, "png", out), 400, "INVALID_IMAGE", "图片编码失败");
+        } catch (IOException ex) {
+          // ImageIO's final flush can replace the original output-limit exception.
+          if (out.limitExceeded)
+            throw new BusinessException(400, "INVALID_IMAGE", "编码后图片最大5MB");
+          throw ex;
         }
+      } finally {
+        image.flush();
       }
       return new Stage(temp);
-    } catch (Exception ex) {
+    } catch (IOException | RuntimeException ex) {
       try {
         if (temp != null) removeFile(temp);
       } finally {
@@ -112,8 +99,33 @@ public class ImageStorage {
         if (!b.code().equals("UPLOAD_STORAGE_FULL")) rejected(b.code());
         throw b;
       }
-      rejected("invalid_image");
-      throw new BusinessException(400, "INVALID_IMAGE", "图片读取或编码失败，编码后最大5MB");
+      if (ex instanceof IOException) {
+        rejected("storage_unavailable");
+        throw new BusinessException(503, "UPLOAD_UNAVAILABLE", "图片存储暂不可用");
+      }
+      throw ex;
+    }
+  }
+
+  private BufferedImage decode(MultipartFile file) throws IOException {
+    try (var input = ImageIO.createImageInputStream(file.getInputStream())) {
+      var readers = ImageIO.getImageReaders(input);
+      require(readers.hasNext(), 400, "INVALID_IMAGE", "图片无法解码");
+      var reader = readers.next();
+      try {
+        reader.setInput(input);
+        String format = reader.getFormatName().toLowerCase(Locale.ROOT);
+        int w = reader.getWidth(0), h = reader.getHeight(0);
+        require(
+            Set.of("png", "jpeg", "jpg").contains(format)
+                && w > 0 && h > 0 && w <= 4096 && h <= 4096,
+            400, "INVALID_IMAGE", "仅支持边长不超过4096的PNG或JPEG");
+        return reader.read(0);
+      } finally {
+        reader.dispose();
+      }
+    } catch (javax.imageio.IIOException ex) {
+      throw new BusinessException(400, "INVALID_IMAGE", "图片读取或解码失败");
     }
   }
 
@@ -231,13 +243,17 @@ public class ImageStorage {
 
   private final class BoundedOutput extends FilterOutputStream {
     private long written;
+    private boolean limitExceeded;
 
     BoundedOutput(OutputStream out) {
       super(out);
     }
 
     private void reserve(int bytes) throws IOException {
-      if (written + bytes > MAX_FILE) throw new IOException("Encoded image exceeds limit");
+      if (written + bytes > MAX_FILE) {
+        limitExceeded = true;
+        throw new IOException("Encoded image exceeds limit");
+      }
     }
 
     @Override
