@@ -29,9 +29,12 @@ export function stageSummary(current, elapsedSeconds) {
   };
 }
 export function acceptedStage(value) {
+  const reads = new Set(['menu', 'search.page', 'search.miss', 'orders.history', 'merchant.history', 'ledger.history', 'finance.reconcile']);
   return value.unexpectedErrors === 0 && value.workerFailures === 0 && value.requests > 0
     && value.readP95Ms !== null && value.readP95Ms <= 1000
-    && (value.kind !== 'mixed' || value.completedTransactions === 15 && value.transactionP95Ms !== null && value.transactionP95Ms <= 10000);
+    && Object.entries(value.operations ?? {}).filter(([name]) => reads.has(name))
+      .every(([, operation]) => operation.httpP95Ms !== null && operation.httpP95Ms <= 1000)
+    && (value.kind !== 'mixed' || value.completedTransactions === (value.expectedTransactions ?? 15) && value.transactionP95Ms !== null && value.transactionP95Ms <= 10000);
 }
 function integer(name, fallback, min, max) {
   const value = Number(process.env[name] ?? fallback);
@@ -93,18 +96,27 @@ export async function main() {
       throw new Error('Thirty distinct verified fixture identities are required');
     const seconds = integer('PERF_SECONDS', 60, 5, 600);
     const pauseMs = integer('PERF_READ_PAUSE_MS', 1000, 1, 5000);
+    if (process.env.PERF_SCENARIO && !['standard', 'lunch'].includes(process.env.PERF_SCENARIO))
+      throw new Error('Unknown performance scenario');
+    const lunch = process.env.PERF_SCENARIO === 'lunch', writers = lunch ? 30 : 5;
+    const expectedTransactions = writers * 3;
+    if (lunch && sessions.some(user => !/^[1-9]\d*$/.test(user.staffId) || typeof user.staffToken !== 'string'))
+      throw new Error('Lunch scenario requires the prepared store staff identities');
     report = {
       startedAt: new Date().toISOString(), baseUrl: base.origin, project, status: 'RUNNING',
       scope: 'Isolated single-instance simulated-money scenario; virtual clients are not simultaneous in-flight requests; no production capacity, maximum TPS, real payment or long-duration reliability claim.',
       identities: { source: 'Direct-DB fixture sessions verified through normal HTTP authentication', distinctUsers: 30 },
       fixture: { campusId: fixture.campusId, storeId: fixture.storeId, productId: fixture.productId,
-        stores: fixture.stores, products: fixture.products },
+        stores: fixture.stores, products: fixture.products, historyOrders: fixture.historyOrders ?? 0,
+        historyPolicy: fixture.historyPolicy ?? 'No synthetic history.' },
       backlogScope: { storeId: fixture.storeId, note: 'All transaction workers use the newly prepared fixture store; unrelated role-test fixtures are excluded.' },
-      loadPolicy: { concurrency: levels, secondsPerReadStage: seconds, readPauseMs: pauseMs,
-        mixedClients: 30, mixedSeconds: 300, mixedTransactionWorkers: 5, transactionsPerWriter: 3,
+      loadPolicy: { concurrency: lunch ? [30] : levels, secondsPerReadStage: lunch ? 0 : seconds, readPauseMs: pauseMs,
+        scenario: lunch ? 'lunch' : 'standard', mixedClients: 30, mixedSeconds: 300, mixedTransactionWorkers: writers, transactionsPerWriter: 3,
+        workbenchObservers: lunch ? 1 : 0,
         transactionStartOffsetsSeconds: [0, 90, 180], orderWriteBudgetPerIdentityPer61Seconds: 24,
-        note: 'Each worker alternates one menu and one paged-search request with a pause after each. Mixed writers browse between full transactions. Real server rate limits remain enabled; HTTP latency excludes client pacing and write-budget waits, while transaction and elapsed time include them.' },
-      acceptanceTargets: { readP95Ms: 1000, transactionP95Ms: 10000, completedMixedTransactions: 15,
+        note: (lunch ? 'Thirty users start full transactions together at 0/90/180 seconds, with three store staff identities. Between bursts they read menus, matched/unmatched searches and order history; a workbench observer reads merchant history, ledger and reconciliation every 15 seconds. ' : 'Each worker alternates menu and paged search. Mixed writers browse between transactions. ')
+          + 'Real server rate limits remain enabled; HTTP latency excludes client pacing and write-budget waits, while transaction and elapsed time include them.' },
+      acceptanceTargets: { readP95Ms: 1000, transactionP95Ms: 10000, completedMixedTransactions: expectedTransactions,
         unexpectedErrors: 0, workerFailures: 0, drainSeconds: 60, failedTasks: 0, oomKills: 0, unexpectedRestarts: 0 },
       stages: [], resourceSamples: [], controlErrors: [], acceptance: false,
     };
@@ -226,6 +238,12 @@ export async function main() {
       const identity = await api('/user/auth/me', user.token);
       if (String(identity.id) !== user.id || identity.type !== 'USER') throw new Error('Fixture HTTP identity mismatch');
     }
+    if (lunch) for (const user of [...new Map(sessions.map(user => [user.staffId, user])).values()]) {
+      const staff = await api('/admin/auth/me', user.staffToken);
+      if (String(staff.id) !== user.staffId || staff.role !== 'SHOP_MANAGER'
+          || String(staff.storeId) !== String(fixture.storeId) || staff.mustChangePassword)
+        throw new Error('Fixture HTTP identity mismatch');
+    }
     const admin = await api('/admin/auth/login', '', 'POST', { username: process.env.ADMIN_USERNAME || 'admin', password: process.env.ADMIN_PASSWORD });
     if (admin.role !== 'PLATFORM_ADMIN' || admin.mustChangePassword) throw new Error('An isolated administrator with a changed password is required');
     const a = admin.token, store = { id: String(fixture.storeId) }, product = { id: String(fixture.productId) };
@@ -239,18 +257,19 @@ export async function main() {
       return { stores: [{ storeId: store.id, cartVersion: cart.cartVersion, fulfillment: 'PICKUP', addressId: null, couponId: null }], platformCouponId: null };
     }
     async function transaction(user, current) {
+      const merchant = lunch ? user.staffToken : a;
       const start = performance.now(), input = await ensureCart(user);
       const quote = await api('/user/checkouts/preview', user.token, 'POST', input, 'quote');
       const checkout = await api('/user/checkouts', user.token, 'POST', { ...input, quoteHash: quote.quoteHash }, 'checkout.submit', { 'Idempotency-Key': randomUUID() });
       const paid = await api(`/user/checkouts/${checkout.id}/pay`, user.token, 'POST', { version: checkout.version }, 'checkout.mockPay');
       if (paid.state !== 'PAID' || paid.orders.length !== 1) throw new Error('Unexpected simulated payment result');
       let order = paid.orders[0];
-      await api(`/merchant/orders/${order.id}/actions/accept`, a, 'POST', { version: order.version }, 'merchant.accept');
+      await api(`/merchant/orders/${order.id}/actions/accept`, merchant, 'POST', { version: order.version }, 'merchant.accept');
       const created = await api(`/user/orders/${order.id}/aftersales`, user.token, 'POST', { kind: 'CANCEL', reason: '隔离性能夹具取消并模拟退款', items: null, evidenceIds: [] }, 'aftersale.apply');
       const requests = await api('/user/aftersales?orderNumber=' + encodeURIComponent(order.number), user.token, 'GET', undefined, 'aftersale.read');
       const request = requests.find(value => value.id === created.id);
       if (!request) throw new Error('Created cancellation request is missing');
-      await api(`/merchant/aftersales/${request.id}/decision`, a, 'POST', { version: request.version, approve: true, reason: '隔离性能夹具同意取消' }, 'merchant.approve');
+      await api(`/merchant/aftersales/${request.id}/decision`, merchant, 'POST', { version: request.version, approve: true, reason: '隔离性能夹具同意取消' }, 'merchant.approve');
       const deadline = Date.now() + 20000;
       do {
         order = await api(`/user/orders/${order.id}`, user.token, 'GET', undefined, 'refund.poll');
@@ -283,7 +302,11 @@ export async function main() {
     report.backlogBefore = await backlog();
     if (failed(report.backlogBefore) || pending(report.backlogBefore)) throw new Error('Fixture already contains unfinished tasks');
     async function browse(user, iteration) {
-      if (iteration % 2 === 0)
+      if (lunch && iteration % 5 === 3)
+        await api('/user/orders?limit=100', user.token, 'GET', undefined, 'orders.history', {}, true);
+      else if (lunch && iteration % 5 === 2)
+        await api(`/user/search/page?campusId=${fixture.campusId}&query=NoMatchingLunchItem&limit=50`, user.token, 'GET', undefined, 'search.miss', {}, true);
+      else if (iteration % 2 === 0)
         await api(`/user/stores/${store.id}/products`, user.token, 'GET', undefined, 'menu', {}, true);
       else
         await api(`/user/search/page?campusId=${fixture.campusId}&query=Performance&limit=50`, user.token, 'GET', undefined, 'search.page', {}, true);
@@ -291,32 +314,53 @@ export async function main() {
     async function runStage(kind, concurrency, duration) {
       const current = { kind, concurrency, requestedSeconds: duration, succeeded: 0, unexpectedErrors: 0,
         errors: {}, workerFailures: 0, peakInFlightRequests: 0, completedTransactions: 0,
-        latencies: [], readLatencies: [], transactionLatencies: [], operations: {} };
+        latencies: [], readLatencies: [], transactionLatencies: [], operations: {}, expectedTransactions };
       const before = await backlog(), start = performance.now(), stop = Date.now() + duration * 1000;
       stage = current;
       try {
-        await Promise.all(sessions.slice(0, concurrency).map(async (user, index) => {
+        const users = sessions.slice(0, concurrency).map(async (user, index) => {
           let iteration = index % 2, round = 0;
           try {
             while (Date.now() < stop) {
-              if (kind === 'mixed' && index < 5 && round < 3 && performance.now() - start >= round * 90000) {
+              if (kind === 'mixed' && index < writers && round < 3 && performance.now() - start >= round * 90000) {
                 await transaction(user, current); round++;
               } else {
                 await browse(user, iteration++);
                 await sleep(Math.min(pauseMs, Math.max(0, stop - Date.now())));
               }
             }
-            if (kind === 'mixed' && index < 5 && round !== 3) throw new Error('Incomplete mixed transaction schedule');
+            if (kind === 'mixed' && index < writers && round !== 3) throw new Error('Incomplete mixed transaction schedule');
           } catch (error) {
             current.workerFailures++;
             if (!error.requestFailure) {
               current.unexpectedErrors++; current.errors.BUSINESS_INVARIANT = (current.errors.BUSINESS_INVARIANT || 0) + 1;
             }
           }
-        }));
+        });
+        if (lunch) users.push((async () => {
+          const today = new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10);
+          const begin = new Date(Date.now() - 90 * 86400000 + 8 * 3600000).toISOString().slice(0, 10);
+          try {
+            while (Date.now() < stop) {
+              await api(`/merchant/stores/${store.id}/orders?limit=100`, a, 'GET', undefined, 'merchant.history', {}, true);
+              await api(`/platform/ledger/page?storeId=${store.id}&limit=100`, a, 'GET', undefined, 'ledger.history', {}, true);
+              const reconciliation = await api(`/platform/finance/reconciliation?storeId=${store.id}&begin=${begin}&end=${today}`, a, 'GET', undefined, 'finance.reconcile', {}, true);
+              if (Number(reconciliation.differenceCount) !== 0) throw new Error('Reconciliation difference');
+              await sleep(Math.min(15000, Math.max(0, stop - Date.now())));
+            }
+          } catch (error) {
+            current.workerFailures++;
+            if (!error.requestFailure) {
+              current.unexpectedErrors++; current.errors.BUSINESS_INVARIANT = (current.errors.BUSINESS_INVARIANT || 0) + 1;
+            }
+          }
+        })());
+        await Promise.all(users);
       } finally {
         stage = undefined;
         const summary = stageSummary(current, (performance.now() - start) / 1000);
+        summary.expectedTransactions = expectedTransactions;
+        summary.invariantsAfter = await invariants();
         summary.backlogBefore = before;
         report.stages.push(summary);
         await persist();
@@ -332,7 +376,7 @@ export async function main() {
     const preparedProducts = await api(`/user/stores/${store.id}/products`, sessions[0].token);
     if (!preparedProducts.some(value => value.id === product.id && Number(value.remaining) >= 15))
       throw new Error('Fixture product unavailable');
-    for (const concurrency of levels) await runStage('read', concurrency, seconds);
+    if (!lunch) for (const concurrency of levels) await runStage('read', concurrency, seconds);
     await runStage('mixed', 30, 300);
     const drainStarted = Date.now(), drainDeadline = drainStarted + 60000;
     do {
@@ -345,7 +389,7 @@ export async function main() {
     if (pending(report.backlogAfter)) throw new Error('Background tasks did not drain');
     report.invariantsAfter = await invariants();
     const before = report.invariantsBefore, after = report.invariantsAfter;
-    if (after.orders - before.orders !== 15 || after.succeededRefunds - before.succeededRefunds !== 15
+    if (after.orders - before.orders !== expectedTransactions || after.succeededRefunds - before.succeededRefunds !== expectedTransactions
         || after.quotaErrors || after.refundErrors || after.quantityErrors)
       throw new Error('Database business invariants failed');
     report.status = 'COMPLETED';

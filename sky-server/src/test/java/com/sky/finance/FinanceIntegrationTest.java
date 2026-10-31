@@ -22,6 +22,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.*;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.*;
@@ -224,6 +225,40 @@ class FinanceIntegrationTest {
   }
 
   @Test
+  void reconciliationKeepsEmptyTotalsAndCapsDifferencesWithoutRestrictingBalancesToDates() {
+    var empty = finance.reconcile(store, LocalDate.of(2026, 10, 27), LocalDate.of(2026, 10, 27));
+    assertEquals(0, empty.currentOrderNetCents());
+    assertEquals(0, empty.ledgerNetCents());
+    assertEquals(0, empty.differenceCount());
+    assertTrue(empty.differences().isEmpty());
+    assertFalse(empty.hasMoreDifferences());
+    var ids = new ArrayList<Long>();
+    for (int i = 0; i < 205; i++) ids.add(order(1000));
+    long outside = order(2000);
+    db.update("UPDATE orders SET store_id=? WHERE id=?", other, outside);
+    var result = finance.reconcile(store, LocalDate.of(2026, 10, 27), LocalDate.of(2026, 10, 27));
+    assertEquals(205000, result.currentOrderNetCents());
+    assertEquals(0, result.ledgerNetCents());
+    assertEquals(0, result.periodPaidCents());
+    assertEquals(205, result.differenceCount());
+    assertEquals(
+        ids.subList(0, 200),
+        result.differences().stream().map(FinanceViews.FinanceDifference::orderId).toList());
+    assertTrue(result.hasMoreDifferences());
+  }
+
+  @Test
+  void reconciliationRestoresTheConnectionTemporaryTableBudget() {
+    var transaction = new TransactionTemplate(manager);
+    transaction.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
+    transaction.executeWithoutResult(status -> {
+      var before = db.jdbc.queryForObject("SELECT @@session.tmp_table_size", Long.class);
+      finance.reconcile(store, LocalDate.of(2026, 10, 27), LocalDate.of(2026, 10, 28));
+      assertEquals(before, db.jdbc.queryForObject("SELECT @@session.tmp_table_size", Long.class));
+    });
+  }
+
+  @Test
   void openingBalanceIsSeparateAndDifferencesAreReportedWithoutRepair() {
     long id = order(1000);
     db.update("UPDATE orders SET refunded_cents=200 WHERE id=?", id);
@@ -233,12 +268,13 @@ class FinanceIntegrationTest {
         id,
         store);
     refund(id, 50, "SUCCEEDED");
+    refund(id, 25, "SUCCEEDED");
     var preview = finance.preview(store, null);
     assertEquals(800, preview.openingNetCents());
-    assertEquals(-50, preview.netCents());
+    assertEquals(-75, preview.netCents());
     var good = finance.reconcile(store, LocalDate.of(2026, 10, 26), LocalDate.of(2026, 10, 28));
     assertEquals(0, good.differenceCount());
-    assertEquals(750, good.ledgerNetCents());
+    assertEquals(725, good.ledgerNetCents());
     db.update("UPDATE orders SET paid_cents=1100 WHERE id=?", id);
     var bad = finance.reconcile(store, LocalDate.of(2026, 10, 26), LocalDate.of(2026, 10, 28));
     assertEquals(1, bad.differenceCount());

@@ -239,26 +239,34 @@ public class FinanceService {
     Object[] storeArgs = store == null ? new Object[] {} : new Object[] {store};
     String balances =
         "SELECT o.id order_id,o.store_id,o.paid_cents order_paid,o.refunded_cents"
-            + " order_refunded,COALESCE(f.paid_cents,0)+COALESCE(l.paid,0)"
-            + " ledger_paid,COALESCE(f.refunded_cents,0)+COALESCE(l.refunded,0) ledger_refunded"
-            + " FROM orders o LEFT JOIN finance_opening f ON f.order_id=o.id LEFT JOIN (SELECT"
-            + " order_id,SUM(CASE WHEN source_type='PAYMENT' THEN amount_cents ELSE 0 END)"
-            + " paid,SUM(CASE WHEN source_type='REFUND' THEN -amount_cents ELSE 0 END) refunded"
-            + " FROM finance_ledger GROUP BY order_id) l ON l.order_id=o.id WHERE 1=1"
-            + storeFilter;
-    String differences =
-        "SELECT * FROM ("
-            + balances
-            + ") b WHERE order_paid<>ledger_paid OR order_refunded<>ledger_refunded";
-    long differenceCount = db.count("SELECT COUNT(*) FROM (" + differences + ") d", storeArgs);
-    var rows = db.rows(differences + " ORDER BY order_id LIMIT 200", storeArgs);
-    var totals =
-        db.one(
-            "SELECT COALESCE(SUM(order_paid-order_refunded),0) order_net,"
-                + "COALESCE(SUM(ledger_paid-ledger_refunded),0) ledger_net FROM ("
+            + " order_refunded,COALESCE(MAX(f.paid_cents),0)"
+            + "+COALESCE(SUM(CASE WHEN l.source_type='PAYMENT' THEN l.amount_cents ELSE 0 END),0)"
+            + " ledger_paid,COALESCE(MAX(f.refunded_cents),0)"
+            + "+COALESCE(SUM(CASE WHEN l.source_type='REFUND' THEN -l.amount_cents ELSE 0 END),0)"
+            + " ledger_refunded FROM orders o FORCE INDEX(ix_orders_finance_balance)"
+            + " LEFT JOIN finance_opening f ON f.order_id=o.id"
+            + " LEFT JOIN finance_ledger l FORCE INDEX(ix_finance_ledger_balance)"
+            + " ON l.order_id=o.id WHERE 1=1"
+            + storeFilter
+            + " GROUP BY o.store_id,o.id";
+    // Prefer the covering index over the narrower legacy index; both consumers reuse one CTE.
+    // A statement-only 32 MiB budget avoids the measured 16 MiB spill without changing pooled sessions.
+    var summary =
+        db.rows(
+            "WITH balances AS ("
                 + balances
-                + ") b",
+                + "), totals AS (SELECT COALESCE(SUM(order_paid-order_refunded),0) order_net,"
+                + "COALESCE(SUM(ledger_paid-ledger_refunded),0) ledger_net,"
+                + "COALESCE(SUM(order_paid<>ledger_paid OR order_refunded<>ledger_refunded),0)"
+                + " difference_count FROM balances), differences AS (SELECT * FROM balances"
+                + " WHERE order_paid<>ledger_paid OR order_refunded<>ledger_refunded"
+                + " ORDER BY order_id LIMIT 200) SELECT /*+ SET_VAR(tmp_table_size=33554432) */"
+                + " totals.*,differences.* FROM totals"
+                + " LEFT JOIN differences ON true ORDER BY differences.order_id",
             storeArgs);
+    var totals = summary.getFirst();
+    long differenceCount = Db.id(totals, "difference_count");
+    var rows = summary.stream().filter(row -> row.get("order_id") != null).toList();
     long opening =
         db.count(
             "SELECT COALESCE(SUM(paid_cents-refunded_cents),0) FROM finance_opening"

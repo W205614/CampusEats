@@ -20,7 +20,7 @@
 | `sky-server/src/main/resources/` | 应用配置和 `db/migration/` 中的 Flyway 迁移 |
 | `sky-server/src/test/` | 集成测试、并发及边界测试，与生产代码分开 |
 
-平台五类原控制器默认启用：`PlatformController`（目录发现）、`PlatformCheckoutController`、`PlatformFulfillmentController`、`PlatformAftersaleController`、`PlatformManagementController`；本轮增加 `LocalUserController`、`OperationsController` 和 `FinanceController`。旧交易控制器由 `campus.legacy-api=true` 条件启用，部分集成测试仍覆盖旧交易路径；模拟账务 HTTP 入口与当前平台模式配套启用。`business/` 与 `platform/` 并非可以整目录删除的重复实现。不要修改已执行的 Flyway 迁移；本轮从V13追加至V17。
+平台五类原控制器默认启用：`PlatformController`（目录发现）、`PlatformCheckoutController`、`PlatformFulfillmentController`、`PlatformAftersaleController`、`PlatformManagementController`；另有 `LocalUserController`、`OperationsController` 和 `FinanceController`。旧交易控制器由 `campus.legacy-api=true` 条件启用，部分集成测试仍覆盖旧交易路径；模拟账务HTTP入口与当前平台模式配套启用。`business/` 与 `platform/` 并非可以整目录删除的重复实现。不要修改已执行的Flyway迁移；V13—V17为业务能力追加，V18—V19只补充对账流水与订单覆盖索引。
 
 控制器只协调 HTTP 与服务。`ArchitectureBoundaryTest` 检查控制器不持有 `Db`，并检查指定核心服务不依赖 `web` 视图；这是一组明确的边界约束，不是完整 DDD 或所有包无环的证明。不要为了移动目录复制配额、金额或退款算法。
 
@@ -101,7 +101,7 @@ H5 默认使用同源 API。H5 和小程序构建成功不代表微信登录、�
 
 根目录保留 Maven、Docker、Git 和编辑器需要默认发现的入口配置；部署文件与运维配置模板集中在 `deploy/`，应用配置及前端构建配置留在所属模块，见[部署配置导航](../deploy/README.md)。不将所有配置搬入统一目录后再为每个工具补路径。
 
-`target/`、`node_modules/`、`dist/`、浏览器报告由工具生成，受 Git 忽略。本机证据放在 `.local/verification/`，实际目录以当前验证记录为准；当前恢复集使用 `.local/backups/LATEST.txt` 定位，制品发布还记录对应提交与CI run。不要在开发指南中硬编码某次恢复目录作为永久路径。工具、扫描缓存、运维状态与锁继续按用途保留。`.env`、凭据、最新恢复集和业务卷不能作为过时文件批量删除，旧验证和旧备份按明确清单移入回收站。
+`target/`、`node_modules/`、`dist/`、浏览器报告由工具生成，受 Git 忽略。本机证据放在 `.local/verification/`，实际目录以当前验证记录为准，制品发布记录对应提交与CI run。完整数据备份和离线镜像恢复包已按用户要求停用，`.local/backups/LATEST.json` 和 `LATEST.txt` 是禁用标记，不能用于恢复。明确执行发布时仍须通过临时备份与独立恢复校验，验证完成后按既定策略回收临时材料。工具、运维状态与锁按用途保留；`.env`、凭据、当前镜像、业务卷和上传文件不能作为过时文件批量删除。
 
 本地只验证改动直接影响的模块或流程；提交后以该提交的 GitHub Actions 结论为准。写入测试使用 Testcontainers 或独立 Compose 凭据、端口、镜像及数据卷，不指向日常数据库。修改数据库时，既保留历史迁移的固定目标测试，也在升级测试里按原列比对旧记录，另行核对新阶段、消息和期初记录；不能把新增列导致的整表校验变化当作旧数据被改写，也不能因此跳过旧字段保护。
 

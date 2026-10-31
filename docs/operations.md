@@ -2,6 +2,8 @@
 
 以下命令均在项目根目录的 PowerShell 7 执行；初次部署见[项目首页](../README.md)，脚本用途见[脚本导航](../scripts/README.md)。
 
+本机保持单机演示，完整数据备份、离线镜像恢复包和自动备份保持停用，恢复指针为 `DISABLED_BY_USER`。下文的备份、复制和调度命令仅说明保留工具的人工使用方法，不是当前已启用配置。只读运维检查仍会报告 `No recent independently verified backup`，应按这项已确认策略单独解释，不能把检查的非零退出码改称全部通过，也不能据此自动创建备份。发布时的临时恢复校验与清理规则见[部署说明](platform-deployment.md#本机保留策略)。
+
 菜单的目录、口味和套餐组成按店批量读取，库存和活动价实时批量查询。下单、支付退款仍保留幂等与事务保护；这不代表已经验证生产峰值容量。
 
 | 保护项 | 默认行为 |
@@ -123,3 +125,40 @@ Remove-Item Env:ADMIN_PASSWORD
 默认1／5／10／30个客户端读取阶梯各60秒，每客户端交替请求菜单和分页搜索，每次间隔1秒。随后30客户端混合运行5分钟，其中5个写者按0／90／180秒各完成3笔完整模拟交易，其余时间浏览；共验收15笔下单、模拟支付、接单、取消申请、批准及退款。保留服务端真实限流和每身份24次／61秒写预算，记录实际进行中请求峰值；虚拟客户端数量不等于同时在途请求数。读取阶段可通过 `PERF_CONCURRENCY`、`PERF_SECONDS`、`PERF_READ_PAUSE_MS` 调整，报告始终记录实际策略。
 
 JSON报告包含请求量、成功吞吐、HTTP／读取／交易P95、非预期错误、失败客户端、写预算等待，以及夹具店铺退款／通知积压的完整分页快照。每10秒异步采样容器资源，结束核对OOM、重启和数据库库存／退款／数量约束。目标为读取P95不超过1秒、完整交易P95不超过10秒、15笔交易均完成、无非预期错误或失败任务，结束后60秒内夹具任务清空。任一目标失败即返回非零并保留部分报告；不得降低标准后冒充原场景通过。短时本机测量不代表生产峰值、长期稳定性、高可用或真实资金成功率。
+
+### 午餐集中到达与历史增长
+
+使用相同隔离部署及资源限制，身份准备时增加 `--lunch`，生成30名用户与3名同店员工的夹具会话，均通过普通HTTP鉴权核验。测量设置 `PERF_SCENARIO=lunch`：持续5分钟，在第0／90／180秒各由30名用户同时开始一笔加购、报价、下单、模拟支付、商家接单、取消申请、批准和模拟退款，共90笔。每名员工负责10名用户，保留真实账号写预算，不通过提高限流制造容量。
+
+用户在波次之间按1秒间隔混合读取菜单、命中／无命中搜索和100条订单历史；另1个工作台观察者每15秒读取商家历史、流水及对账。实际在途峰值、每类接口P95、交易P95和任务排空分别记录。读取整体及各类读取接口P95均须不超过1秒，交易P95不超过10秒，90笔均完成，且没有非预期错误、约束异常、OOM或重启。它是合成的集中到达压力场景，不是实际午餐流量回放，也不测登录或浏览器渲染容量。
+
+先测无合成历史的基线，再对同一夹具递增至5万、20万笔历史订单。下面只展示已有隔离环境中的命令，配置、令牌与输出均须在 `.local`，不得替换为日常项目：
+
+```powershell
+node ./scripts/prepare-performance.mjs --project campuseats-perf-lunch-20261031 `
+  --config .local/verification/lunch-capacity-20261031/perf.env `
+  --base-url http://127.0.0.1:28096 `
+  --output .local/verification/lunch-capacity-20261031/sessions.json --lunch
+$env:BASE_URL='http://127.0.0.1:28096'
+$env:PERF_PROJECT_NAME='campuseats-perf-lunch-20261031'
+$env:PERF_USER_TOKENS_FILE='.local/verification/lunch-capacity-20261031/sessions.json'
+$env:ADMIN_PASSWORD=([regex]::Match((Get-Content .local/verification/lunch-capacity-20261031/perf.env -Raw),'(?m)^DEMO_ADMIN_PASSWORD=([^\r\n]+)')).Groups[1].Value
+$env:PERF_OUTPUT='.local/verification/lunch-capacity-20261031/history-0.json'
+$env:PERF_SCENARIO='lunch'
+node ./scripts/measure-performance.mjs
+# 每次增长前先等待上一轮测量结束；目标依次为50000、200000。
+node ./scripts/prepare-performance.mjs --project campuseats-perf-lunch-20261031 `
+  --config .local/verification/lunch-capacity-20261031/perf.env `
+  --base-url http://127.0.0.1:28096 `
+  --output .local/verification/lunch-capacity-20261031/sessions.json `
+  --grow-history --history-orders 50000
+$env:PERF_OUTPUT='.local/verification/lunch-capacity-20261031/history-50000.json'
+node ./scripts/measure-performance.mjs
+# 再将增长目标改为200000，完成后用新的history-200000.json输出重复测量。
+Remove-Item Env:ADMIN_PASSWORD,Env:PERF_SCENARIO
+# 结束后仅停止本轮隔离项目，为测试库刷新预留60秒。
+docker compose --env-file .local/verification/lunch-capacity-20261031/perf.env `
+  -p campuseats-perf-lunch-20261031 stop -t 60
+```
+
+历史数据仅在核验归属的隔离库生成：分布于过去90天，80%集中在热店，包含已完成自取订单、明细、支付流水、模拟支付凭据及已消耗配额。30个账号的历史被有意集中以测试读取成本，不代表真实用户频次；这些SQL夹具不计入本轮HTTP成功交易。增长只增加数据，不删除或复制日常数据，不创建备份、不启用调度。容量结果及当前保留目录见[当前版本记录](verification/current.md)。

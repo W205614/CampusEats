@@ -57,4 +57,7 @@ test('acceptance fails closed for empty traffic, errors, slow reads and incomple
     { completedTransactions: 16 }, { transactionP95Ms: null }, { transactionP95Ms: 10000.01 }])
     assert.equal(acceptedStage({ ...good, ...delta }), false);
   assert.equal(acceptedStage({ ...good, kind: 'read', completedTransactions: 0, transactionP95Ms: null }), true);
+  assert.equal(acceptedStage({ ...good, expectedTransactions: 90, completedTransactions: 90 }), true);
+  assert.equal(acceptedStage({ ...good, expectedTransactions: 90 }), false);
+  assert.equal(acceptedStage({ ...good, operations: { 'finance.reconcile': { httpP95Ms: 1001 } } }), false);
 });
