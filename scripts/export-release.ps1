@@ -1,4 +1,4 @@
-param([string]$OutputDirectory='.local/release-bundle',[string]$SecurityDirectory='.local/security',[string]$SourceSha=$env:GITHUB_SHA,[string]$RunId=$env:GITHUB_RUN_ID,[string]$ServerImage='campuseats-server:v1',[string]$WebImage='campuseats-web:v1')
+param([string]$OutputDirectory='.local/release-bundle',[string]$SecurityDirectory='.local/security',[string]$SourceSha=$env:GITHUB_SHA,[string]$RunId=$env:GITHUB_RUN_ID,[string]$ServerImage='campuseats-server:v1',[string]$WebImage='campuseats-web:v1',[string]$MySqlImage='campuseats-mysql:v1')
 $ErrorActionPreference='Stop'
 if($env:CI -cne 'true' -or $env:GITHUB_REPOSITORY -cne 'W205614/CampusEats' -or $SourceSha -notmatch '^[a-f0-9]{40}$' -or $RunId -notmatch '^[0-9]+$'){throw 'Release export requires the repository CI commit and run identity.'}
 $root=Split-Path $PSScriptRoot -Parent
@@ -10,7 +10,7 @@ New-SecureDirectory -Path $output | Out-Null
 $security=[IO.Path]::GetFullPath($SecurityDirectory,$root)
 $scan=@(Get-Content -LiteralPath (Join-Path $security 'summary.json') -Raw | ConvertFrom-Json)
 $images=@()
-foreach($pair in @(@{service='server';image=$ServerImage},@{service='web';image=$WebImage})){
+foreach($pair in @(@{service='server';image=$ServerImage},@{service='web';image=$WebImage},@{service='mysql';image=$MySqlImage})){
  $raw=& docker image inspect $pair.image
  if($LASTEXITCODE -ne 0){throw 'Cannot inspect tested image.'}
  $image=@($raw | ConvertFrom-Json)[0]
@@ -25,7 +25,7 @@ foreach($pair in @(@{service='server';image=$ServerImage},@{service='web';image=
 $archive=Join-Path $output 'application-images.tar'
 & docker image save --output $archive @($images.reference)
 if($LASTEXITCODE -ne 0){throw 'Tested image export failed.'}
-$graph=@(Read-ReleaseImageGraph -Archive $archive -SourceSha $SourceSha)
+$graph=@(Read-ReleaseImageGraph -Archive $archive -SourceSha $SourceSha -ExpectedServices @('mysql','server','web'))
 foreach($image in $images){
  $identity=@($graph | Where-Object service -CEQ $image.service)[0]
  if($image.sourceRuntimeId -cnotin @($identity.configDigest,$identity.platformManifestDigest)){throw 'Scanned runtime image differs from the exported OCI graph.'}
@@ -38,7 +38,7 @@ foreach($name in @('summary.json','server-runtime-sbom.cdx.json','server-runtime
 }
 $migrations=@(Get-ChildItem -LiteralPath (Join-Path $root 'sky-server/src/main/resources/db/migration') -Filter 'V*.sql' | Sort-Object Name | ForEach-Object {if($_.Name -notmatch '^V(\d+)__'){throw 'Unexpected migration name.'};@{name=$_.Name;version=[int]$Matches[1];sha256=(Get-ReleaseMigrationHash -Path $_.FullName);fileSha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash}})
 $files=@(Get-ChildItem -LiteralPath $output -File -Recurse | ForEach-Object {@{path=[IO.Path]::GetRelativePath($output,$_.FullName).Replace('\','/');bytes=$_.Length;sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash}})
-$manifest=@{schemaVersion=2;imageIdentityFormat='oci-uncompressed-v1';repository='W205614/CampusEats';sourceSha=$SourceSha;runId=$RunId;runAttempt=[int]$env:GITHUB_RUN_ATTEMPT;createdAt=[DateTimeOffset]::UtcNow.ToString('o');platform='linux/amd64';archive='application-images.tar';images=$images;migrationHashFormat='utf8-lf-v1';migrations=$migrations;files=$files}
+$manifest=@{schemaVersion=3;imageIdentityFormat='oci-uncompressed-v1';repository='W205614/CampusEats';sourceSha=$SourceSha;runId=$RunId;runAttempt=[int]$env:GITHUB_RUN_ATTEMPT;createdAt=[DateTimeOffset]::UtcNow.ToString('o');platform='linux/amd64';archive='application-images.tar';images=$images;migrationHashFormat='utf8-lf-v1';migrations=$migrations;files=$files}
 $path=Join-Path $output 'release-manifest.json';Write-OperationsJson -Path $path -Value $manifest
 $hash=(Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash
 [void](Read-VerifiedReleaseBundle -Directory $output -ExpectedSourceSha $SourceSha -ExpectedRunId $RunId -ExpectedManifestSha256 $hash)

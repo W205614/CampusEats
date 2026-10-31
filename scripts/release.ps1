@@ -53,7 +53,9 @@ try {
  $override=Join-Path $releaseRoot 'candidate.json'
  $gateOverride=Join-Path $releaseRoot 'migration-gate.json'
  $imageMap=@{};$identityMap=@{};foreach($image in $resolvedImages){$imageMap[$image.service]=$image.runtimeId;$identityMap[$image.service]=$image}
- Write-OperationsJson -Path $override -Value @{services=@{server=@{image=$imageMap.server};web=@{image=$imageMap.web}}}
+ $candidateServices=@{server=@{image=$imageMap.server};web=@{image=$imageMap.web}}
+ if($imageMap.ContainsKey('mysql')){$candidateServices.mysql=@{image=$imageMap.mysql}}
+ Write-OperationsJson -Path $override -Value @{services=$candidateServices}
  Write-OperationsJson -Path $gateOverride -Value @{services=@{server=@{image=$imageMap.server;environment=@{TASKS_ENABLED='false'}}}}
  $record=[ordered]@{project=$ProjectName;sourceSha=$ExpectedSourceSha;ciRun=$ExpectedRunId;manifestSha256=$ExpectedManifestSha256;images=$imageMap;startedAt=[DateTimeOffset]::UtcNow.ToString('o');mode=$(if($Initialize){'isolated-initialization'}else{'existing-daily-release'});outcome='preparing';dependencies=@{};dependencyImages=@{};beforeBackup=$null;currentBackup=$null}
  $record['imageIdentities']=$resolvedImages
@@ -66,6 +68,7 @@ try {
    if($LASTEXITCODE -ne 0 -or $running -cne 'true'){throw 'Existing database dependencies must be running before release.'}
    $record.dependencies[$service]=$container
    $record.dependencyImages[$service]=((& docker inspect --format '{{.Image}}' $container) -join '')
+   if($identityMap.ContainsKey($service)){Assert-ReleaseContainerImage -ContainerId $container -Image $identityMap[$service]}
   }
   $schema=Read-ReleaseSchema -ComposeArguments $compose
   if($schema.version -gt (@($manifest.migrations.version) | Measure-Object -Maximum).Maximum){throw 'Database is newer than the selected artifact.'}
@@ -89,12 +92,13 @@ try {
   # The nested backup observed stopped writers and leaves them stopped until candidate startup.
   & (Join-Path $PSScriptRoot 'platform-data-manifest.ps1') -ProjectName $ProjectName -EnvFile $envPath -OutputPath (Join-Path $releaseRoot 'historical-before.json')
  }else{
-  & docker @compose up -d --wait --wait-timeout 180 mysql redis
+  & docker @compose -f compose.yaml -f $override up -d --no-build --wait --wait-timeout 180 mysql redis
   if($LASTEXITCODE -ne 0){throw 'Isolated database initialization failed.'}
   foreach($service in @('mysql','redis')){
    $container=(& docker @compose ps -a -q $service) -join ''
    $record.dependencies[$service]=$container
    $record.dependencyImages[$service]=((& docker inspect --format '{{.Image}}' $container) -join '')
+   if($identityMap.ContainsKey($service)){Assert-ReleaseContainerImage -ContainerId $container -Image $identityMap[$service]}
   }
  }
  # Persist immutable references before starting, so a later plain compose up cannot restore old tags.

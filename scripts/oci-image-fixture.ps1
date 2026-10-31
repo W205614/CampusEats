@@ -1,8 +1,8 @@
 # Tiny, real OCI save archives for delivery checks; no Docker daemon is involved.
 function New-ReleaseOciFixture {
- param([Parameter(Mandatory)][string]$Path,[string]$SourceSha=('a'*40),[string]$Fault='')
+ param([Parameter(Mandatory)][string]$Path,[string]$SourceSha=('a'*40),[string]$Fault='',[string[]]$Services=@('server','web'))
  $utf8=[Text.UTF8Encoding]::new($false);$members=[ordered]@{};$images=@();$descriptors=@();$compat=@();$repositories=@{}
- foreach($service in @('server','web')){
+ foreach($service in $Services){
   $reference='campuseats-'+$service+':sha-'+$SourceSha
   $layerStream=[IO.MemoryStream]::new();$layerWriter=[System.Formats.Tar.TarWriter]::new($layerStream,$true)
   try{

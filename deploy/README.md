@@ -5,6 +5,7 @@
 | 文件 | 用途 |
 |---|---|
 | `web.Dockerfile` | 构建工作台、用户H5与Nginx镜像 |
+| `mysql.Dockerfile` | 在固定MySQL 8.4.13镜像上安装经官方SHA-256核对的curl/libcurl安全补丁 |
 | `nginx.conf`、`proxy-headers.conf` | 页面路由、API代理与可信代理头 |
 | `maven-settings.xml` | 后端源码镜像的Maven镜像源配置 |
 | `dish.svg` | 默认演示餐品图片 |

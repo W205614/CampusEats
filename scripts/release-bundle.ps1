@@ -19,9 +19,10 @@ function Read-VerifiedReleaseBundle {
  $manifest=Join-Path $directoryPath 'release-manifest.json'
  if((Get-FileHash -LiteralPath $manifest -Algorithm SHA256).Hash -ine $ExpectedManifestSha256){throw 'Release manifest hash does not match the trusted CI result.'}
  $record=Get-Content -LiteralPath $manifest -Raw | ConvertFrom-Json
- if($record.schemaVersion -notin @(1,2) -or $record.repository -cne 'W205614/CampusEats' -or $record.sourceSha -cne $ExpectedSourceSha -or [string]$record.runId -cne $ExpectedRunId -or $record.runAttempt -lt 1 -or $record.platform -cne 'linux/amd64' -or $record.migrationHashFormat -cne 'utf8-lf-v1'){throw 'Release bundle provenance or migration hash format differs from the requested CI run.'}
- if($record.schemaVersion -eq 2 -and $record.imageIdentityFormat -cne 'oci-uncompressed-v1'){throw 'Unsupported release image identity format.'}
- if(@($record.images).Count -ne 2 -or ((@($record.images.service | Sort-Object) -join ',') -cne 'server,web')){throw 'Expected exactly the two application images.'}
+ if($record.schemaVersion -notin @(1,2,3) -or $record.repository -cne 'W205614/CampusEats' -or $record.sourceSha -cne $ExpectedSourceSha -or [string]$record.runId -cne $ExpectedRunId -or $record.runAttempt -lt 1 -or $record.platform -cne 'linux/amd64' -or $record.migrationHashFormat -cne 'utf8-lf-v1'){throw 'Release bundle provenance or migration hash format differs from the requested CI run.'}
+ if($record.schemaVersion -ge 2 -and $record.imageIdentityFormat -cne 'oci-uncompressed-v1'){throw 'Unsupported release image identity format.'}
+ $expectedServices=if($record.schemaVersion -eq 3){@('mysql','server','web')}else{@('server','web')}
+ if(@($record.images).Count -ne $expectedServices.Count -or ((@($record.images.service | Sort-Object) -join ',') -cne ($expectedServices -join ','))){throw 'Release image services differ from the manifest schema.'}
  foreach($image in $record.images){
   $sourceId=if($record.schemaVersion -eq 1){$image.id}else{$image.sourceRuntimeId}
   if($sourceId -notmatch '^sha256:[a-f0-9]{64}$' -or $image.revision -cne $ExpectedSourceSha -or $image.reference -cne ('campuseats-'+$image.service+':sha-'+$ExpectedSourceSha)){throw 'Unexpected application image identity.'}
@@ -36,15 +37,15 @@ function Read-VerifiedReleaseBundle {
  }
  if(!$files.ContainsKey('application-images.tar') -or !$files.ContainsKey('security/summary.json') -or !$files.ContainsKey('security/server-runtime-sbom.cdx.json')){throw 'Required image archive or security evidence is missing.'}
  # Version 1 is accepted only by deriving identities from its hash-verified OCI graph.
- # Version 2 must declare exactly the same identities; no revision-only fallback exists.
- $graph=@(Read-ReleaseImageGraph -Archive (Join-Path $directoryPath $record.archive) -SourceSha $ExpectedSourceSha)
+ # Versions 2 and 3 must declare exactly the same identities; no revision-only fallback exists.
+ $graph=@(Read-ReleaseImageGraph -Archive (Join-Path $directoryPath $record.archive) -SourceSha $ExpectedSourceSha -ExpectedServices $expectedServices)
  $scan=@(Get-Content -LiteralPath (Join-Path $directoryPath 'security/summary.json') -Raw | ConvertFrom-Json)
  $normalized=@()
  foreach($image in $record.images){
   $identity=@($graph | Where-Object service -CEQ $image.service)[0]
   $sourceId=if($record.schemaVersion -eq 1){$image.id}else{$image.sourceRuntimeId}
   if($sourceId -cnotin @($identity.configDigest,$identity.platformManifestDigest)){throw 'Scanned source runtime ID is outside the verified OCI graph.'}
-  if($record.schemaVersion -eq 2){
+  if($record.schemaVersion -ge 2){
    foreach($field in @('configDigest','platformManifestDigest','layerDigests','diffIds')){if((@($image.$field) -join ',') -cne (@($identity.$field) -join ',')){throw 'Declared image identity differs from the verified OCI graph.'}}
   }
   $evidence=@($scan | Where-Object service -CEQ $image.service)

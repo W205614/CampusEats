@@ -27,4 +27,11 @@ foreach($fault in @('layer-bytes','config-bytes','mapping','diff-id','layer-size
  $rejected=$false;try{Read-ReleaseImageGraph -Archive $archive -SourceSha $sha | Out-Null}catch{$rejected=$true}
  if(!$rejected){throw "Corrupt OCI graph accepted: $fault"}
 }
-Write-Host 'Image identity: config/manifest runtime IDs resolve; unknown IDs, platform/revision/rootfs changes and substituted OCI blobs/mapping fail closed. No Docker used.'
+$three=@('mysql','server','web')
+[void](New-ReleaseOciFixture -Path $archive -SourceSha $sha -Services $three)
+if(@(Read-ReleaseImageGraph -Archive $archive -SourceSha $sha -ExpectedServices $three).Count -ne 3){throw 'Explicit MySQL image was not verified.'}
+foreach($services in @(@('server','web'),@('mysql','server','server'))){
+ $rejected=$false;try{Read-ReleaseImageGraph -Archive $archive -SourceSha $sha -ExpectedServices $services | Out-Null}catch{$rejected=$true}
+ if(!$rejected){throw 'Unexpected or duplicate services were accepted.'}
+}
+Write-Host 'Image identity: exact two/three-image layouts and config/manifest IDs resolve; substituted services, bytes, layers and source identities fail closed. No Docker used.'

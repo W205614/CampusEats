@@ -1,8 +1,9 @@
 # docker image save on the supported CI engine emits a single-platform OCI layout.
 # Verify the bytes, graph and tag mapping before interpreting either Docker ID form.
 function Read-ReleaseImageGraph {
- param([Parameter(Mandatory)][string]$Archive,[Parameter(Mandatory)][string]$SourceSha)
+ param([Parameter(Mandatory)][string]$Archive,[Parameter(Mandatory)][string]$SourceSha,[ValidateSet('server','web','mysql')][string[]]$ExpectedServices=@('server','web'))
  if($SourceSha -notmatch '^[a-f0-9]{40}$'){throw 'Invalid image source revision.'}
+ if(!$ExpectedServices.Count -or @($ExpectedServices | Select-Object -Unique).Count -ne $ExpectedServices.Count){throw 'Explicit distinct image services are required.'}
  $blobs=[Collections.Generic.Dictionary[string,object]]::new([StringComparer]::Ordinal)
  $roots=@{};$paths=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)
  $stream=[IO.File]::OpenRead([IO.Path]::GetFullPath($Archive));$reader=$null;$metadataBytes=0L
@@ -29,13 +30,14 @@ function Read-ReleaseImageGraph {
    }else{throw 'Unsupported image archive layout.'}
   }
  }finally{if($reader){$reader.Dispose()};$stream.Dispose()}
- if($roots['oci-layout'].imageLayoutVersion -cne '1.0.0' -or $roots['index.json'].schemaVersion -ne 2 -or @($roots['index.json'].manifests).Count -ne 2 -or @($roots['manifest.json']).Count -ne 2){throw 'Expected the supported two-image OCI save layout.'}
+ if($roots['oci-layout'].imageLayoutVersion -cne '1.0.0' -or $roots['index.json'].schemaVersion -ne 2 -or @($roots['index.json'].manifests).Count -ne $ExpectedServices.Count -or @($roots['manifest.json']).Count -ne $ExpectedServices.Count){throw 'OCI save layout does not match the explicitly expected image services.'}
  $used=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal);$images=@();$services=@{}
  foreach($descriptor in $roots['index.json'].manifests){
   if($descriptor.mediaType -cne 'application/vnd.oci.image.manifest.v1+json'){throw 'Only direct single-platform OCI manifests are supported.'}
   $reference=[string]$descriptor.annotations.'io.containerd.image.name'
   $reference=$reference -creplace '^docker.io/library/',''
-  $service=if($reference -ceq ('campuseats-server:sha-'+$SourceSha)){'server'}elseif($reference -ceq ('campuseats-web:sha-'+$SourceSha)){'web'}else{throw 'Unexpected OCI image reference.'}
+  $matched=@($ExpectedServices | Where-Object {$reference -ceq ('campuseats-'+$_+':sha-'+$SourceSha)})
+  if($matched.Count -ne 1){throw 'Unexpected OCI image reference.'};$service=$matched[0]
   if($services.ContainsKey($service)){throw 'Duplicate OCI application reference.'};$services[$service]=$true
   $manifest=Read-ReleaseGraphJson -Descriptor $descriptor -Blobs $blobs -Used $used
   if($manifest.schemaVersion -ne 2 -or $manifest.mediaType -cne 'application/vnd.oci.image.manifest.v1+json' -or $manifest.config.mediaType -cne 'application/vnd.oci.image.config.v1+json'){throw 'Unsupported platform image/config media type.'}
@@ -55,7 +57,7 @@ function Read-ReleaseImageGraph {
   if($compat.Count -ne 1 -or $compat[0].Config -cne ('blobs/sha256/'+$manifest.config.digest.Substring(7)) -or (@($compat[0].Layers) -join ',') -cne ($expectedPaths -join ',')){throw 'Docker save tag/config/layer mapping differs from the OCI graph.'}
   if($roots.ContainsKey('repositories')){
    $repository='campuseats-'+$service;$tag='sha-'+$SourceSha;$legacy=$roots['repositories'].$repository
-   if(@($roots['repositories'].PSObject.Properties).Count -ne 2 -or @($legacy.PSObject.Properties).Count -ne 1 -or $legacy.$tag -cne $layers[-1].digest.Substring(7)){throw 'Legacy repository tag mapping differs from the OCI graph.'}
+   if(@($roots['repositories'].PSObject.Properties).Count -ne $ExpectedServices.Count -or @($legacy.PSObject.Properties).Count -ne 1 -or $legacy.$tag -cne $layers[-1].digest.Substring(7)){throw 'Legacy repository tag mapping differs from the OCI graph.'}
   }
   $images+=[pscustomobject]@{service=$service;reference=$reference;revision=$SourceSha;configDigest=$manifest.config.digest;platformManifestDigest=$descriptor.digest;layerDigests=@($layers.digest);diffIds=$diffIds}
  }

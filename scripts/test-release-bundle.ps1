@@ -41,4 +41,13 @@ foreach($case in @('source','run','hash','archive')){
  try {Read-VerifiedReleaseBundle -Directory $fixture -ExpectedSourceSha $source -ExpectedRunId $expectedRun -ExpectedManifestSha256 $expectedHash | Out-Null}catch{$rejected=$true}
  if(!$rejected){throw "Release boundary accepted $case mismatch."}
 }
-Write-Host 'Release bundle: exact source/run, trusted manifest and all archive hashes fail closed; no Docker writes were used.'
+$images=@(New-ReleaseOciFixture -Path (Join-Path $fixture 'application-images.tar') -SourceSha $sha -Services @('mysql','server','web'))
+$manifest.schemaVersion=3;$manifest.images=$images
+Write-OperationsJson -Path (Join-Path $fixture 'security/summary.json') -Value @($images | ForEach-Object {@{service=$_.service;status='passed';imageId=$_.sourceRuntimeId}})
+$manifest.files=@(Get-ChildItem -LiteralPath $fixture -File -Recurse | Where-Object Name -CNE 'release-manifest.json' | ForEach-Object {@{path=[IO.Path]::GetRelativePath($fixture,$_.FullName).Replace('\','/');bytes=$_.Length;sha256=(Get-FileHash -LiteralPath $_.FullName).Hash}})
+Write-OperationsJson -Path $path -Value $manifest
+if(@((Read-VerifiedReleaseBundle -Directory $fixture -ExpectedSourceSha $sha -ExpectedRunId $run -ExpectedManifestSha256 (Get-FileHash $path).Hash).images).Count -ne 3){throw 'Version 3 did not verify MySQL.'}
+$images[0].configDigest='sha256:'+('f'*64);Write-OperationsJson -Path $path -Value $manifest
+$rejected=$false;try{Read-VerifiedReleaseBundle -Directory $fixture -ExpectedSourceSha $sha -ExpectedRunId $run -ExpectedManifestSha256 (Get-FileHash $path).Hash | Out-Null}catch{$rejected=$true}
+if(!$rejected){throw 'Substituted MySQL identity was accepted.'}
+Write-Host 'Release bundle: exact source/run, two/three-image graphs, MySQL identity and all archive hashes fail closed; no Docker writes were used.'
