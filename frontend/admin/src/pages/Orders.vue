@@ -32,7 +32,7 @@ const session = useSession(),
   timer = ref<ReturnType<typeof setInterval>>(),
   loading = ref(false),
   hasMore = ref(false);
-let loadedPages = 1, sequence = 0, initialization = 0, mounted = false;
+let loadedPages = 1, sequence = 0, readSequence = 0, initialization = 0, mounted = false;
 watch([() => session.session?.token, selectedStore], () => {
   sequence++;
   loadedPages = 1;
@@ -45,8 +45,8 @@ watch([() => session.session?.token, selectedStore], () => {
 }, { flush: 'sync' });
 async function load(pages = loadedPages) {
   if (!mounted || !session.session || loading.value || busy.value || exceptionOrder.value) return;
-  const current = ++sequence;
-  const isCurrent = () => mounted && current === sequence;
+  const current = sequence, read = ++readSequence;
+  const isCurrent = () => mounted && current === sequence && read === readSequence;
   const isCourier = courier.value, store = selectedStore.value;
   loading.value = true;
   try {
@@ -99,8 +99,12 @@ async function saveAvailability() {
   catch(e){notifyError(e);}finally{availabilityBusy.value=false;}
 }
 async function perform(o: Order, operation: () => Promise<void>): Promise<boolean> {
-  if (!mounted || busy.value || loading.value || needsRefresh.value) return false;
+  if (!mounted || busy.value || needsRefresh.value) return false;
+  // A background read can start before Vue disables an already clicked button.
+  // Supersede that read; the write still validates the captured order version.
   const current = sequence;
+  readSequence++;
+  loading.value = false;
   const isCurrent = () => mounted && current === sequence;
   const path = courier.value ? '/courier' : '/merchant';
   busy.value = true;
