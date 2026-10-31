@@ -6,8 +6,8 @@
 |---|---|---|
 | 首次启动、源码升级 | `start.ps1` | 生成本机配置、构建镜像并等待健康；已有数据会先暂停写入、备份和独立验证，详见[升级说明](../docs/platform-deployment.md) |
 | CI制品下载 | `download-release.ps1` | 4 MiB有界分段，核对成功run、来源SHA及完整归档／清单摘要，不保存GitHub令牌 |
-| CI制品发布 | `release.ps1` | 不构建镜像；停写迁移、原字段及上传核对、独立恢复后开放，保留原依赖及卷 |
-| CI制品导出 | `export-release.ps1` | CI末尾导出已测试扫描的两应用镜像、SBOM及来源清单 |
+| CI制品发布 | `release.ps1` | 不构建镜像；停写迁移、原字段及上传核对、独立恢复后开放；应用发布保留已就绪依赖及业务卷，V3要求MySQL与制品身份一致，依赖补丁升级步骤见[部署说明](../docs/platform-deployment.md#已采用-ci-制品的日常环境) |
+| CI制品导出 | `export-release.ps1` | CI末尾以V3清单导出已测试、扫描的Java／Web／MySQL三个镜像、四服务扫描证据、SBOM及来源；V1／V2两个应用镜像的历史验证格式仍保留 |
 | 加密副本与解密 | `encrypted-backups.ps1`、`decrypt-backup.ps1` | 固定age，缺公钥拒绝对外副本；私钥单独保管 |
 | 调度预览 | `ops-schedule.ps1` | 生成和校验Windows任务XML，不实际注册 |
 | 凭据权限 | `secure-files.ps1` | 写前限制权限并核验，失败中止；普通临时文件使用回收站清理 |
