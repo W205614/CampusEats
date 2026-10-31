@@ -7,6 +7,8 @@
     "dev": "vite --host 127.0.0.1",
     "build": "vue-tsc --noEmit && vite build",
     "typecheck": "vue-tsc --noEmit",
+    "postinstall": "node tooling/apply-compat-patches.cjs",
+    "test:toolchain": "node --test tooling/redocly.test.cjs",
     "test": "playwright test",
     "generate:types": "node ../../scripts/generate-contracts.mjs"
   },
@@ -24,5 +26,11 @@
     "@playwright/test": "1.63.0",
     "openapi-typescript": "7.13.0",
     "@types/node": "24.10.1"
+  },
+  "overrides": {
+    "@redocly/openapi-core": {
+      ".": "1.34.20",
+      "minimatch": "11.0.1"
+    }
   }
 }

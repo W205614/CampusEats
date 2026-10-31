@@ -51,7 +51,7 @@ jobs:
             frontend/admin/package-lock.json
             frontend/client/package-lock.json
       - run: mvn -B -ntp clean verify
-      - run: npm ci --prefix frontend/admin && npm run build --prefix frontend/admin
+      - run: npm ci --prefix frontend/admin && npm run test:toolchain --prefix frontend/admin && npm run build --prefix frontend/admin
       - run: npm ci --prefix frontend/client --include=optional && npm run test:toolchain --prefix frontend/client && npm run typecheck --prefix frontend/client && npm run build:h5 --prefix frontend/client && npm run build:mp-weixin --prefix frontend/client
       - name: Check generated API types
         run: node scripts/generate-contracts.mjs && git diff --exit-code -- frontend/contracts/openapi.ts

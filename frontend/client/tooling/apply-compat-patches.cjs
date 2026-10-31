@@ -4,10 +4,10 @@ const crypto = require('node:crypto');
 const patches = require('./compat-patches.json');
 const hash = text => crypto.createHash('sha256').update(text).digest('hex');
 
-function applyPatches(root = path.resolve(__dirname, '..'), checkOnly = false) {
+function applyPatches(root = path.resolve(__dirname, '..'), checkOnly = false, entries = patches) {
   const writes = [];
   // Validate the entire set before changing anything. Unknown upstream bytes fail closed.
-  for (const patch of patches) {
+  for (const patch of entries) {
     const folder = path.join(root, 'node_modules', patch.package);
     const manifest = JSON.parse(fs.readFileSync(path.join(folder, 'package.json'), 'utf8'));
     if (manifest.version !== patch.version) throw new Error(`Review compatibility patch for ${patch.package}@${manifest.version}`);

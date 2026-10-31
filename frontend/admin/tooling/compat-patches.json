@@ -1,0 +1,12 @@
+[
+  {
+    "package": "@redocly/openapi-core",
+    "version": "1.34.20",
+    "file": "lib/utils.js",
+    "before": "896a9acce92e3e5905aa267e895985d57888a87f500d58c29da9c8f9d488ff1c",
+    "after": "825736f13fb67dc4a1e2157bb51396209c7343cfd00376ed5d923e3e9ff82a18",
+    "edits": [
+      ["const minimatch = require(\"minimatch\");", "const { minimatch } = require(\"minimatch\");"]
+    ]
+  }
+]
