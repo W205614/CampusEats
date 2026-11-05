@@ -34,9 +34,20 @@
 | `frontend/admin/tests/` | Playwright 场景，包含用户端与工作台流程，运行前确认隔离环境 |
 | `frontend/client/tooling/` | 锁定 uni-app 工具链的兼容包、补丁与回归；[用途和升级规则](../frontend/client/tooling/README.md) |
 
-阅读顺序：用户 `pages/checkout/index.vue` → `api.ts` → 后端 `PlatformCheckoutController` → `CheckoutService` → `StoreCart`、`Money`、`PlatformScope` → `V5__multi_campus_platform.sql`。随后看 `FulfillmentService` 和 `AftersaleService`，对照[架构规则](platform-architecture.md)理解事务和权限边界。
+## 按业务追踪请求
 
-本轮新增路径建议按下面顺序读：
+下表按默认多校区模式列出入口。用户端由 `api.ts` 发请求，员工端由 `platform-api.ts` 发请求，控制器和服务均位于 `sky-server/src/main/java/com/sky/`。
+
+| 场景 | 从页面追到服务 | 关键操作 |
+|---|---|---|
+| 购物车增减餐品 | [菜单](../frontend/client/src/pages/menu/index.vue)或[购物车](../frontend/client/src/pages/cart/index.vue) → `POST /api/v1/user/stores/{storeId}/cart/items` → `PlatformCheckoutController` → [StoreCart.change](../sky-server/src/main/java/com/sky/platform/StoreCart.java) | `platform.StoreCart` 按用户和店铺锁定购物车、检查版本；加购时调用 `business.CartService.validate` 校验商品与口味。 |
+| 合单报价、提交与支付 | [结算页](../frontend/client/src/pages/checkout/index.vue) → `PlatformCheckoutController` → [CheckoutService.preview / submit](../sky-server/src/main/java/com/sky/platform/CheckoutService.java)；[订单页](../frontend/client/src/pages/orders/index.vue) → 同一控制器 → `CheckoutService.pay` | 报价读取各店购物车，提交时创建子单、调用 `business.QuotaService.reserve` 预占配额并清空对应购物车；支付成功后由 `finance.LedgerService.payment` 逐子单记账。 |
+| 店长接单和自取核销 | [订单履约页](../frontend/admin/src/pages/Orders.vue) → [PlatformFulfillmentController](../sky-server/src/main/java/com/sky/web/PlatformFulfillmentController.java) → [FulfillmentService](../sky-server/src/main/java/com/sky/platform/FulfillmentService.java) | `action` 处理接单，核对店铺权限与订单版本，再调用 `business.QuotaService.transition` 确认配额；自取码核销走单独的 `verify` 方法。 |
+| 查经营报表 | [经营报表页](../frontend/admin/src/pages/Reports.vue) → [PlatformManagementController](../sky-server/src/main/java/com/sky/web/PlatformManagementController.java) → `DiscoveryService.reportView` → [ReportQueryService.view](../sky-server/src/main/java/com/sky/platform/ReportQueryService.java) | 工作台按店铺或平台范围取数，`platform.ReportQueryService` 负责聚合。旧接口由 `CatalogController` 调用 `business.ReportService`，需开启 `campus.legacy-api`。 |
+
+追数据库结构可从 [V5 多校区迁移](../sky-server/src/main/resources/db/migration/V5__multi_campus_platform.sql)开始，按版本往后看。权限范围、合单与售后规则见[平台架构](platform-architecture.md)。
+
+其他能力的源码入口如下。
 
 | 要理解的能力 | 代码链与关键约束 |
 |---|---|
@@ -44,7 +55,6 @@
 | 时限和异常 | `PlatformScope.event → FulfillmentStages` 保存阶段快照；`OperationsJobs → OperationsService` 有界扫描、确认跟进与人员交接；历史异常保留发生时快照 |
 | 持久消息 | 同事务的 `BusinessMessages` 生成接收账号消息，`InboxService` 每次检查当前权限；配送消息有履约白名单，WebSocket不承担必达确认 |
 | 模拟账务 | `CheckoutService / PlatformJobs → LedgerService` 成功落账；`FinanceService` 读取期初、冻结已结束日并对账，后续退款不改旧账单 |
-| 经营统计 | `DiscoveryService → ReportQueryService`；公开记录类型与兼容 Map 方法共用只读RR查询，导出也必须经过事务代理 |
 | 集合分页 | `CollectionPages / CursorPages / DiscoveryCursor`；签名范围绑定身份与筛选，前端两端 `paged-list.ts` 隔离旧账号、旧筛选响应 |
 
 管理端新增 `Users.vue`、`ServiceOperations.vue`、`Inbox.vue`、`Finance.vue`。订单的用户、商家和配送响应分开；配送完成、取消或改派后的字段与访问权限不能只由页面隐藏，必须验证服务端投影。抢单楼栋使用下单快照，楼栋改名后不回查新名称覆盖它。

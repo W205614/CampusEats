@@ -2,6 +2,52 @@
 
 以下命令均在项目根目录的 PowerShell 7 执行；初次部署见[项目首页](../README.md)，脚本用途见[脚本导航](../scripts/README.md)。
 
+## 演示账号
+
+全新演示库创建两个校区，每个校区有两家店。初始员工账号如下，初始密码见本机 `.local/demo-credentials.txt`。
+
+| 角色 | 账号 |
+|---|---|
+| 平台管理员 | `admin` |
+| 店长 | `manager1` ～ `manager4` |
+| 店铺运营员 | `operator1` ～ `operator4` |
+| 校区配送员 | `courier1`、`courier1b`、`courier2`、`courier2b` |
+
+新建的店长、运营员和配送员首次登录须改密。已有账号继续使用当前密码。需要独立体验时，平台管理员可创建测试用户并重置其密码。将 `APP_MODE` 改为 `trial` 会关闭共享演示登录，空试用库只创建需要首次改密的平台账号。修改运行配置后按[部署说明](platform-deployment.md)重新创建对应容器。
+
+## 日常启停与排障
+
+| 遇到的问题 | 处理方式 |
+|---|---|
+| 找不到 `pwsh`，或脚本运行报版本相关错误 | 安装 PowerShell 7，按[首次启动](../README.md#首次启动)运行脚本 |
+| Docker 连接失败或构建下载失败 | 确认 Docker Desktop 已启动且处于 Linux 容器模式，并检查镜像源与依赖下载的网络连接 |
+| `18083` 端口被占用 | 修改 `.env` 的 `WEB_PORT` 和 `ALLOWED_ORIGINS`，按[部署说明](platform-deployment.md)应用配置，使用新端口访问 |
+| 店铺休息中，无法下单 | 在工作台检查对应店铺的接单开关、营业时段和商品配额；新增店铺默认关闭接单 |
+| 手机打不开页面 | 默认只监听本机 `127.0.0.1`，请先用部署电脑的浏览器体验 |
+| 启动失败或页面无法访问 | 在项目根目录查看 `docker compose ps -a` 和下方日志；按需停止的容器需先启动 |
+| `start.ps1` 提示当前环境已采用 CI 制品 | 日常启停使用下方命令；升级使用 `download-release.ps1`、`release.ps1`，按[CI 制品发布说明](platform-deployment.md#已采用-ci-制品的日常环境)核对来源和依赖镜像 |
+| 服务已启动，`ops-check.ps1` 提示无近期验证备份 | 本机备份按当前策略停用，该项会返回非零；逐项检查 `issues`，不要把其它服务、任务或数据异常当作同一原因 |
+
+以下命令均在项目根目录执行：
+
+```powershell
+# 查看全部容器，包括已停止的服务
+docker compose ps -a
+
+# 查看最近的日志
+docker compose logs --tail=100 server web
+
+# 暂停服务，给数据库留出退出时间，保留数据
+docker compose stop --timeout 60
+
+# 再次启动已有容器，沿用原镜像和配置
+docker compose start --wait --wait-timeout 300
+```
+
+以上是日常启停命令，不用于构建新版本或应用配置修改。数据库、Redis 和上传文件使用三个 Docker 持久卷保存。不要使用 `docker compose down -v` 停止日常环境，该命令会删除数据卷。
+
+## 运行边界
+
 本机保持单机演示，完整数据备份、离线镜像恢复包和自动备份保持停用，恢复指针为 `DISABLED_BY_USER`。下文的备份、复制和调度命令仅说明保留工具的人工使用方法，不是当前已启用配置。只读运维检查仍会报告 `No recent independently verified backup`，应按这项已确认策略单独解释，不能把检查的非零退出码改称全部通过，也不能据此自动创建备份。发布时的临时恢复校验与清理规则见[部署说明](platform-deployment.md#本机保留策略)。
 
 菜单的目录、口味和套餐组成按店批量读取，库存和活动价实时批量查询。下单、支付退款仍保留幂等与事务保护；这不代表已经验证生产峰值容量。
