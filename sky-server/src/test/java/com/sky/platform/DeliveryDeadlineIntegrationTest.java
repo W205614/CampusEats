@@ -196,7 +196,7 @@ class DeliveryDeadlineIntegrationTest {
   /** Execute the actual operational query against MySQL, replacing wall time with the fixed Clock. */
   private long operationalCount(int fromEnd) throws Exception {
     var script = Files.readString(Path.of("..", "scripts", "ops-check.ps1"));
-    var sql = Pattern.compile("(?s)\\$sql=@'\\R(.*?)\\R'@").matcher(script);
+    var sql = Pattern.compile("(?s)\\$sql\\h*=\\h*@'\\R(.*?)\\R'@").matcher(script);
     assertTrue(sql.find(), "Cannot find the operational SQL block");
     var statements =
         Arrays.stream(sql.group(1).split(";"))
