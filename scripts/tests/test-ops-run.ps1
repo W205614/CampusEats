@@ -76,6 +76,12 @@ try {$lease=Enter-OperationsLock -Root $Root -ProjectName 'campuseats-v1';Exit-O
  # Recreate a valid source/copy for runner state and HTTP tests.
  $source2=Join-Path $fixture '.local/backups/source2';New-FixtureBackup $source2
  $fixtureAge=Get-PinnedAge
+ # The copied runner has its own tool cache. Reuse the verified archive for its backup.
+ $ageVersionDir = (Get-Item -LiteralPath $fixtureAge).Directory.Parent
+ $runnerAgeCache = Join-Path $fixture ".local/tools/age/$($ageVersionDir.Name)"
+ [void][IO.Directory]::CreateDirectory($runnerAgeCache)
+ $archivePattern = if ($IsWindows) { '*.zip' } else { '*.tar.gz' }
+ Get-ChildItem -LiteralPath $ageVersionDir.FullName -File -Filter $archivePattern | Copy-Item -Destination $runnerAgeCache
  $fixtureKeygen=Join-Path (Split-Path $fixtureAge -Parent) ('age-keygen'+$(if($IsWindows){'.exe'}else{''}))
  $fixtureIdentity=Join-Path $fixture 'identity.txt'
  $fixturePrivate=(& $fixtureKeygen 2>$null) -join "`n"
