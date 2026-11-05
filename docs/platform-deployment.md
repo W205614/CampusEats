@@ -23,7 +23,7 @@ pwsh -NoProfile -File ./scripts/release.ps1 -BundleDirectory .local/releases/dow
 
 发布清单分别记录源引擎运行ID、配置摘要和平台清单摘要。读取可信OCI归档时逐项验证索引、清单、配置及有序层的内容地址；导入后本机ID必须属于该图中已验证的配置／平台清单身份，文件系统层顺序、平台和源码revision也必须匹配。Compose固定本机已解析的内容ID，容器再次核对实际引用。仅有同名标签、相同revision或相同架构不能通过验证。
 
-清单格式V3包含Java、Web及已安装安全补丁的MySQL三个镜像；V1／V2仍严格验证原两个应用镜像。MySQL保持8.4.13及原入口、配置和数据目录，只安装Oracle ELSA-2026-92907的两个固定RPM，下载时核对官方SHA-256，安装时校验RPM签名。源构建的 `MYSQL_IMAGE` 默认为 `campuseats-mysql:v1`，已采用制品的日常环境继续固定内容ID。
+清单格式V3包含Java、Web及已安装安全补丁的MySQL三个镜像；V1／V2仍严格验证原两个应用镜像。MySQL保持8.4.13及原入口、配置和数据目录，安装 Oracle ELSA-2026-92907 的 curl/libcurl 补丁和 [ELSA-2026-79281](https://linux.oracle.com/errata/ELSA-2026-79281.html) 的 glibc、glibc-common、glibc-minimal-langpack 补丁，下载时核对官方SHA-256，安装时校验RPM签名。源构建的 `MYSQL_IMAGE` 默认为 `campuseats-mysql:v1`，已采用制品的日常环境继续固定内容ID。
 
 已有日常库升级MySQL补丁时，先停止Web／Java并独立恢复验证临时备份，保存原表原列及主键记录指纹；从同一已验证V3归档导入MySQL镜像，只替换MySQL容器并复用原数据库卷。健康、MySQL版本及原数据指纹核对通过后，再执行应用发布。`release.ps1` 会拒绝与V3制品身份不符的现有MySQL容器；依赖升级失败时保持停写并保留临时材料。全新隔离初始化会直接选择制品内的MySQL镜像。
 
