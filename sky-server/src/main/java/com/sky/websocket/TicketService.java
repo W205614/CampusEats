@@ -20,8 +20,13 @@ public class TicketService {
   private final RedisAccess access;
   private final RateLimits limits;
 
-  public TicketService(StringRedisTemplate redis, Json json, Db db, Clock clock,
-      RedisAccess access, RateLimits limits) {
+  public TicketService(
+      StringRedisTemplate redis,
+      Json json,
+      Db db,
+      Clock clock,
+      RedisAccess access,
+      RateLimits limits) {
     this.redis = redis;
     this.json = json;
     this.db = db;
@@ -41,10 +46,13 @@ public class TicketService {
     limits.check("ws-ticket-ip:" + sourceAddress, 60, 60);
     String ticket = UUID.randomUUID().toString();
     try {
-      access.call(() -> {
-        redis.opsForValue().set("campus:ws:" + ticket, json.write(actor), Duration.ofSeconds(30));
-        return true;
-      });
+      access.call(
+          () -> {
+            redis
+                .opsForValue()
+                .set("campus:ws:" + ticket, json.write(actor), Duration.ofSeconds(30));
+            return true;
+          });
     } catch (Exception ex) {
       throw new BusinessException(503, "REDIS_UNAVAILABLE", "实时通知暂不可用，请使用订单查询");
     }
@@ -52,7 +60,8 @@ public class TicketService {
   }
 
   public Actor consume(String ticket) {
-    if (ticket == null || !ticket.matches("[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}")) return null;
+    if (ticket == null || !ticket.matches("[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}"))
+      return null;
     try {
       String data = access.call(() -> redis.opsForValue().getAndDelete("campus:ws:" + ticket));
       if (data == null) return null;

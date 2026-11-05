@@ -19,7 +19,8 @@ public class PlatformCheckoutController {
   private final CheckoutService checkout;
   private final AddressService addresses;
 
-  public PlatformCheckoutController(StoreCart cart, CheckoutService checkout, AddressService addresses) {
+  public PlatformCheckoutController(
+      StoreCart cart, CheckoutService checkout, AddressService addresses) {
     this.cart = cart;
     this.checkout = checkout;
     this.addresses = addresses;
@@ -89,7 +90,9 @@ public class PlatformCheckoutController {
   }
 
   @GetMapping("/user/checkouts")
-  public Object checkouts(@RequestParam(required = false) Long beforeId, @RequestParam(required = false) Integer limit) {
+  public Object checkouts(
+      @RequestParam(required = false) Long beforeId,
+      @RequestParam(required = false) Integer limit) {
     return checkout.list(beforeId, limit);
   }
 

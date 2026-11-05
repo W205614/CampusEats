@@ -17,16 +17,24 @@ class PublicReadLimitsTest {
   @Test
   void forwardedClientsGetIndependentPublicReadBudgetsAndRetryHeader() throws Exception {
     var limits = mock(RateLimits.class);
-    var filter = new AuthFilter(mock(AuthService.class), new ErrorWriter(new Json(new ObjectMapper())),
-        limits, new SimpleMeterRegistry());
+    var filter =
+        new AuthFilter(
+            mock(AuthService.class),
+            new ErrorWriter(new Json(new ObjectMapper())),
+            limits,
+            new SimpleMeterRegistry());
     doThrow(new BusinessException(429, "RATE_LIMITED", "操作过于频繁"))
-        .when(limits).check("search-ip:192.0.2.7", 1200, 60);
+        .when(limits)
+        .check("search-ip:192.0.2.7", 1200, 60);
     var request = new MockHttpServletRequest("GET", "/api/v1/user/search/page");
     request.setRemoteAddr("172.18.0.4");
     request.addHeader("X-Forwarded-For", "192.0.2.7");
     var response = new MockHttpServletResponse();
-    new ForwardedHeaderFilter().doFilter(request, response,
-        (req, res) -> filter.doFilter(req, res, (a, b) -> fail("Must throttle")));
+    new ForwardedHeaderFilter()
+        .doFilter(
+            request,
+            response,
+            (req, res) -> filter.doFilter(req, res, (a, b) -> fail("Must throttle")));
     assertEquals(429, response.getStatus());
     assertEquals("60", response.getHeader("Retry-After"));
     assertTrue(response.getContentAsString().contains("RATE_LIMITED"));
@@ -41,12 +49,14 @@ class PublicReadLimitsTest {
   void accountCaseVariantsShareTheExistingAccountBudget() {
     var limits = mock(RateLimits.class);
     doThrow(new BusinessException(429, "RATE_LIMITED", "busy"))
-        .when(limits).check(anyString(), eq(10), eq(60));
+        .when(limits)
+        .check(anyString(), eq(10), eq(60));
     var auth = mock(AuthService.class);
     var controller = new AuthController(auth, limits);
     assertThrows(BusinessException.class, () -> controller.login(new Login("Admin", "secret")));
     assertThrows(BusinessException.class, () -> controller.login(new Login("admin", "secret")));
-    verify(limits, times(2)).check("login-account:" + com.sky.common.Hashes.sha256("admin"), 10, 60);
+    verify(limits, times(2))
+        .check("login-account:" + com.sky.common.Hashes.sha256("admin"), 10, 60);
     verifyNoInteractions(auth);
   }
 }

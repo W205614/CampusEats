@@ -17,10 +17,22 @@ import org.springframework.data.redis.core.script.RedisScript;
 class RateLimitsTest {
   static class MutableClock extends Clock {
     final AtomicLong now = new AtomicLong(Instant.parse("2026-10-07T04:00:00Z").toEpochMilli());
-    public ZoneId getZone() { return ZoneOffset.UTC; }
-    public Clock withZone(ZoneId zone) { return this; }
-    public Instant instant() { return Instant.ofEpochMilli(now.get()); }
-    void advanceSeconds(int seconds) { now.addAndGet(seconds * 1000L); }
+
+    public ZoneId getZone() {
+      return ZoneOffset.UTC;
+    }
+
+    public Clock withZone(ZoneId zone) {
+      return this;
+    }
+
+    public Instant instant() {
+      return Instant.ofEpochMilli(now.get());
+    }
+
+    void advanceSeconds(int seconds) {
+      now.addAndGet(seconds * 1000L);
+    }
   }
 
   final MutableClock clock = new MutableClock();
@@ -31,7 +43,8 @@ class RateLimitsTest {
   @SuppressWarnings("unchecked")
   void offline() {
     doThrow(new RedisConnectionFailureException("isolated test outage"))
-        .when(redis).execute(any(RedisScript.class), anyList(), any(Object[].class));
+        .when(redis)
+        .execute(any(RedisScript.class), anyList(), any(Object[].class));
   }
 
   void fill(int count) {
@@ -124,15 +137,17 @@ class RateLimitsTest {
       var futures = new ArrayList<Future<String>>();
       for (int i = 0; i < 20; i++) {
         int index = i;
-        futures.add(pool.submit(() -> {
-          start.await();
-          try {
-            limits.check(key.apply(index), max, 60);
-            return "OK";
-          } catch (BusinessException ex) {
-            return ex.code();
-          }
-        }));
+        futures.add(
+            pool.submit(
+                () -> {
+                  start.await();
+                  try {
+                    limits.check(key.apply(index), max, 60);
+                    return "OK";
+                  } catch (BusinessException ex) {
+                    return ex.code();
+                  }
+                }));
       }
       start.countDown();
       var results = new ArrayList<String>();

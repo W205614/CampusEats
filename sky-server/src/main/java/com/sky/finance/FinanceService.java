@@ -252,7 +252,8 @@ public class FinanceService {
             + storeFilter
             + " GROUP BY o.store_id,o.id";
     // Prefer the covering index over the narrower legacy index; both consumers reuse one CTE.
-    // A statement-only 32 MiB budget avoids the measured 16 MiB spill without changing pooled sessions.
+    // A statement-only 32 MiB budget avoids the measured 16 MiB spill without changing pooled
+    // sessions.
     var summary =
         db.rows(
             "WITH balances AS ("

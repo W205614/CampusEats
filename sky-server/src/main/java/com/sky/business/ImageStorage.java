@@ -81,8 +81,7 @@ public class ImageStorage {
           require(ImageIO.write(image, "png", out), 400, "INVALID_IMAGE", "图片编码失败");
         } catch (IOException ex) {
           // ImageIO's final flush can replace the original output-limit exception.
-          if (out.limitExceeded)
-            throw new BusinessException(400, "INVALID_IMAGE", "编码后图片最大5MB");
+          if (out.limitExceeded) throw new BusinessException(400, "INVALID_IMAGE", "编码后图片最大5MB");
           throw ex;
         }
       } finally {
@@ -119,8 +118,13 @@ public class ImageStorage {
         int h = reader.getHeight(0);
         require(
             Set.of("png", "jpeg", "jpg").contains(format)
-                && w > 0 && h > 0 && w <= 4096 && h <= 4096,
-            400, "INVALID_IMAGE", "仅支持边长不超过4096的PNG或JPEG");
+                && w > 0
+                && h > 0
+                && w <= 4096
+                && h <= 4096,
+            400,
+            "INVALID_IMAGE",
+            "仅支持边长不超过4096的PNG或JPEG");
         return reader.read(0);
       } finally {
         reader.dispose();

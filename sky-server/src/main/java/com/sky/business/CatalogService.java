@@ -173,12 +173,14 @@ public class CatalogService {
           LocalDateTime.now(clock),
           id);
     }
-    Set<String> invalidations = new TreeSet<>(List.of("menu:DISH:" + target, "menu:SETMEAL:" + target));
+    Set<String> invalidations =
+        new TreeSet<>(List.of("menu:DISH:" + target, "menu:SETMEAL:" + target));
     if (input.type() == 1)
-      for (var dependent : db.rows(
-          "SELECT DISTINCT s.category_id FROM setmeal s JOIN setmeal_dish sd ON sd.setmeal_id=s.id"
-              + " JOIN dish d ON d.id=sd.dish_id WHERE d.category_id=?", target))
-        invalidations.add("menu:SETMEAL:" + dependent.get("category_id"));
+      for (var dependent :
+          db.rows(
+              "SELECT DISTINCT s.category_id FROM setmeal s JOIN setmeal_dish sd ON sd.setmeal_id=s.id"
+                  + " JOIN dish d ON d.id=sd.dish_id WHERE d.category_id=?",
+              target)) invalidations.add("menu:SETMEAL:" + dependent.get("category_id"));
     invalidations.forEach(cache::afterCommit);
     audit.write(Actor.current(), "CATEGORY_SAVE", target, "更新分类");
     return target;
@@ -188,8 +190,11 @@ public class CatalogService {
   public void deleteCategory(long id) {
     Actor.admin();
     // Serialize with product creation's FOR SHARE before checking references.
-    require(db.one("SELECT id FROM category WHERE id=? FOR UPDATE", id) != null,
-        404, "NOT_FOUND", "分类不存在");
+    require(
+        db.one("SELECT id FROM category WHERE id=? FOR UPDATE", id) != null,
+        404,
+        "NOT_FOUND",
+        "分类不存在");
     require(
         db.count(
                 "SELECT (SELECT COUNT(*) FROM dish WHERE category_id=?)+(SELECT COUNT(*) FROM"
@@ -306,10 +311,11 @@ public class CatalogService {
             target);
       }
       // Composition metadata and availability depend on every dish edit, not only disabling it.
-      for (var dependent : db.rows(
-          "SELECT DISTINCT s.category_id FROM setmeal s JOIN setmeal_dish sd ON sd.setmeal_id=s.id"
-              + " WHERE sd.dish_id=?", target))
-        invalidations.add("menu:SETMEAL:" + dependent.get("category_id"));
+      for (var dependent :
+          db.rows(
+              "SELECT DISTINCT s.category_id FROM setmeal s JOIN setmeal_dish sd ON sd.setmeal_id=s.id"
+                  + " WHERE sd.dish_id=?",
+              target)) invalidations.add("menu:SETMEAL:" + dependent.get("category_id"));
     } else {
       db.update("DELETE FROM setmeal_dish WHERE setmeal_id=?", target);
       for (var c : components)

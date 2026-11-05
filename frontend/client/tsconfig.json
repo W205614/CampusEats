@@ -5,20 +5,10 @@
     "moduleResolution": "Bundler",
     "strict": true,
     "skipLibCheck": true,
-    "lib": [
-      "ES2022",
-      "DOM"
-    ],
-    "types": [
-      "@dcloudio/types",
-      "vite/client"
-    ],
+    "lib": ["ES2022", "DOM"],
+    "types": ["@dcloudio/types", "vite/client"],
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "include": [
-    "src/**/*.ts",
-    "src/**/*.vue",
-    "../contracts/**/*.ts"
-  ]
+  "include": ["src/**/*.ts", "src/**/*.vue", "../contracts/**/*.ts"]
 }

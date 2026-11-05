@@ -8,8 +8,16 @@ import org.springframework.stereotype.Service;
 /** Authorization and projection stay with the audit query instead of the HTTP layer. */
 @Service
 public class AuditHistory {
-  public record Entry(long id, String actorType, long actorId, String action, long targetId,
-      String detail, LocalDateTime createdAt, Long storeId, Long campusId) {}
+  public record Entry(
+      long id,
+      String actorType,
+      long actorId,
+      String action,
+      long targetId,
+      String detail,
+      LocalDateTime createdAt,
+      Long storeId,
+      Long campusId) {}
 
   private final Db db;
   private final PlatformScope scope;
@@ -31,13 +39,26 @@ public class AuditHistory {
     }
     filter += query.conditions(args);
     args.add(pageLimit);
-    return db.rows("SELECT id,actor_type,actor_id,action,target_id,detail,created_at,store_id,campus_id"
-            + " FROM audit_log WHERE 1=1" + filter + " ORDER BY id DESC LIMIT ?", args.toArray())
-        .stream().map(row -> new Entry(Db.id(row, "id"), row.get("actor_type").toString(),
-            Db.id(row, "actor_id"), row.get("action").toString(), Db.id(row, "target_id"),
-            row.get("detail").toString(), Db.time(row.get("created_at")),
-            row.get("store_id") == null ? null : Db.id(row, "store_id"),
-            row.get("campus_id") == null ? null : Db.id(row, "campus_id")))
+    return db
+        .rows(
+            "SELECT id,actor_type,actor_id,action,target_id,detail,created_at,store_id,campus_id"
+                + " FROM audit_log WHERE 1=1"
+                + filter
+                + " ORDER BY id DESC LIMIT ?",
+            args.toArray())
+        .stream()
+        .map(
+            row ->
+                new Entry(
+                    Db.id(row, "id"),
+                    row.get("actor_type").toString(),
+                    Db.id(row, "actor_id"),
+                    row.get("action").toString(),
+                    Db.id(row, "target_id"),
+                    row.get("detail").toString(),
+                    Db.time(row.get("created_at")),
+                    row.get("store_id") == null ? null : Db.id(row, "store_id"),
+                    row.get("campus_id") == null ? null : Db.id(row, "campus_id")))
         .toList();
   }
 }

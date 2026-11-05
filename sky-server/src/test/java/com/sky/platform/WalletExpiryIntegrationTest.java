@@ -21,18 +21,25 @@ import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.*;
 import org.testcontainers.mysql.MySQLContainer;
 
-@SpringBootTest(properties = {
-    "spring.profiles.active=demo",
-    "campus.jwt-secret=wallet-expiry-test-key-at-least-thirty-two-characters",
-    "campus.demo-admin-password=TestAdmin!2026",
-    "campus.tasks-enabled=false"
-})
+@SpringBootTest(
+    properties = {
+      "spring.profiles.active=demo",
+      "campus.jwt-secret=wallet-expiry-test-key-at-least-thirty-two-characters",
+      "campus.demo-admin-password=TestAdmin!2026",
+      "campus.tasks-enabled=false"
+    })
 @Testcontainers
 class WalletExpiryIntegrationTest {
-  @Container static final MySQLContainer mysql = new MySQLContainer("mysql:8.4")
-      .withDatabaseName("wallet_expiry_test").withUsername("test").withPassword("test")
-      .withCreateContainerCmdModifier(c -> c.getHostConfig().withMemory(768L * 1024 * 1024));
-  @Container static final GenericContainer<?> redis =
+  @Container
+  static final MySQLContainer mysql =
+      new MySQLContainer("mysql:8.4")
+          .withDatabaseName("wallet_expiry_test")
+          .withUsername("test")
+          .withPassword("test")
+          .withCreateContainerCmdModifier(c -> c.getHostConfig().withMemory(768L * 1024 * 1024));
+
+  @Container
+  static final GenericContainer<?> redis =
       new GenericContainer<>("redis:7.4-alpine").withExposedPorts(6379);
 
   @DynamicPropertySource
@@ -46,13 +53,25 @@ class WalletExpiryIntegrationTest {
 
   static class MutableClock extends Clock {
     final AtomicReference<Instant> at = new AtomicReference<>();
-    public ZoneId getZone() { return ZoneId.of("Asia/Shanghai"); }
-    public Clock withZone(ZoneId zone) { return this; }
-    public Instant instant() { return at.get(); }
+
+    public ZoneId getZone() {
+      return ZoneId.of("Asia/Shanghai");
+    }
+
+    public Clock withZone(ZoneId zone) {
+      return this;
+    }
+
+    public Instant instant() {
+      return at.get();
+    }
   }
+
   @TestConfiguration
   static class Configuration {
-    @Bean @Primary MutableClock walletClock() {
+    @Bean
+    @Primary
+    MutableClock walletClock() {
       var clock = new MutableClock();
       clock.at.set(Instant.parse("2026-10-27T04:00:00Z"));
       return clock;
@@ -69,19 +88,35 @@ class WalletExpiryIntegrationTest {
   @BeforeEach
   void fixture() {
     clock.at.set(Instant.parse("2026-10-27T04:00:00Z"));
-    user = db.insert("INSERT INTO user(openid,name,create_time) VALUES(?,'钱包边界用户',?)",
-        UUID.randomUUID().toString(), LocalDateTime.now(clock));
-    SecurityContextHolder.getContext().setAuthentication(new UsernamePasswordAuthenticationToken(
-        new Actor(user, "USER", "USER", "", false), null, List.of()));
+    user =
+        db.insert(
+            "INSERT INTO user(openid,name,create_time) VALUES(?,'钱包边界用户',?)",
+            UUID.randomUUID().toString(),
+            LocalDateTime.now(clock));
+    SecurityContextHolder.getContext()
+        .setAuthentication(
+            new UsernamePasswordAuthenticationToken(
+                new Actor(user, "USER", "USER", "", false), null, List.of()));
   }
-  @AfterEach void clear() { SecurityContextHolder.clearContext(); }
+
+  @AfterEach
+  void clear() {
+    SecurityContextHolder.clearContext();
+  }
 
   long coupon(String state, LocalDateTime end, boolean enabled) {
-    long template = db.insert("INSERT INTO coupon(name,kind,threshold_cents,value,total,claimed,per_user,starts_at,ends_at,enabled)"
-        + " VALUES(?,'REDUCTION',0,100,1,1,1,?,?,?)", "边界券-" + UUID.randomUUID(),
-        LocalDateTime.now(clock).minusDays(1), end, enabled);
-    return db.insert("INSERT INTO user_coupon(user_id,coupon_id,state) VALUES(?,?,?)", user, template, state);
+    long template =
+        db.insert(
+            "INSERT INTO coupon(name,kind,threshold_cents,value,total,claimed,per_user,starts_at,ends_at,enabled)"
+                + " VALUES(?,'REDUCTION',0,100,1,1,1,?,?,?)",
+            "边界券-" + UUID.randomUUID(),
+            LocalDateTime.now(clock).minusDays(1),
+            end,
+            enabled);
+    return db.insert(
+        "INSERT INTO user_coupon(user_id,coupon_id,state) VALUES(?,?,?)", user, template, state);
   }
+
   CursorPages.Page<CollectionPages.Wallet> page(String state, String cursor) {
     return pages.wallet(new CursorPages.Request(cursor, 50, state, null));
   }
@@ -97,17 +132,43 @@ class WalletExpiryIntegrationTest {
     var all = page(null, null).records();
     var actual = new HashMap<Long, String>();
     all.forEach(r -> actual.put(Long.valueOf(r.id()), r.state()));
-    assertEquals(Map.of(expired, "EXPIRED", available, "AVAILABLE", stopped, "AVAILABLE",
-        locked, "LOCKED", used, "USED"), actual);
-    assertEquals(List.of(String.valueOf(expired)), page("EXPIRED", null).records().stream().map(CollectionPages.Wallet::id).toList());
-    assertEquals(Set.of(String.valueOf(available), String.valueOf(stopped)),
-        new HashSet<>(page("AVAILABLE", null).records().stream().map(CollectionPages.Wallet::id).toList()));
+    assertEquals(
+        Map.of(
+            expired,
+            "EXPIRED",
+            available,
+            "AVAILABLE",
+            stopped,
+            "AVAILABLE",
+            locked,
+            "LOCKED",
+            used,
+            "USED"),
+        actual);
+    assertEquals(
+        List.of(String.valueOf(expired)),
+        page("EXPIRED", null).records().stream().map(CollectionPages.Wallet::id).toList());
+    assertEquals(
+        Set.of(String.valueOf(available), String.valueOf(stopped)),
+        new HashSet<>(
+            page("AVAILABLE", null).records().stream().map(CollectionPages.Wallet::id).toList()));
     var legacy = marketing.wallet();
-    assertEquals("EXPIRED", legacy.stream().filter(r -> Db.id(r, "id") == expired).findFirst().orElseThrow().get("state"));
-    assertEquals("AVAILABLE", db.one("SELECT state FROM user_coupon WHERE id=?", expired).get("state"));
+    assertEquals(
+        "EXPIRED",
+        legacy.stream()
+            .filter(r -> Db.id(r, "id") == expired)
+            .findFirst()
+            .orElseThrow()
+            .get("state"));
+    assertEquals(
+        "AVAILABLE", db.one("SELECT state FROM user_coupon WHERE id=?", expired).get("state"));
     var tx = new TransactionTemplate(manager);
-    assertEquals("COUPON_THRESHOLD", assertThrows(BusinessException.class,
-        () -> tx.execute(s -> marketing.discount(user, expired, null, 1000))).code());
+    assertEquals(
+        "COUPON_THRESHOLD",
+        assertThrows(
+                BusinessException.class,
+                () -> tx.execute(s -> marketing.discount(user, expired, null, 1000)))
+            .code());
     assertEquals(100L, tx.execute(s -> marketing.discount(user, stopped, null, 1000)).longValue());
   }
 
@@ -120,15 +181,19 @@ class WalletExpiryIntegrationTest {
     assertTrue(page("AVAILABLE", null).records().isEmpty());
     assertEquals("EXPIRED", page(null, null).records().getFirst().state());
     assertEquals(String.valueOf(owned), page("EXPIRED", null).records().getFirst().id());
-    assertEquals("AVAILABLE", db.one("SELECT state FROM user_coupon WHERE id=?", owned).get("state"));
+    assertEquals(
+        "AVAILABLE", db.one("SELECT state FROM user_coupon WHERE id=?", owned).get("state"));
   }
 
   @Test
   void allExpiredPagesAreCompleteAndDoNotIncludeAnotherUser() {
     var at = LocalDateTime.now(clock);
     for (int i = 0; i < 205; i++) coupon("AVAILABLE", at.minusSeconds(1), true);
-    long other = db.insert("INSERT INTO user(openid,name,create_time) VALUES(?,'其他用户',?)",
-        UUID.randomUUID().toString(), at);
+    long other =
+        db.insert(
+            "INSERT INTO user(openid,name,create_time) VALUES(?,'其他用户',?)",
+            UUID.randomUUID().toString(),
+            at);
     long foreign = coupon("AVAILABLE", at.minusSeconds(1), true);
     db.update("UPDATE user_coupon SET user_id=? WHERE id=?", other, foreign);
     var ids = new HashSet<String>();

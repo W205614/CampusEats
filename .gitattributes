@@ -13,6 +13,16 @@
 *.cjs text eol=lf
 *.mjs text eol=lf
 *.properties text eol=lf
+*.md text eol=lf
+*.html text eol=lf
+*.conf text eol=lf
+*.svg text eol=lf
+*Dockerfile text eol=lf
+*.example text eol=lf
+.editorconfig text eol=lf
+.gitattributes text eol=lf
+.gitignore text eol=lf
+.dockerignore text eol=lf
 
 # 小程序文件统一 LF
 *.js text eol=lf

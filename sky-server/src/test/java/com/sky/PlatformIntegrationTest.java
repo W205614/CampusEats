@@ -683,13 +683,15 @@ class PlatformIntegrationTest {
     String token = auth.issue("ADMIN", platform.id()).get("token").toString();
     for (String action : List.of("reassign", "exception-cancel"))
       for (String reason : new String[] {null, "  ", "改".repeat(201)}) {
-        Object input = action.equals("reassign")
-            ? new PlatformCommands.Reassign(4, replacement, reason)
-            : new PlatformCommands.ExceptionCancel(4, reason);
-        mvc.perform(post("/api/v1/platform/orders/" + id + "/" + action)
-                .header("Authorization", "Bearer " + token)
-                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
-                .content(json.write(input)))
+        Object input =
+            action.equals("reassign")
+                ? new PlatformCommands.Reassign(4, replacement, reason)
+                : new PlatformCommands.ExceptionCancel(4, reason);
+        mvc.perform(
+                post("/api/v1/platform/orders/" + id + "/" + action)
+                    .header("Authorization", "Bearer " + token)
+                    .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                    .content(json.write(input)))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value("INVALID_INPUT"));
       }
@@ -861,7 +863,8 @@ class PlatformIntegrationTest {
 
   @Test
   void operationsHealthExposesDisabledJobsAndMetricsWithoutAffectingReadiness() throws Exception {
-    String adminToken = auth.login(new Commands.Login("admin", "TestAdmin!2026")).get("token").toString();
+    String adminToken =
+        auth.login(new Commands.Login("admin", "TestAdmin!2026")).get("token").toString();
     operationalMetrics.sample();
     mvc.perform(get("/actuator/health/operations").header("Authorization", "Bearer " + adminToken))
         .andExpect(status().isOk())
@@ -879,7 +882,9 @@ class PlatformIntegrationTest {
     try {
       operations.run(
           "metrics", round -> round.failed(new IllegalStateException("test failure"), "test"));
-      mvc.perform(get("/actuator/health/operations").header("Authorization", "Bearer " + adminToken)).andExpect(status().isServiceUnavailable());
+      mvc.perform(
+              get("/actuator/health/operations").header("Authorization", "Bearer " + adminToken))
+          .andExpect(status().isServiceUnavailable());
       String readiness =
           mvc.perform(get("/actuator/health/readiness"))
               .andExpect(status().isOk())
@@ -1597,39 +1602,67 @@ class PlatformIntegrationTest {
       refunds.add(new Object[] {order});
       events.add(new Object[] {order});
     }
-    db.jdbc.batchUpdate("INSERT INTO checkout(user_id,request_id,request_hash,state,total_cents,"
-        + "expires_at,created_at,quote_json) VALUES(?,?,'fixture','PAID',0,NOW(),NOW(),'{}')", checkouts);
-    db.jdbc.batchUpdate("INSERT INTO orders(number,user_id,address_book_id,order_time,amount,"
-        + "courier_id,store_id,campus_id) VALUES(?,?,0,NOW(),0,?,1,1)", orders);
-    db.jdbc.batchUpdate("INSERT INTO aftersale(order_id,user_id,store_id,kind,state,reason,"
-        + "amount_cents,created_at) VALUES(?,?,1,'FULL','REJECTED','batch',0,NOW())", requests);
-    db.jdbc.batchUpdate("INSERT INTO refund_request(order_id,store_id,amount_cents,state,"
-        + "next_attempt_at,created_at) VALUES(?,1,0,'SUCCEEDED',NOW(),NOW())", refunds);
-    db.jdbc.batchUpdate("INSERT INTO outbox_event(event_type,aggregate_id,payload,state,"
-        + "next_attempt_at,created_at,store_id) VALUES('ORDER_REFUNDED',?,'{}','SUCCEEDED',NOW(),NOW(),1)", events);
+    db.jdbc.batchUpdate(
+        "INSERT INTO checkout(user_id,request_id,request_hash,state,total_cents,"
+            + "expires_at,created_at,quote_json) VALUES(?,?,'fixture','PAID',0,NOW(),NOW(),'{}')",
+        checkouts);
+    db.jdbc.batchUpdate(
+        "INSERT INTO orders(number,user_id,address_book_id,order_time,amount,"
+            + "courier_id,store_id,campus_id) VALUES(?,?,0,NOW(),0,?,1,1)",
+        orders);
+    db.jdbc.batchUpdate(
+        "INSERT INTO aftersale(order_id,user_id,store_id,kind,state,reason,"
+            + "amount_cents,created_at) VALUES(?,?,1,'FULL','REJECTED','batch',0,NOW())",
+        requests);
+    db.jdbc.batchUpdate(
+        "INSERT INTO refund_request(order_id,store_id,amount_cents,state,"
+            + "next_attempt_at,created_at) VALUES(?,1,0,'SUCCEEDED',NOW(),NOW())",
+        refunds);
+    db.jdbc.batchUpdate(
+        "INSERT INTO outbox_event(event_type,aggregate_id,payload,state,"
+            + "next_attempt_at,created_at,store_id) VALUES('ORDER_REFUNDED',?,'{}','SUCCEEDED',NOW(),NOW(),1)",
+        events);
 
     assertBatchPages("checkout", (before, limit) -> checkout.list(before, limit));
     assertBatchPages("orders", (before, limit) -> fulfillment.orders(null, before, limit));
-    assertBatchPages("aftersale", (before, limit) -> aftersale.list(null, false,
-        new HistoryQuery(before, null, null, null, null, null, limit)));
+    assertBatchPages(
+        "aftersale",
+        (before, limit) ->
+            aftersale.list(
+                null, false, new HistoryQuery(before, null, null, null, null, null, limit)));
     act(platform);
-    assertBatchPages("refund_request", (before, limit) -> jobs.refunds(null,
-        new HistoryQuery(before, null, null, null, null, null, limit)));
-    assertBatchPages("outbox_event", (before, limit) -> jobs.events(null,
-        new HistoryQuery(before, null, null, null, null, null, limit)));
+    assertBatchPages(
+        "refund_request",
+        (before, limit) ->
+            jobs.refunds(null, new HistoryQuery(before, null, null, null, null, null, limit)));
+    assertBatchPages(
+        "outbox_event",
+        (before, limit) ->
+            jobs.events(null, new HistoryQuery(before, null, null, null, null, null, limit)));
     assertEquals(100, fulfillment.orders(1L).size());
     assertEquals(1000, fulfillment.orders(1L, null, 1000).size());
     assertEquals(1, fulfillment.orders(3L, null, 1000).size());
-    assertTrue(fulfillment.orders(3L, null, 1000).stream().allMatch(row -> Db.id(row, "store_id") == 3));
-    assertTrue(jobs.events(3L, new HistoryQuery(null, null, null, null, null, null, 1000))
-        .stream().allMatch(row -> Db.id(row, "store_id") == 3));
-    assertTrue(jobs.refunds(3L, new HistoryQuery(null, null, null, null, null, null, 1000)).isEmpty());
-    assertTrue(aftersale.list(3L, false, new HistoryQuery(null, null, null, null, null, null, 1000)).isEmpty());
+    assertTrue(
+        fulfillment.orders(3L, null, 1000).stream().allMatch(row -> Db.id(row, "store_id") == 3));
+    assertTrue(
+        jobs.events(3L, new HistoryQuery(null, null, null, null, null, null, 1000)).stream()
+            .allMatch(row -> Db.id(row, "store_id") == 3));
+    assertTrue(
+        jobs.refunds(3L, new HistoryQuery(null, null, null, null, null, null, 1000)).isEmpty());
+    assertTrue(
+        aftersale
+            .list(3L, false, new HistoryQuery(null, null, null, null, null, null, 1000))
+            .isEmpty());
     act(staff("manager1"));
-    assertEquals(403, assertThrows(BusinessException.class,
-        () -> fulfillment.orders(3L, null, 1000)).status());
-    assertEquals(403, assertThrows(BusinessException.class,
-        () -> jobs.refunds(3L, new HistoryQuery(null, null, null, null, null, null, 1000))).status());
+    assertEquals(
+        403,
+        assertThrows(BusinessException.class, () -> fulfillment.orders(3L, null, 1000)).status());
+    assertEquals(
+        403,
+        assertThrows(
+                BusinessException.class,
+                () -> jobs.refunds(3L, new HistoryQuery(null, null, null, null, null, null, 1000)))
+            .status());
     act(courier);
     assertEquals(1000, fulfillment.orders(null, null, 1000).size());
     act(new Actor(courier.id(), "ADMIN", "DELIVERER", "", false, null, 2L));
@@ -1638,37 +1671,64 @@ class PlatformIntegrationTest {
     act(user(Long.parseLong(otherUser.get("id").toString())));
     assertTrue(checkout.list(null, 1000).isEmpty());
     assertTrue(fulfillment.orders(null, null, 1000).isEmpty());
-    assertTrue(aftersale.list(null, false, new HistoryQuery(null, null, null, null, null, null, 1000)).isEmpty());
+    assertTrue(
+        aftersale
+            .list(null, false, new HistoryQuery(null, null, null, null, null, null, 1000))
+            .isEmpty());
 
-    String adminToken = auth.login(new Commands.Login("admin", "TestAdmin!2026")).get("token").toString();
+    String adminToken =
+        auth.login(new Commands.Login("admin", "TestAdmin!2026")).get("token").toString();
     String userToken = auth.demo(new Commands.DemoLogin(1)).get("token").toString();
-    for (String path : List.of("/user/orders", "/user/checkouts", "/user/aftersales",
-        "/merchant/stores/1/orders", "/merchant/stores/1/aftersales", "/platform/aftersales",
-        "/merchant/stores/1/refunds", "/platform/refunds", "/merchant/stores/1/events", "/platform/events")) {
+    for (String path :
+        List.of(
+            "/user/orders",
+            "/user/checkouts",
+            "/user/aftersales",
+            "/merchant/stores/1/orders",
+            "/merchant/stores/1/aftersales",
+            "/platform/aftersales",
+            "/merchant/stores/1/refunds",
+            "/platform/refunds",
+            "/merchant/stores/1/events",
+            "/platform/events")) {
       String token = path.startsWith("/user/") ? userToken : adminToken;
       mvc.perform(get("/api/v1" + path).header("Authorization", "Bearer " + token))
-          .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(100));
-      mvc.perform(get("/api/v1" + path).header("Authorization", "Bearer " + token).param("limit", "1000"))
-          .andExpect(status().isOk()).andExpect(jsonPath("$.data.length()").value(1000));
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.length()").value(100));
+      mvc.perform(
+              get("/api/v1" + path)
+                  .header("Authorization", "Bearer " + token)
+                  .param("limit", "1000"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.length()").value(1000));
       for (String invalid : List.of("0", "-1", "1001", "bad"))
-        mvc.perform(get("/api/v1" + path).header("Authorization", "Bearer " + token).param("limit", invalid))
+        mvc.perform(
+                get("/api/v1" + path)
+                    .header("Authorization", "Bearer " + token)
+                    .param("limit", invalid))
             .andExpect(status().isBadRequest());
     }
   }
 
-  private void assertBatchPages(String table,
-      java.util.function.BiFunction<Long, Integer, List<Map<String, Object>>> load) {
-    var expected = db.rows("SELECT id FROM " + table + " ORDER BY id DESC")
-        .stream().map(row -> Db.id(row, "id")).toList();
+  private void assertBatchPages(
+      String table, java.util.function.BiFunction<Long, Integer, List<Map<String, Object>>> load) {
+    var expected =
+        db.rows("SELECT id FROM " + table + " ORDER BY id DESC").stream()
+            .map(row -> Db.id(row, "id"))
+            .toList();
     assertEquals(100, load.apply(null, null).size());
-    assertEquals(expected.subList(0, 1), load.apply(null, 1).stream().map(row -> Db.id(row, "id")).toList());
+    assertEquals(
+        expected.subList(0, 1), load.apply(null, 1).stream().map(row -> Db.id(row, "id")).toList());
     var first = load.apply(null, 1000);
     assertEquals(expected.subList(0, 1000), first.stream().map(row -> Db.id(row, "id")).toList());
     var second = load.apply(Db.id(first.getLast(), "id"), 1000);
-    assertEquals(expected.subList(1000, expected.size()), second.stream().map(row -> Db.id(row, "id")).toList());
+    assertEquals(
+        expected.subList(1000, expected.size()),
+        second.stream().map(row -> Db.id(row, "id")).toList());
     assertTrue(load.apply(Db.id(second.getLast(), "id"), 1000).isEmpty());
     for (int invalid : List.of(0, -1, 1001))
-      assertEquals(400, assertThrows(BusinessException.class, () -> load.apply(null, invalid)).status());
+      assertEquals(
+          400, assertThrows(BusinessException.class, () -> load.apply(null, invalid)).status());
   }
 
   @Test
@@ -1898,20 +1958,34 @@ class PlatformIntegrationTest {
   }
 
   @Test
-  void discoveryPagesReachAllStoresAndProductsPastTwoHundredWithStableTypedCursors() throws Exception {
+  void discoveryPagesReachAllStoresAndProductsPastTwoHundredWithStableTypedCursors()
+      throws Exception {
     long campus = db.insert("INSERT INTO campus(name) VALUES(?)", "page-" + UUID.randomUUID());
     var expectedStores = new ArrayList<Long>();
     var expectedProducts = new ArrayList<String>();
     try {
       for (int i = 0; i < 205; i++) {
-        long store = db.insert("INSERT INTO store(campus_id,name,open) VALUES(?,?,true)", campus, "Page店" + i);
+        long store =
+            db.insert(
+                "INSERT INTO store(campus_id,name,open) VALUES(?,?,true)", campus, "Page店" + i);
         expectedStores.add(store);
-        long category = db.insert("INSERT INTO category(store_id,name,type,sort,status) VALUES(?,'菜品',1,0,1)", store);
-        long dish = db.insert("INSERT INTO dish(store_id,category_id,name,price,status) VALUES(?,?,'Rice%_Exact',10,1)", store, category);
+        long category =
+            db.insert(
+                "INSERT INTO category(store_id,name,type,sort,status) VALUES(?,'菜品',1,0,1)", store);
+        long dish =
+            db.insert(
+                "INSERT INTO dish(store_id,category_id,name,price,status) VALUES(?,?,'Rice%_Exact',10,1)",
+                store, category);
         expectedProducts.add(store + ":DISH:" + dish);
         if (i == 0) {
-          long setCategory = db.insert("INSERT INTO category(store_id,name,type,sort,status) VALUES(?,'套餐',2,0,1)", store);
-          long setmeal = db.insert("INSERT INTO setmeal(store_id,category_id,name,price,status) VALUES(?,?,'Rice%_Exact',15,1)", store, setCategory);
+          long setCategory =
+              db.insert(
+                  "INSERT INTO category(store_id,name,type,sort,status) VALUES(?,'套餐',2,0,1)",
+                  store);
+          long setmeal =
+              db.insert(
+                  "INSERT INTO setmeal(store_id,category_id,name,price,status) VALUES(?,?,'Rice%_Exact',15,1)",
+                  store, setCategory);
           expectedProducts.add(store + ":SETMEAL:" + setmeal);
         }
       }
@@ -1929,28 +2003,45 @@ class PlatformIntegrationTest {
       cursor = null;
       do {
         var page = discoveryPages.search(campus, "Rice%_", null, true, cursor, 31);
-        actualProducts.addAll(page.records().stream().map(r ->
-            Db.id(r, "store_id") + ":" + r.get("item_type") + ":" + Db.id(r, "id")).toList());
+        actualProducts.addAll(
+            page.records().stream()
+                .map(r -> Db.id(r, "store_id") + ":" + r.get("item_type") + ":" + Db.id(r, "id"))
+                .toList());
         cursor = page.nextCursor();
       } while (cursor != null);
       assertEquals(expectedProducts, actualProducts);
-      assertTrue(discoveryPages.search(campus, "rice%_", null, true, null, null).records().isEmpty());
-      assertEquals(1, discoveryPages.stores(campus, "Page店204", null, null, 1, false).records().size());
-      assertEquals(expectedStores.getLast(), Db.id(discoveryPages.store(expectedStores.getLast()), "id"));
-      mvc.perform(get("/api/v1/user/stores/page").param("campusId", "" + campus).param("limit", "1"))
-          .andExpect(status().isOk()).andExpect(jsonPath("$.data.hasMore").value(true))
+      assertTrue(
+          discoveryPages.search(campus, "rice%_", null, true, null, null).records().isEmpty());
+      assertEquals(
+          1, discoveryPages.stores(campus, "Page店204", null, null, 1, false).records().size());
+      assertEquals(
+          expectedStores.getLast(), Db.id(discoveryPages.store(expectedStores.getLast()), "id"));
+      mvc.perform(
+              get("/api/v1/user/stores/page").param("campusId", "" + campus).param("limit", "1"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.hasMore").value(true))
           .andExpect(jsonPath("$.data.records[0].id").value("" + expectedStores.getFirst()));
-      mvc.perform(get("/api/v1/user/search/page").param("campusId", "" + campus).param("query", "Rice%_").param("limit", "1"))
-          .andExpect(status().isOk()).andExpect(jsonPath("$.data.nextCursor").isString());
+      mvc.perform(
+              get("/api/v1/user/search/page")
+                  .param("campusId", "" + campus)
+                  .param("query", "Rice%_")
+                  .param("limit", "1"))
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.nextCursor").isString());
       mvc.perform(get("/api/v1/user/stores/" + expectedStores.getLast()))
-          .andExpect(status().isOk()).andExpect(jsonPath("$.data.id").value("" + expectedStores.getLast()));
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.data.id").value("" + expectedStores.getLast()));
       // Legacy arrays deliberately keep their old bounded behavior for old clients.
       assertEquals(200, directory.stores(campus, null, false).size());
       assertEquals(200, discovery.search(campus, null, null, null).size());
     } finally {
-      db.update("DELETE FROM dish WHERE store_id IN (SELECT id FROM store WHERE campus_id=?)", campus);
-      db.update("DELETE FROM setmeal WHERE store_id IN (SELECT id FROM store WHERE campus_id=?)", campus);
-      db.update("DELETE FROM category WHERE store_id IN (SELECT id FROM store WHERE campus_id=?)", campus);
+      db.update(
+          "DELETE FROM dish WHERE store_id IN (SELECT id FROM store WHERE campus_id=?)", campus);
+      db.update(
+          "DELETE FROM setmeal WHERE store_id IN (SELECT id FROM store WHERE campus_id=?)", campus);
+      db.update(
+          "DELETE FROM category WHERE store_id IN (SELECT id FROM store WHERE campus_id=?)",
+          campus);
       db.update("DELETE FROM store WHERE campus_id=?", campus);
       db.update("DELETE FROM campus WHERE id=?", campus);
     }
@@ -1958,45 +2049,89 @@ class PlatformIntegrationTest {
 
   @Test
   void discoveryPagesApplyBusinessHoursBeforePagingAndRejectScopeAndRoleChanges() throws Exception {
-    long campus = db.insert("INSERT INTO campus(name) VALUES(?)", "hours-page-" + UUID.randomUUID());
+    long campus =
+        db.insert("INSERT INTO campus(name) VALUES(?)", "hours-page-" + UUID.randomUUID());
     try {
-      long closed = db.insert("INSERT INTO store(campus_id,name,open,hours) VALUES(?,'A休息店',true,'[\"00:00-01:00\"]')", campus);
-      long opened = db.insert("INSERT INTO store(campus_id,name,open,hours) VALUES(?,'B营业店',true,'[\"12:00-24:00\"]')", campus);
-      long category = db.insert("INSERT INTO category(store_id,name,type,sort,status) VALUES(?,'分类',1,0,1)", opened);
-      db.insert("INSERT INTO dish(store_id,category_id,name,price,status) VALUES(?,?,'时段商品',1,1)", opened, category);
+      long closed =
+          db.insert(
+              "INSERT INTO store(campus_id,name,open,hours) VALUES(?,'A休息店',true,'[\"00:00-01:00\"]')",
+              campus);
+      long opened =
+          db.insert(
+              "INSERT INTO store(campus_id,name,open,hours) VALUES(?,'B营业店',true,'[\"12:00-24:00\"]')",
+              campus);
+      long category =
+          db.insert(
+              "INSERT INTO category(store_id,name,type,sort,status) VALUES(?,'分类',1,0,1)", opened);
+      db.insert(
+          "INSERT INTO dish(store_id,category_id,name,price,status) VALUES(?,?,'时段商品',1,1)",
+          opened,
+          category);
       var open = discoveryPages.stores(campus, null, true, null, 1, false);
       assertEquals(List.of(opened), open.records().stream().map(r -> Db.id(r, "id")).toList());
       assertFalse(open.hasMore());
-      assertEquals(List.of(closed), discoveryPages.stores(campus, null, false, null, 1, false).records().stream().map(r -> Db.id(r, "id")).toList());
+      assertEquals(
+          List.of(closed),
+          discoveryPages.stores(campus, null, false, null, 1, false).records().stream()
+              .map(r -> Db.id(r, "id"))
+              .toList());
       assertEquals(1, discoveryPages.search(campus, "时段", null, true, null, 1).records().size());
       assertTrue(discoveryPages.search(campus, "时段", null, false, null, 1).records().isEmpty());
       clock.value.set(Instant.parse("2026-10-15T15:59:00Z"));
       assertEquals(1, discoveryPages.search(campus, "时段", null, true, null, 1).records().size());
       String cursor = discoveryPages.stores(campus, null, null, null, 1, false).nextCursor();
-      assertEquals("INVALID_CURSOR", assertThrows(BusinessException.class,
-          () -> discoveryPages.stores(campus, "B", null, cursor, 1, false)).code());
+      assertEquals(
+          "INVALID_CURSOR",
+          assertThrows(
+                  BusinessException.class,
+                  () -> discoveryPages.stores(campus, "B", null, cursor, 1, false))
+              .code());
       mvc.perform(get("/api/v1/user/stores/page").param("limit", "201"))
-          .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_LIMIT"));
-      mvc.perform(get("/api/v1/user/search/page").param("campusId", "" + campus).param("cursor", "tampered"))
-          .andExpect(status().isBadRequest()).andExpect(jsonPath("$.code").value("INVALID_CURSOR"));
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.code").value("INVALID_LIMIT"));
+      mvc.perform(
+              get("/api/v1/user/search/page")
+                  .param("campusId", "" + campus)
+                  .param("cursor", "tampered"))
+          .andExpect(status().isBadRequest())
+          .andExpect(jsonPath("$.code").value("INVALID_CURSOR"));
       act(platform);
       String adminCursor = discoveryPages.stores(null, null, null, null, 1, true).nextCursor();
       act(staff("manager1"));
-      assertEquals(List.of(1L), discoveryPages.stores(null, null, null, null, 200, true).records().stream().map(r -> Db.id(r, "id")).toList());
-      assertEquals("INVALID_CURSOR", assertThrows(BusinessException.class,
-          () -> discoveryPages.stores(null, null, null, adminCursor, 1, true)).code());
+      assertEquals(
+          List.of(1L),
+          discoveryPages.stores(null, null, null, null, 200, true).records().stream()
+              .map(r -> Db.id(r, "id"))
+              .toList());
+      assertEquals(
+          "INVALID_CURSOR",
+          assertThrows(
+                  BusinessException.class,
+                  () -> discoveryPages.stores(null, null, null, adminCursor, 1, true))
+              .code());
       act(staff("courier1"));
-      assertEquals("FORBIDDEN", assertThrows(BusinessException.class,
-          () -> discoveryPages.stores(null, null, null, null, 50, true)).code());
+      assertEquals(
+          "FORBIDDEN",
+          assertThrows(
+                  BusinessException.class,
+                  () -> discoveryPages.stores(null, null, null, null, 50, true))
+              .code());
       db.update("UPDATE store SET enabled=false WHERE id=?", opened);
-      assertEquals("NOT_FOUND", assertThrows(BusinessException.class, () -> discoveryPages.store(opened)).code());
+      assertEquals(
+          "NOT_FOUND",
+          assertThrows(BusinessException.class, () -> discoveryPages.store(opened)).code());
       assertTrue(discoveryPages.search(campus, "时段", null, null, null, null).records().isEmpty());
       db.update("UPDATE campus SET enabled=false WHERE id=?", campus);
       assertTrue(discoveryPages.stores(campus, null, null, null, 200, false).records().isEmpty());
-      assertEquals("NOT_FOUND", assertThrows(BusinessException.class, () -> discoveryPages.store(closed)).code());
+      assertEquals(
+          "NOT_FOUND",
+          assertThrows(BusinessException.class, () -> discoveryPages.store(closed)).code());
     } finally {
-      db.update("DELETE FROM dish WHERE store_id IN (SELECT id FROM store WHERE campus_id=?)", campus);
-      db.update("DELETE FROM category WHERE store_id IN (SELECT id FROM store WHERE campus_id=?)", campus);
+      db.update(
+          "DELETE FROM dish WHERE store_id IN (SELECT id FROM store WHERE campus_id=?)", campus);
+      db.update(
+          "DELETE FROM category WHERE store_id IN (SELECT id FROM store WHERE campus_id=?)",
+          campus);
       db.update("DELETE FROM store WHERE campus_id=?", campus);
       db.update("DELETE FROM campus WHERE id=?", campus);
     }

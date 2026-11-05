@@ -33,8 +33,13 @@ public class MaintenanceJobs {
     this(db, clock, metrics, enabled, operations, System::nanoTime);
   }
 
-  MaintenanceJobs(Db db, Clock clock, MeterRegistry metrics, boolean enabled,
-      RuntimeOperations operations, LongSupplier ticker) {
+  MaintenanceJobs(
+      Db db,
+      Clock clock,
+      MeterRegistry metrics,
+      boolean enabled,
+      RuntimeOperations operations,
+      LongSupplier ticker) {
     this.db = db;
     this.clock = clock;
     this.metrics = metrics;
@@ -77,12 +82,17 @@ public class MaintenanceJobs {
           metrics.counter("campus.maintenance.budget.exhaustions").increment();
           return;
         }
-        int deleted = kind == 0
-            ? db.update("DELETE FROM auth_session WHERE expires_at<? ORDER BY expires_at LIMIT 200",
-                now.minusDays(7))
-            : db.update("DELETE FROM outbox_event WHERE state='SUCCEEDED' AND created_at<?"
-                + " ORDER BY created_at LIMIT 200", now.minusDays(30));
-        metrics.counter("campus.maintenance.deleted", "kind", kind == 0 ? "sessions" : "outbox")
+        int deleted =
+            kind == 0
+                ? db.update(
+                    "DELETE FROM auth_session WHERE expires_at<? ORDER BY expires_at LIMIT 200",
+                    now.minusDays(7))
+                : db.update(
+                    "DELETE FROM outbox_event WHERE state='SUCCEEDED' AND created_at<?"
+                        + " ORDER BY created_at LIMIT 200",
+                    now.minusDays(30));
+        metrics
+            .counter("campus.maintenance.deleted", "kind", kind == 0 ? "sessions" : "outbox")
             .increment(deleted);
         pending[kind] = deleted == 200;
       }

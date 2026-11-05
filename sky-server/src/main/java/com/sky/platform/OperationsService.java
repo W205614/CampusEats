@@ -187,8 +187,7 @@ public class OperationsService {
       if (Db.bool(o, "delivery_overdue") != overdue)
         db.update("UPDATE orders SET delivery_overdue=? WHERE id=?", overdue, order);
     }
-    if (stage.get("deadline_at") != null
-        && !Db.time(stage.get("deadline_at")).isAfter(at))
+    if (stage.get("deadline_at") != null && !Db.time(stage.get("deadline_at")).isAfter(at))
       create(o, stage, "STAGE_OVERDUE");
     if (status >= 3
         && status <= 4

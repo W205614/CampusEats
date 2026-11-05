@@ -41,9 +41,18 @@ public class EvidenceService {
         org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
   }
 
-  public EvidenceService(String root, Db db, PlatformScope scope, ImageStorage storage,
+  public EvidenceService(
+      String root,
+      Db db,
+      PlatformScope scope,
+      ImageStorage storage,
       org.springframework.transaction.PlatformTransactionManager manager) {
-    this(root, db, scope, storage, manager,
+    this(
+        root,
+        db,
+        scope,
+        storage,
+        manager,
         new EvidenceReadLimits(java.time.Clock.systemUTC(), 4, 2, 120));
   }
 
@@ -117,11 +126,14 @@ public class EvidenceService {
       require(Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS), 404, "NOT_FOUND", "图片不存在");
       channel = Files.newByteChannel(file, StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS);
       long size = channel.size();
-      require(size > 0 && size <= 5L * 1024 * 1024,
-          503, "EVIDENCE_UNAVAILABLE", "举证图片暂不可用");
+      require(size > 0 && size <= 5L * 1024 * 1024, 503, "EVIDENCE_UNAVAILABLE", "举证图片暂不可用");
       return new Read(channel, size, lease);
     } catch (Exception ex) {
-      if (channel != null) try { channel.close(); } catch (IOException ignored) {}
+      if (channel != null)
+        try {
+          channel.close();
+        } catch (IOException ignored) {
+        }
       lease.close();
       if (ex instanceof NoSuchFileException)
         throw new com.sky.common.BusinessException(404, "NOT_FOUND", "图片不存在");

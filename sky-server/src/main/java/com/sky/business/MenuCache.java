@@ -19,9 +19,10 @@ public class MenuCache {
   private final TransactionTemplate retryTx;
   private final RedisAccess access;
   private final Semaphore fallback = new Semaphore(8, true);
+
   private record Loading(long generation, CompletableFuture<List<Map<String, Object>>> result) {}
-  private final ConcurrentHashMap<String, Loading> loading =
-      new ConcurrentHashMap<>();
+
+  private final ConcurrentHashMap<String, Loading> loading = new ConcurrentHashMap<>();
   private static final long WAIT_NANOS = TimeUnit.MILLISECONDS.toNanos(1500);
   private final AtomicLongArray generations = new AtomicLongArray(256);
   private final String epoch = UUID.randomUUID().toString();
@@ -37,8 +38,12 @@ public class MenuCache {
 
   @org.springframework.beans.factory.annotation.Autowired
   public MenuCache(
-      StringRedisTemplate redis, Json json, Db db, Clock clock,
-      org.springframework.transaction.PlatformTransactionManager manager, RedisAccess access) {
+      StringRedisTemplate redis,
+      Json json,
+      Db db,
+      Clock clock,
+      org.springframework.transaction.PlatformTransactionManager manager,
+      RedisAccess access) {
     this.retryTx = new TransactionTemplate(manager);
     this.retryTx.setPropagationBehavior(
         org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
@@ -60,7 +65,8 @@ public class MenuCache {
       loading.remove(key, current);
     if (current != null) {
       try {
-        return copy(current.result().get(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS));
+        return copy(
+            current.result().get(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS));
       } catch (InterruptedException ex) {
         Thread.currentThread().interrupt();
         throw busy();
@@ -74,7 +80,8 @@ public class MenuCache {
     }
     boolean admitted = false;
     try {
-      admitted = fallback.tryAcquire(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
+      admitted =
+          fallback.tryAcquire(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
       if (!admitted) throw busy();
       // Recheck after admission: another fill can finish between the initial GET and registration.
       var rows = cached(key, generation);
@@ -82,12 +89,20 @@ public class MenuCache {
         rows = copy(loader.get());
         try {
           var snapshot = rows;
-          access.call(() -> {
-            redis.opsForValue().set("campus:" + key,
-                json.write(Map.of("epoch", epoch, "generation", generation, "items", snapshot)),
-                Duration.ofSeconds(snapshot.isEmpty() ? 30 : 240 + ThreadLocalRandom.current().nextInt(121)));
-            return true;
-          });
+          access.call(
+              () -> {
+                redis
+                    .opsForValue()
+                    .set(
+                        "campus:" + key,
+                        json.write(
+                            Map.of("epoch", epoch, "generation", generation, "items", snapshot)),
+                        Duration.ofSeconds(
+                            snapshot.isEmpty()
+                                ? 30
+                                : 240 + ThreadLocalRandom.current().nextInt(121)));
+                return true;
+              });
         } catch (Exception ignored) {
         }
       }
@@ -174,7 +189,8 @@ public class MenuCache {
             @Override
             public void afterCommit() {
               // No Redis I/O or reader lock on the committed write's response path.
-              // The durable event removes the entry later; generations make old fills unreadable now.
+              // The durable event removes the entry later; generations make old fills unreadable
+              // now.
               advance(key);
             }
           });

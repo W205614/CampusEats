@@ -147,7 +147,10 @@ public class MarketingService {
                 + " u.id DESC LIMIT 200",
             Actor.user().id());
     rows.forEach(
-        r -> r.put("state", WalletState.display(r.get("state").toString(), Db.time(r.get("ends_at")), at)));
+        r ->
+            r.put(
+                "state",
+                WalletState.display(r.get("state").toString(), Db.time(r.get("ends_at")), at)));
     return rows;
   }
 

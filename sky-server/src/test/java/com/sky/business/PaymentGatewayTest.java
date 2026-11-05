@@ -17,22 +17,36 @@ class PaymentGatewayTest {
   private final PlatformTransactionManager manager = mock(PlatformTransactionManager.class);
 
   private MockPaymentGateway gateway(boolean enabled) {
-    when(manager.getTransaction(any(TransactionDefinition.class))).thenReturn(new SimpleTransactionStatus());
+    when(manager.getTransaction(any(TransactionDefinition.class)))
+        .thenReturn(new SimpleTransactionStatus());
     return new MockPaymentGateway(enabled, db, manager);
   }
 
   private void durableRows() {
     var rows = new HashMap<String, Map<String, Object>>();
-    when(db.one(anyString(), any(Object[].class))).thenAnswer(call -> {
-      Object[] args = (Object[]) call.getRawArguments()[1];
-      return rows.get(args[0]);
-    });
-    when(db.update(anyString(), any(Object[].class))).thenAnswer(call -> {
-      Object[] args = (Object[]) call.getRawArguments()[1];
-      rows.putIfAbsent((String) args[0], Map.of("payment_key", args[1], "amount_cents", args[2],
-          "currency", args[3], "reference", args[4]));
-      return 1;
-    });
+    when(db.one(anyString(), any(Object[].class)))
+        .thenAnswer(
+            call -> {
+              Object[] args = (Object[]) call.getRawArguments()[1];
+              return rows.get(args[0]);
+            });
+    when(db.update(anyString(), any(Object[].class)))
+        .thenAnswer(
+            call -> {
+              Object[] args = (Object[]) call.getRawArguments()[1];
+              rows.putIfAbsent(
+                  (String) args[0],
+                  Map.of(
+                      "payment_key",
+                      args[1],
+                      "amount_cents",
+                      args[2],
+                      "currency",
+                      args[3],
+                      "reference",
+                      args[4]));
+              return 1;
+            });
   }
 
   @Test
@@ -51,9 +65,14 @@ class PaymentGatewayTest {
                     port.refund(
                         new PaymentGateway.Refund("refund-request:3", "checkout:4", 1500, "CNY")))
             .code());
-    assertEquals(receipt, gateway(true).refund(request), "A new gateway instance uses the stored decision");
-    verify(manager, atLeastOnce()).getTransaction(argThat(definition ->
-        definition.getPropagationBehavior() == TransactionDefinition.PROPAGATION_REQUIRES_NEW));
+    assertEquals(
+        receipt, gateway(true).refund(request), "A new gateway instance uses the stored decision");
+    verify(manager, atLeastOnce())
+        .getTransaction(
+            argThat(
+                definition ->
+                    definition.getPropagationBehavior()
+                        == TransactionDefinition.PROPAGATION_REQUIRES_NEW));
     assertEquals(
         "REFUND_CONFLICT",
         assertThrows(

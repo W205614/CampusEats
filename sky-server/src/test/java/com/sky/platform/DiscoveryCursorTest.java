@@ -14,11 +14,17 @@ class DiscoveryCursorTest {
     assertEquals(position, codec.decode(cursor, "scope-a"));
     assertEquals(DiscoveryCursor.Position.START, codec.decode(null, "scope-a"));
     for (String invalid : new String[] {"", "wrong", cursor + "x", "x" + cursor, "a".repeat(513)})
-      assertEquals("INVALID_CURSOR", assertThrows(BusinessException.class,
-          () -> codec.decode(invalid, "scope-a")).code());
-    assertEquals("INVALID_CURSOR", assertThrows(BusinessException.class,
-        () -> codec.decode(cursor, "scope-b")).code());
-    assertEquals("INVALID_CURSOR", assertThrows(BusinessException.class,
-        () -> new DiscoveryCursor("another-key").decode(cursor, "scope-a")).code());
+      assertEquals(
+          "INVALID_CURSOR",
+          assertThrows(BusinessException.class, () -> codec.decode(invalid, "scope-a")).code());
+    assertEquals(
+        "INVALID_CURSOR",
+        assertThrows(BusinessException.class, () -> codec.decode(cursor, "scope-b")).code());
+    assertEquals(
+        "INVALID_CURSOR",
+        assertThrows(
+                BusinessException.class,
+                () -> new DiscoveryCursor("another-key").decode(cursor, "scope-a"))
+            .code());
   }
 }

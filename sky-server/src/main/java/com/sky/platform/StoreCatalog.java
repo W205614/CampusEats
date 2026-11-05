@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class StoreCatalog {
   /** Deliberate single-instance demo boundary, counting dishes and set meals, including disabled. */
   public static final int MAX_PRODUCTS_PER_STORE = 500;
+
   public static final int MAX_FLAVORS_PER_DISH = 20;
   private final Db db;
   private final PlatformScope scope;
@@ -105,9 +106,15 @@ public class StoreCatalog {
     if (id == null) {
       // A shared parent row serializes creation across both product tables. A count without this
       // transaction lock would let concurrent requests both admit the final available slot.
-      require(db.one("SELECT id FROM store WHERE id=? FOR UPDATE", store) != null,
-          404, "NOT_FOUND", "店铺不存在");
-      require(catalogSize(store) < MAX_PRODUCTS_PER_STORE, 409, "CATALOG_LIMIT",
+      require(
+          db.one("SELECT id FROM store WHERE id=? FOR UPDATE", store) != null,
+          404,
+          "NOT_FOUND",
+          "店铺不存在");
+      require(
+          catalogSize(store) < MAX_PRODUCTS_PER_STORE,
+          409,
+          "CATALOG_LIMIT",
           "每店最多500个菜品和套餐（含停售商品），请维护现有商品");
     }
     var category =
@@ -149,8 +156,7 @@ public class StoreCatalog {
             "套餐包含停售菜品");
       }
     } else {
-      require(flavors.size() <= MAX_FLAVORS_PER_DISH, 400, "INVALID_FLAVOR",
-          "每个菜品最多20组口味");
+      require(flavors.size() <= MAX_FLAVORS_PER_DISH, 400, "INVALID_FLAVOR", "每个菜品最多20组口味");
       Set<String> names = new HashSet<>();
       for (var f : flavors)
         require(
@@ -224,7 +230,10 @@ public class StoreCatalog {
     else scope.store(store, true);
     // Imported historical data is preserved. Reject an oversized whole-menu response explicitly
     // rather than allocating it or silently hiding the tail; existing items remain editable.
-    require(catalogSize(store) <= MAX_PRODUCTS_PER_STORE, 409, "CATALOG_LIMIT",
+    require(
+        catalogSize(store) <= MAX_PRODUCTS_PER_STORE,
+        409,
+        "CATALOG_LIMIT",
         "店铺目录超过500个商品，请先联系维护者整理目录，原数据保留");
     var rows = admin ? load(store) : cache.load(key(store), () -> load(store));
     var out = new ArrayList<Map<String, Object>>();
@@ -303,7 +312,9 @@ public class StoreCatalog {
               + (type.equals("DISH") ? "0" : "1")
               + " item_rank,s.name store_name FROM "
               + table
-              + " p FORCE INDEX(ix_" + table + "_search_order) JOIN store s ON s.id=p.store_id"
+              + " p FORCE INDEX(ix_"
+              + table
+              + "_search_order) JOIN store s ON s.id=p.store_id"
               + " JOIN category c ON c.id=p.category_id AND c.store_id=p.store_id"
               + " JOIN campus campus ON campus.id=s.campus_id WHERE p.store_id IN (:stores)"
               + " AND s.enabled=true AND campus.enabled=true AND p.status=1 AND c.status=1"
@@ -462,8 +473,11 @@ public class StoreCatalog {
   }
 
   private long catalogSize(long store) {
-    return db.count("SELECT (SELECT COUNT(*) FROM dish WHERE store_id=?)"
-        + "+(SELECT COUNT(*) FROM setmeal WHERE store_id=?)", store, store);
+    return db.count(
+        "SELECT (SELECT COUNT(*) FROM dish WHERE store_id=?)"
+            + "+(SELECT COUNT(*) FROM setmeal WHERE store_id=?)",
+        store,
+        store);
   }
 
   private Map<Long, List<Map<String, Object>>> grouped(List<Map<String, Object>> rows, String key) {

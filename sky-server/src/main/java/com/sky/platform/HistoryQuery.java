@@ -20,7 +20,13 @@ public record HistoryQuery(
     Integer limit) {
   public static final HistoryQuery EMPTY = new HistoryQuery(null, null, null, null, null, null);
 
-  public HistoryQuery(Long beforeId, String state, String orderNumber, LocalDate begin, LocalDate end, Long taskId) {
+  public HistoryQuery(
+      Long beforeId,
+      String state,
+      String orderNumber,
+      LocalDate begin,
+      LocalDate end,
+      Long taskId) {
     this(beforeId, state, orderNumber, begin, end, taskId, null);
   }
 

@@ -223,8 +223,7 @@ public class DirectoryService {
   public long staff(Long id, PlatformCommands.Staff input) {
     Actor a = Actor.employee();
     require(
-        Set.of("PLATFORM_ADMIN", "SHOP_MANAGER").contains(a.role()),
-        403, "FORBIDDEN", "无员工管理权限");
+        Set.of("PLATFORM_ADMIN", "SHOP_MANAGER").contains(a.role()), 403, "FORBIDDEN", "无员工管理权限");
     boolean platform = a.role().equals("PLATFORM_ADMIN");
     // All low-frequency staff management uses the same hierarchy: administrator set,
     // then caller/target employees by id. Managers must not introduce the reverse order.
@@ -241,11 +240,7 @@ public class DirectoryService {
     // this transaction waits for the locks. Revalidate before any personnel write.
     auth.requireCurrentEmployee(a, caller);
     if (id != null)
-      require(
-          employees.stream().anyMatch(e -> Db.id(e, "id") == id),
-          404,
-          "NOT_FOUND",
-          "员工不存在");
+      require(employees.stream().anyMatch(e -> Db.id(e, "id") == id), 404, "NOT_FOUND", "员工不存在");
     if (id != null && (!input.enabled() || !input.role().equals("PLATFORM_ADMIN"))) {
       boolean removesAdministrator =
           administrators.stream()

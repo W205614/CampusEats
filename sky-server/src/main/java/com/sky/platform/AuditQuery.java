@@ -23,13 +23,22 @@ public record AuditQuery(
     int pageLimit = limit == null ? 200 : ListLimit.resolve(limit);
     require(beforeId == null || beforeId > 0, 400, "INVALID_CURSOR", "分页游标须为正整数");
     require(actorId == null || actorId > 0, 400, "INVALID_ACTOR", "操作人编号须为正整数");
-    require(action == null || action.matches("[A-Z][A-Z0-9_]{0,47}"),
-        400, "INVALID_ACTION", "操作类型须为完整的操作代码");
-    require(begin == null && end == null
-            || begin != null && end != null && !end.isBefore(begin)
-                && begin.getYear() >= 2000 && end.getYear() <= 2100
+    require(
+        action == null || action.matches("[A-Z][A-Z0-9_]{0,47}"),
+        400,
+        "INVALID_ACTION",
+        "操作类型须为完整的操作代码");
+    require(
+        begin == null && end == null
+            || begin != null
+                && end != null
+                && !end.isBefore(begin)
+                && begin.getYear() >= 2000
+                && end.getYear() <= 2100
                 && ChronoUnit.DAYS.between(begin, end) < 366,
-        400, "INVALID_RANGE", "请同时提供起止日期，范围最多366天");
+        400,
+        "INVALID_RANGE",
+        "请同时提供起止日期，范围最多366天");
     return pageLimit;
   }
 

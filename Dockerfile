@@ -9,10 +9,13 @@ COPY sky-server/pom.xml sky-server/pom.xml
 COPY sky-common/src sky-common/src
 COPY sky-pojo/src sky-pojo/src
 COPY sky-server/src/main sky-server/src/main
-RUN --mount=type=cache,target=/root/.m2 mvn -s /workspace/maven-settings.xml -Dmaven.mirror.url=$MAVEN_MIRROR_URL -U -B -ntp -Dmaven.test.skip=true -Dmaven.wagon.http.retryHandler.count=3 package
+RUN --mount=type=cache,target=/root/.m2 \
+    mvn -s /workspace/maven-settings.xml -Dmaven.mirror.url=$MAVEN_MIRROR_URL -U -B -ntp \
+      -Dmaven.test.skip=true -Dmaven.wagon.http.retryHandler.count=3 package
 RUN cd /workspace/sky-server/target && test -s bom.json && \
     sha256sum sky-server-1.0-SNAPSHOT.jar bom.json | \
     sed 's/sky-server-1.0-SNAPSHOT.jar/app.jar/; s/bom.json/sbom.cdx.json/' > runtime-manifest.sha256
+
 FROM eclipse-temurin:21.0.13_9-jre-alpine-3.24@sha256:82cf3d9ccbe1ed46252008d51b2f2329e6b9e8a2f4394c4bebefc3ea7f4b1372 AS runtime
 ARG RUNTIME_REFRESH=initial
 ARG SOURCE_REVISION=unknown

@@ -157,8 +157,9 @@ public class AftersaleService {
     if (platform) scope.platform();
     else if (store != null) scope.merchant(store, false);
     else Actor.user();
-    int pageLimit = query.validate(
-        Set.of("PENDING", "ESCALATED", "APPROVED", "REJECTED", "WITHDRAWN", "REFUNDED"), false);
+    int pageLimit =
+        query.validate(
+            Set.of("PENDING", "ESCALATED", "APPROVED", "REJECTED", "WITHDRAWN", "REFUNDED"), false);
     var args = new ArrayList<Object>();
     String filter = "";
     if (!platform) {

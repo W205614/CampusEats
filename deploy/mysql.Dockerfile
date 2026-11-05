@@ -1,9 +1,20 @@
 FROM scratch AS patch
-ADD --checksum=sha256:7300400c68f72c78650a0d76cf233deb8860a32771c5b0bb8bc4ee509ac6bb22 https://yum.oracle.com/repo/OracleLinux/OL9/baseos/latest/x86_64/getPackage/curl-7.76.1-40.el9_8.9.x86_64.rpm /curl.rpm
-ADD --checksum=sha256:a522b6ab35fe1118a580537a375ab4f9d41f94b00411497f1d6cdb5e35353dfd https://yum.oracle.com/repo/OracleLinux/OL9/baseos/latest/x86_64/getPackage/libcurl-7.76.1-40.el9_8.9.x86_64.rpm /libcurl.rpm
-ADD --checksum=sha256:78c1344a1fc8673db5a81d541adde98d01c8fcf2ced249be170703512f556502 https://yum.oracle.com/repo/OracleLinux/OL9/baseos/latest/x86_64/getPackage/glibc-2.34-283.0.1.el9_8.x86_64.rpm /glibc.rpm
-ADD --checksum=sha256:a5a1ba0e1bb459bf1d797bd0fc60d7edc6ce5fe5363afc0542d3e994d23962a0 https://yum.oracle.com/repo/OracleLinux/OL9/baseos/latest/x86_64/getPackage/glibc-common-2.34-283.0.1.el9_8.x86_64.rpm /glibc-common.rpm
-ADD --checksum=sha256:b4c56f25bcd9b05774be687ed3d6b9318483f5864f3a5e9725db346c81ce5e86 https://yum.oracle.com/repo/OracleLinux/OL9/baseos/latest/x86_64/getPackage/glibc-minimal-langpack-2.34-283.0.1.el9_8.x86_64.rpm /glibc-minimal-langpack.rpm
+ADD --checksum=sha256:7300400c68f72c78650a0d76cf233deb8860a32771c5b0bb8bc4ee509ac6bb22 \
+    https://yum.oracle.com/repo/OracleLinux/OL9/baseos/latest/x86_64/getPackage/curl-7.76.1-40.el9_8.9.x86_64.rpm \
+    /curl.rpm
+ADD --checksum=sha256:a522b6ab35fe1118a580537a375ab4f9d41f94b00411497f1d6cdb5e35353dfd \
+    https://yum.oracle.com/repo/OracleLinux/OL9/baseos/latest/x86_64/getPackage/libcurl-7.76.1-40.el9_8.9.x86_64.rpm \
+    /libcurl.rpm
+ADD --checksum=sha256:78c1344a1fc8673db5a81d541adde98d01c8fcf2ced249be170703512f556502 \
+    https://yum.oracle.com/repo/OracleLinux/OL9/baseos/latest/x86_64/getPackage/glibc-2.34-283.0.1.el9_8.x86_64.rpm \
+    /glibc.rpm
+ADD --checksum=sha256:a5a1ba0e1bb459bf1d797bd0fc60d7edc6ce5fe5363afc0542d3e994d23962a0 \
+    https://yum.oracle.com/repo/OracleLinux/OL9/baseos/latest/x86_64/getPackage/glibc-common-2.34-283.0.1.el9_8.x86_64.rpm \
+    /glibc-common.rpm
+ADD --checksum=sha256:b4c56f25bcd9b05774be687ed3d6b9318483f5864f3a5e9725db346c81ce5e86 \
+    https://yum.oracle.com/repo/OracleLinux/OL9/baseos/latest/x86_64/getPackage/glibc-minimal-langpack-2.34-283.0.1.el9_8.x86_64.rpm \
+    /glibc-minimal-langpack.rpm
+
 FROM mysql:8.4.13@sha256:a0225d1ea6631c8bc2385dc4c2faba17bbf1834ecf369e1659a9a382bd8d5dd7
 ARG SOURCE_REVISION=unknown
 LABEL org.opencontainers.image.revision=$SOURCE_REVISION

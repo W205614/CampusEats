@@ -23,18 +23,25 @@ import org.testcontainers.junit.jupiter.*;
 import org.testcontainers.mysql.MySQLContainer;
 
 /** Real MySQL locking and ordering checks for the bounded whole-menu/discovery paths only. */
-@SpringBootTest(properties = {
-    "spring.profiles.active=demo",
-    "campus.jwt-secret=test-only-secret-thirty-two-bytes-long-value",
-    "campus.demo-admin-password=TestAdmin!2026",
-    "campus.tasks-enabled=false"
-})
+@SpringBootTest(
+    properties = {
+      "spring.profiles.active=demo",
+      "campus.jwt-secret=test-only-secret-thirty-two-bytes-long-value",
+      "campus.demo-admin-password=TestAdmin!2026",
+      "campus.tasks-enabled=false"
+    })
 @Testcontainers
 class CatalogBoundsIntegrationTest {
-  @Container static final MySQLContainer mysql = new MySQLContainer("mysql:8.4")
-      .withDatabaseName("catalog_bounds").withUsername("test").withPassword("test")
-      .withCreateContainerCmdModifier(c -> c.getHostConfig().withMemory(768L * 1024 * 1024));
-  @Container static final GenericContainer<?> redis =
+  @Container
+  static final MySQLContainer mysql =
+      new MySQLContainer("mysql:8.4")
+          .withDatabaseName("catalog_bounds")
+          .withUsername("test")
+          .withPassword("test")
+          .withCreateContainerCmdModifier(c -> c.getHostConfig().withMemory(768L * 1024 * 1024));
+
+  @Container
+  static final GenericContainer<?> redis =
       new GenericContainer<>("redis:7.4-alpine").withExposedPorts(6379);
 
   @DynamicPropertySource
@@ -53,25 +60,33 @@ class CatalogBoundsIntegrationTest {
   final Actor admin = new Actor(1, "ADMIN", "PLATFORM_ADMIN", "", false);
 
   void act() {
-    SecurityContextHolder.getContext().setAuthentication(
-        new UsernamePasswordAuthenticationToken(admin, null, List.of()));
+    SecurityContextHolder.getContext()
+        .setAuthentication(new UsernamePasswordAuthenticationToken(admin, null, List.of()));
   }
 
   @BeforeEach
   void fixture() {
     act();
     campus = db.insert("INSERT INTO campus(name) VALUES(?)", "bounds-" + UUID.randomUUID());
-    store = db.insert("INSERT INTO store(campus_id,name,open,hours) VALUES(?,?,true,'[\"00:00-24:00\"]')",
-        campus, "目录边界店");
-    dishes = db.insert("INSERT INTO category(store_id,name,type,sort,status) VALUES(?,'菜品',1,0,1)", store);
-    setmeals = db.insert("INSERT INTO category(store_id,name,type,sort,status) VALUES(?,'套餐',2,0,1)", store);
+    store =
+        db.insert(
+            "INSERT INTO store(campus_id,name,open,hours) VALUES(?,?,true,'[\"00:00-24:00\"]')",
+            campus,
+            "目录边界店");
+    dishes =
+        db.insert(
+            "INSERT INTO category(store_id,name,type,sort,status) VALUES(?,'菜品',1,0,1)", store);
+    setmeals =
+        db.insert(
+            "INSERT INTO category(store_id,name,type,sort,status) VALUES(?,'套餐',2,0,1)", store);
   }
 
   private void seed(String table, long category, int count, IntFunction<String> name) {
     var batch = new ArrayList<Object[]>();
     for (int i = 0; i < count; i++) batch.add(new Object[] {store, category, name.apply(i), i % 2});
-    db.jdbc.batchUpdate("INSERT INTO " + table
-        + "(store_id,category_id,name,price,status) VALUES(?,?,?,10,?)", batch);
+    db.jdbc.batchUpdate(
+        "INSERT INTO " + table + "(store_id,category_id,name,price,status) VALUES(?,?,?,10,?)",
+        batch);
   }
 
   private Product dish(String name) {
@@ -79,8 +94,11 @@ class CatalogBoundsIntegrationTest {
   }
 
   private long size() {
-    return db.count("SELECT (SELECT COUNT(*) FROM dish WHERE store_id=?)"
-        + "+(SELECT COUNT(*) FROM setmeal WHERE store_id=?)", store, store);
+    return db.count(
+        "SELECT (SELECT COUNT(*) FROM dish WHERE store_id=?)"
+            + "+(SELECT COUNT(*) FROM setmeal WHERE store_id=?)",
+        store,
+        store);
   }
 
   @AfterEach
@@ -95,23 +113,34 @@ class CatalogBoundsIntegrationTest {
     long component = db.count("SELECT MIN(id) FROM dish WHERE store_id=?", store);
     // The existing component must be available when the newly created set meal is enabled.
     db.update("UPDATE dish SET status=1 WHERE id=?", component);
-    var meal = new Product("并发套餐", setmeals, BigDecimal.TEN, true, "", null,
-        List.of(), List.of(new Component(component, 1)));
+    var meal =
+        new Product(
+            "并发套餐",
+            setmeals,
+            BigDecimal.TEN,
+            true,
+            "",
+            null,
+            List.of(),
+            List.of(new Component(component, 1)));
     var start = new CountDownLatch(1);
     try (var threads = Executors.newFixedThreadPool(2)) {
       var futures = new ArrayList<Future<String>>();
-      for (String type : List.of("DISH", "SETMEAL")) futures.add(threads.submit(() -> {
-        act();
-        try {
-          assertTrue(start.await(5, TimeUnit.SECONDS));
-          catalog.save(store, type, null, type.equals("DISH") ? dish("并发菜品") : meal);
-          return "created";
-        } catch (BusinessException ex) {
-          return ex.code();
-        } finally {
-          SecurityContextHolder.clearContext();
-        }
-      }));
+      for (String type : List.of("DISH", "SETMEAL"))
+        futures.add(
+            threads.submit(
+                () -> {
+                  act();
+                  try {
+                    assertTrue(start.await(5, TimeUnit.SECONDS));
+                    catalog.save(store, type, null, type.equals("DISH") ? dish("并发菜品") : meal);
+                    return "created";
+                  } catch (BusinessException ex) {
+                    return ex.code();
+                  } finally {
+                    SecurityContextHolder.clearContext();
+                  }
+                }));
       start.countDown();
       var outcomes = new ArrayList<String>();
       for (var future : futures) outcomes.add(future.get(15, TimeUnit.SECONDS));
@@ -127,10 +156,14 @@ class CatalogBoundsIntegrationTest {
     assertEquals(500, catalog.products(store, true, null, null).size());
     long id = db.count("SELECT MIN(id) FROM dish WHERE store_id=?", store);
     seed("setmeal", setmeals, 1, i -> "导入历史套餐");
-    assertEquals("CATALOG_LIMIT", assertThrows(BusinessException.class,
-        () -> catalog.products(store, false, null, null)).code());
-    assertEquals("CATALOG_LIMIT", assertThrows(BusinessException.class,
-        () -> catalog.save(store, "DISH", null, dish("不可新增"))).code());
+    assertEquals(
+        "CATALOG_LIMIT",
+        assertThrows(BusinessException.class, () -> catalog.products(store, false, null, null))
+            .code());
+    assertEquals(
+        "CATALOG_LIMIT",
+        assertThrows(BusinessException.class, () -> catalog.save(store, "DISH", null, dish("不可新增")))
+            .code());
     catalog.save(store, "DISH", id, dish("原商品仍可维护"));
     assertEquals("原商品仍可维护", db.one("SELECT name FROM dish WHERE id=?", id).get("name"));
     assertEquals(501, size());
@@ -138,9 +171,11 @@ class CatalogBoundsIntegrationTest {
 
   @Test
   void boundedBranchesKeepCompleteTypedPagingAndSparseCaseSensitiveLiteralMatches() {
-    var indexes = db.rows("SELECT INDEX_NAME,GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) index_columns"
-        + " FROM information_schema.statistics WHERE TABLE_SCHEMA=DATABASE() AND INDEX_NAME IN"
-        + " ('ix_dish_search_order','ix_setmeal_search_order') GROUP BY INDEX_NAME");
+    var indexes =
+        db.rows(
+            "SELECT INDEX_NAME,GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) index_columns"
+                + " FROM information_schema.statistics WHERE TABLE_SCHEMA=DATABASE() AND INDEX_NAME IN"
+                + " ('ix_dish_search_order','ix_setmeal_search_order') GROUP BY INDEX_NAME");
     assertEquals(2, indexes.size());
     for (var index : indexes) assertEquals("store_id,status,id", index.get("index_columns"));
     seed("dish", dishes, 250, i -> (i < 240 ? "Needle%_Exact-" : "needle%_Exact-") + i);
@@ -150,16 +185,20 @@ class CatalogBoundsIntegrationTest {
     var expected = new ArrayList<String>();
     for (String type : List.of("DISH", "SETMEAL")) {
       String table = type.equals("DISH") ? "dish" : "setmeal";
-      for (var row : db.rows("SELECT id FROM " + table
-          + " WHERE store_id=? AND LOCATE(BINARY 'Needle%_Exact',BINARY name)>0 ORDER BY id", store))
-        expected.add(type + ":" + Db.id(row, "id"));
+      for (var row :
+          db.rows(
+              "SELECT id FROM "
+                  + table
+                  + " WHERE store_id=? AND LOCATE(BINARY 'Needle%_Exact',BINARY name)>0 ORDER BY id",
+              store)) expected.add(type + ":" + Db.id(row, "id"));
     }
     var actual = new ArrayList<String>();
     String cursor = null;
     do {
       var page = pages.search(campus, "Needle%_", null, true, cursor, 31);
       assertTrue(page.records().size() <= 31);
-      actual.addAll(page.records().stream().map(r -> r.get("item_type") + ":" + Db.id(r, "id")).toList());
+      actual.addAll(
+          page.records().stream().map(r -> r.get("item_type") + ":" + Db.id(r, "id")).toList());
       assertEquals(page.hasMore(), page.nextCursor() != null);
       cursor = page.nextCursor();
     } while (cursor != null);

@@ -38,8 +38,14 @@ class EvidenceReadTest {
     Files.createDirectories(root.resolve(".private"));
     when(db.one(anyString(), eq(ID))).thenReturn(Map.of("order_id", 5L, "path", ID + ".png"));
     act(1, "USER");
-    service = new EvidenceService(root.toString(), db, scope, mock(ImageStorage.class),
-        mock(PlatformTransactionManager.class), new EvidenceReadLimits(Clock.systemUTC(), 1, 1, 120));
+    service =
+        new EvidenceService(
+            root.toString(),
+            db,
+            scope,
+            mock(ImageStorage.class),
+            mock(PlatformTransactionManager.class),
+            new EvidenceReadLimits(Clock.systemUTC(), 1, 1, 120));
   }
 
   @AfterEach
@@ -60,20 +66,28 @@ class EvidenceReadTest {
     long[] transferred = {0};
     try (var read = service.open(ID)) {
       assertEquals(size, read.size());
-      read.transferTo(new OutputStream() {
-        @Override public void write(int value) { fail("Expected bounded block writes"); }
-        @Override public void write(byte[] bytes, int offset, int length) {
-          assertTrue(length > 0 && length <= 16 * 1024);
-          for (int i = offset; i < offset + length; i++) assertEquals((byte) 73, bytes[i]);
-          transferred[0] += length;
-        }
-      });
+      read.transferTo(
+          new OutputStream() {
+            @Override
+            public void write(int value) {
+              fail("Expected bounded block writes");
+            }
+
+            @Override
+            public void write(byte[] bytes, int offset, int length) {
+              assertTrue(length > 0 && length <= 16 * 1024);
+              for (int i = offset; i < offset + length; i++) assertEquals((byte) 73, bytes[i]);
+              transferred[0] += length;
+            }
+          });
     }
     assertEquals(size, transferred[0]);
     Files.write(file(), new byte[] {1, 2, 3});
-    var mvc = MockMvcBuilders.standaloneSetup(controller())
-        .setControllerAdvice(new ApiAdvice(new org.springframework.mock.web.MockHttpServletRequest()))
-        .build();
+    var mvc =
+        MockMvcBuilders.standaloneSetup(controller())
+            .setControllerAdvice(
+                new ApiAdvice(new org.springframework.mock.web.MockHttpServletRequest()))
+            .build();
     var response = mvc.perform(get("/api/v1/evidence/" + ID)).andReturn().getResponse();
     assertEquals(200, response.getStatus());
     assertEquals("image/png", response.getContentType());
@@ -90,25 +104,33 @@ class EvidenceReadTest {
     try (var held = service.open(ID)) {
       act(2, "USER");
       doThrow(new BusinessException(404, "NOT_FOUND", "订单不存在")).when(scope).order(5, false);
-      assertEquals("NOT_FOUND", assertThrows(BusinessException.class, () -> service.open(ID)).code());
+      assertEquals(
+          "NOT_FOUND", assertThrows(BusinessException.class, () -> service.open(ID)).code());
       act(3, "DELIVERER");
-      assertEquals("FORBIDDEN", assertThrows(BusinessException.class, () -> service.open(ID)).code());
+      assertEquals(
+          "FORBIDDEN", assertThrows(BusinessException.class, () -> service.open(ID)).code());
       SecurityContextHolder.clearContext();
-      assertEquals("UNAUTHORIZED", assertThrows(BusinessException.class, () -> service.open(ID)).code());
+      assertEquals(
+          "UNAUTHORIZED", assertThrows(BusinessException.class, () -> service.open(ID)).code());
     }
   }
 
   @Test
   void missingOrInvalidFilesNeverCommitSuccessAndReleaseAdmission() throws Exception {
     var response = new org.springframework.mock.web.MockHttpServletResponse();
-    assertEquals("NOT_FOUND", assertThrows(BusinessException.class,
-        () -> controller().evidence(ID, response)).code());
+    assertEquals(
+        "NOT_FOUND",
+        assertThrows(BusinessException.class, () -> controller().evidence(ID, response)).code());
     assertFalse(response.isCommitted());
     assertNull(response.getContentType());
     Files.write(file(), new byte[0]);
-    assertEquals("EVIDENCE_UNAVAILABLE", assertThrows(BusinessException.class, () -> service.open(ID)).code());
+    assertEquals(
+        "EVIDENCE_UNAVAILABLE",
+        assertThrows(BusinessException.class, () -> service.open(ID)).code());
     Files.write(file(), new byte[] {1});
-    try (var read = service.open(ID)) { assertEquals(1, read.size()); }
+    try (var read = service.open(ID)) {
+      assertEquals(1, read.size());
+    }
     when(db.one(anyString(), eq(ID))).thenReturn(Map.of("order_id", 5L, "path", "../outside.png"));
     assertEquals("NOT_FOUND", assertThrows(BusinessException.class, () -> service.open(ID)).code());
   }
@@ -117,47 +139,78 @@ class EvidenceReadTest {
   void disconnectedClientReleasesFileAndGlobalAdmission() throws Exception {
     Files.write(file(), new byte[] {1, 2, 3});
     var response = mock(HttpServletResponse.class);
-    when(response.getOutputStream()).thenReturn(new ServletOutputStream() {
-      @Override public boolean isReady() { return true; }
-      @Override public void setWriteListener(WriteListener listener) {}
-      @Override public void write(int value) throws IOException { throw new IOException("client disconnected"); }
-    });
+    when(response.getOutputStream())
+        .thenReturn(
+            new ServletOutputStream() {
+              @Override
+              public boolean isReady() {
+                return true;
+              }
+
+              @Override
+              public void setWriteListener(WriteListener listener) {}
+
+              @Override
+              public void write(int value) throws IOException {
+                throw new IOException("client disconnected");
+              }
+            });
     assertThrows(IOException.class, () -> controller().evidence(ID, response));
-    try (var reopened = service.open(ID)) { assertEquals(3, reopened.size()); }
+    try (var reopened = service.open(ID)) {
+      assertEquals(3, reopened.size());
+    }
   }
 
   @Test
   void globalAndAccountConcurrencyHaveIndependentBoundariesAndCloseIsIdempotent() {
     var limits = new EvidenceReadLimits(Clock.systemUTC(), 2, 1, 120);
     var first = limits.acquire("USER:1");
-    assertEquals("EVIDENCE_BUSY", assertThrows(BusinessException.class,
-        () -> limits.acquire("USER:1")).code());
+    assertEquals(
+        "EVIDENCE_BUSY",
+        assertThrows(BusinessException.class, () -> limits.acquire("USER:1")).code());
     var second = limits.acquire("USER:2");
-    assertEquals("EVIDENCE_BUSY", assertThrows(BusinessException.class,
-        () -> limits.acquire("USER:3")).code());
+    assertEquals(
+        "EVIDENCE_BUSY",
+        assertThrows(BusinessException.class, () -> limits.acquire("USER:3")).code());
     first.close();
     first.close();
     var third = limits.acquire("USER:3");
-    assertEquals("EVIDENCE_BUSY", assertThrows(BusinessException.class,
-        () -> limits.acquire("USER:4")).code());
+    assertEquals(
+        "EVIDENCE_BUSY",
+        assertThrows(BusinessException.class, () -> limits.acquire("USER:4")).code());
     second.close();
     third.close();
-    try (var next = limits.acquire("USER:1")) { assertNotNull(next); }
+    try (var next = limits.acquire("USER:1")) {
+      assertNotNull(next);
+    }
   }
 
   @Test
   void accountBudgetSurvivesPermitReleaseAndResetsAtWindowBoundary() {
     var now = new AtomicLong(1);
-    var clock = new Clock() {
-      @Override public ZoneId getZone() { return ZoneOffset.UTC; }
-      @Override public Clock withZone(ZoneId zone) { return this; }
-      @Override public Instant instant() { return Instant.ofEpochMilli(now.get()); }
-    };
+    var clock =
+        new Clock() {
+          @Override
+          public ZoneId getZone() {
+            return ZoneOffset.UTC;
+          }
+
+          @Override
+          public Clock withZone(ZoneId zone) {
+            return this;
+          }
+
+          @Override
+          public Instant instant() {
+            return Instant.ofEpochMilli(now.get());
+          }
+        };
     var limits = new EvidenceReadLimits(clock, 2, 1, 2);
     limits.acquire("USER:1").close();
     limits.acquire("USER:1").close();
-    assertEquals("RATE_LIMITED", assertThrows(BusinessException.class,
-        () -> limits.acquire("USER:1")).code());
+    assertEquals(
+        "RATE_LIMITED",
+        assertThrows(BusinessException.class, () -> limits.acquire("USER:1")).code());
     limits.acquire("USER:2").close();
     now.set(60001);
     limits.acquire("USER:1").close();
@@ -166,20 +219,35 @@ class EvidenceReadTest {
   @Test
   void limiterAccountRegistryIsBoundedAndReclaimsExpiredInactiveEntries() {
     var now = new AtomicLong(1);
-    var clock = new Clock() {
-      @Override public ZoneId getZone() { return ZoneOffset.UTC; }
-      @Override public Clock withZone(ZoneId zone) { return this; }
-      @Override public Instant instant() { return Instant.ofEpochMilli(now.get()); }
-    };
+    var clock =
+        new Clock() {
+          @Override
+          public ZoneId getZone() {
+            return ZoneOffset.UTC;
+          }
+
+          @Override
+          public Clock withZone(ZoneId zone) {
+            return this;
+          }
+
+          @Override
+          public Instant instant() {
+            return Instant.ofEpochMilli(now.get());
+          }
+        };
     var limits = new EvidenceReadLimits(clock, 2, 1, 120);
     for (int i = 0; i < 10000; i++) limits.acquire("USER:" + i).close();
-    assertEquals("EVIDENCE_BUSY", assertThrows(BusinessException.class,
-        () -> limits.acquire("USER:new")).code());
+    assertEquals(
+        "EVIDENCE_BUSY",
+        assertThrows(BusinessException.class, () -> limits.acquire("USER:new")).code());
     now.set(60001);
     limits.acquire("USER:new").close();
   }
 
-  private Path file() { return root.resolve(".private").resolve(ID + ".png"); }
+  private Path file() {
+    return root.resolve(".private").resolve(ID + ".png");
+  }
 
   private PlatformAftersaleController controller() {
     return new PlatformAftersaleController(null, service, null);
@@ -187,7 +255,7 @@ class EvidenceReadTest {
 
   private static void act(long id, String role) {
     var actor = new Actor(id, role.equals("USER") ? "USER" : "ADMIN", role, "test", false);
-    SecurityContextHolder.getContext().setAuthentication(
-        new UsernamePasswordAuthenticationToken(actor, null, List.of()));
+    SecurityContextHolder.getContext()
+        .setAuthentication(new UsernamePasswordAuthenticationToken(actor, null, List.of()));
   }
 }

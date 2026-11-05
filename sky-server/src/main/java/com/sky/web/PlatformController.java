@@ -23,7 +23,13 @@ public class PlatformController {
   private final UploadService uploads;
   private final DiscoveryPages discoveryPages;
 
-  public PlatformController(DirectoryService directory, PlatformScope scope, StoreCatalog catalog, DiscoveryService discovery, UploadService uploads, DiscoveryPages discoveryPages) {
+  public PlatformController(
+      DirectoryService directory,
+      PlatformScope scope,
+      StoreCatalog catalog,
+      DiscoveryService discovery,
+      UploadService uploads,
+      DiscoveryPages discoveryPages) {
     this.directory = directory;
     this.scope = scope;
     this.catalog = catalog;
@@ -50,7 +56,8 @@ public class PlatformController {
       @RequestParam(required = false) Boolean open,
       @RequestParam(required = false) String cursor,
       @RequestParam(required = false) Integer limit) {
-    return PlatformViewFactory.stores(discoveryPages.stores(campusId, query, open, cursor, limit, false));
+    return PlatformViewFactory.stores(
+        discoveryPages.stores(campusId, query, open, cursor, limit, false));
   }
 
   @GetMapping("/merchant/stores/page")
@@ -60,7 +67,8 @@ public class PlatformController {
       @RequestParam(required = false) Boolean open,
       @RequestParam(required = false) String cursor,
       @RequestParam(required = false) Integer limit) {
-    return PlatformViewFactory.stores(discoveryPages.stores(campusId, query, open, cursor, limit, true));
+    return PlatformViewFactory.stores(
+        discoveryPages.stores(campusId, query, open, cursor, limit, true));
   }
 
   @GetMapping("/user/stores/{id}")
@@ -76,7 +84,8 @@ public class PlatformController {
       @RequestParam(required = false) Boolean open,
       @RequestParam(required = false) String cursor,
       @RequestParam(required = false) Integer limit) {
-    return PlatformViewFactory.search(discoveryPages.search(campusId, query, categoryId, open, cursor, limit));
+    return PlatformViewFactory.search(
+        discoveryPages.search(campusId, query, categoryId, open, cursor, limit));
   }
 
   @GetMapping("/merchant/stores")

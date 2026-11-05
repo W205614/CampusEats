@@ -180,7 +180,8 @@ class DeliveryDeadlineIntegrationTest {
   }
 
   private boolean flagged() {
-    return Db.bool(db.one("SELECT delivery_overdue FROM orders WHERE id=?", order), "delivery_overdue");
+    return Db.bool(
+        db.one("SELECT delivery_overdue FROM orders WHERE id=?", order), "delivery_overdue");
   }
 
   private long version() {
@@ -227,7 +228,10 @@ class DeliveryDeadlineIntegrationTest {
     assertEquals(0, exceptions());
     service.policy(store, new OperationsService.Policy(10, 30, 15, 15, 30, 120, 1));
     assertEquals(
-        deadline, Db.time(db.one("SELECT deadline_at FROM order_stage WHERE order_id=?", order).get("deadline_at")));
+        deadline,
+        Db.time(
+            db.one("SELECT deadline_at FROM order_stage WHERE order_id=?", order)
+                .get("deadline_at")));
     assertEquals(0, operationalCount(2));
 
     clock.advance(Duration.ofMinutes(59));
@@ -238,8 +242,16 @@ class DeliveryDeadlineIntegrationTest {
     assertEquals(1, exceptions());
     assertEquals(1, operationalCount(2));
     assertEquals(0, version(), "Derived timeout flags must not invalidate fulfillment commands");
-    assertEquals(0, db.count("SELECT COUNT(*) FROM outbox_event WHERE aggregate_id=? AND event_type='ORDER_OVERDUE'", order));
-    assertEquals(1, db.count("SELECT COUNT(*) FROM outbox_event WHERE aggregate_id=? AND event_type='ORDER_EXCEPTION'", order));
+    assertEquals(
+        0,
+        db.count(
+            "SELECT COUNT(*) FROM outbox_event WHERE aggregate_id=? AND event_type='ORDER_OVERDUE'",
+            order));
+    assertEquals(
+        1,
+        db.count(
+            "SELECT COUNT(*) FROM outbox_event WHERE aggregate_id=? AND event_type='ORDER_EXCEPTION'",
+            order));
   }
 
   @Test
@@ -261,7 +273,8 @@ class DeliveryDeadlineIntegrationTest {
   void migratedDeadlineDoesNotReuseHistoricalPickupTime() throws Exception {
     var baseline = at();
     var pickup = baseline.minusHours(5);
-    db.update("UPDATE orders SET delivery_started_at=?,delivery_overdue=true WHERE id=?", pickup, order);
+    db.update(
+        "UPDATE orders SET delivery_started_at=?,delivery_overdue=true WHERE id=?", pickup, order);
     db.update(
         "INSERT INTO order_stage(order_id,stage,stage_seq,started_at,deadline_at,migrated) VALUES(?,'DELIVERING',0,?,?,true)",
         order,
@@ -275,10 +288,15 @@ class DeliveryDeadlineIntegrationTest {
     stageJobs.work();
     assertTrue(flagged());
     assertEquals(1, operationalCount(2));
-    var exception = db.one("SELECT migrated,deadline_at FROM order_exception WHERE order_id=?", order);
+    var exception =
+        db.one("SELECT migrated,deadline_at FROM order_exception WHERE order_id=?", order);
     assertTrue(Db.bool(exception, "migrated"));
     assertEquals(baseline.plusMinutes(60), Db.time(exception.get("deadline_at")));
-    assertEquals(pickup, Db.time(db.one("SELECT delivery_started_at FROM orders WHERE id=?", order).get("delivery_started_at")));
+    assertEquals(
+        pickup,
+        Db.time(
+            db.one("SELECT delivery_started_at FROM orders WHERE id=?", order)
+                .get("delivery_started_at")));
     assertEquals(0, version());
   }
 
@@ -297,7 +315,11 @@ class DeliveryDeadlineIntegrationTest {
     assertEquals(1, version());
     assertEquals(1, operationalCount(2));
     assertEquals(0, operationalCount(1));
-    assertEquals(1, db.count("SELECT COUNT(*) FROM outbox_event WHERE aggregate_id=? AND event_type='ORDER_OVERDUE'", order));
+    assertEquals(
+        1,
+        db.count(
+            "SELECT COUNT(*) FROM outbox_event WHERE aggregate_id=? AND event_type='ORDER_OVERDUE'",
+            order));
   }
 
   @Test
@@ -319,7 +341,8 @@ class DeliveryDeadlineIntegrationTest {
       service.detect(order);
       assertTrue(flagged(), "A delayed scan must not rewrite the terminal timeout history");
       assertEquals(0, version());
-      assertEquals("FINISHED", db.one("SELECT stage FROM order_stage WHERE order_id=?", order).get("stage"));
+      assertEquals(
+          "FINISHED", db.one("SELECT stage FROM order_stage WHERE order_id=?", order).get("stage"));
     }
   }
 }

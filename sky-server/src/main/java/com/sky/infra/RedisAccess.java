@@ -56,7 +56,9 @@ public class RedisAccess {
       count("campus.redis.calls.failed");
       throw ex;
     } finally {
-      synchronized (this) { active--; }
+      synchronized (this) {
+        active--;
+      }
     }
   }
 
@@ -73,11 +75,21 @@ public class RedisAccess {
     return generation;
   }
 
-  public synchronized boolean isOpen() { return openUntil != 0; }
-  private synchronized int active() { return active; }
-  private void count(String name) { if (metrics != null) metrics.counter(name).increment(); }
+  public synchronized boolean isOpen() {
+    return openUntil != 0;
+  }
+
+  private synchronized int active() {
+    return active;
+  }
+
+  private void count(String name) {
+    if (metrics != null) metrics.counter(name).increment();
+  }
 
   public static final class Unavailable extends RuntimeException {
-    private Unavailable() { super("Redis temporarily bypassed", null, false, false); }
+    private Unavailable() {
+      super("Redis temporarily bypassed", null, false, false);
+    }
   }
 }

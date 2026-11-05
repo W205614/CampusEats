@@ -10,8 +10,7 @@ public final class ListLimit {
   private ListLimit() {}
 
   public static int resolve(Integer limit) {
-    require(limit == null || limit >= 1 && limit <= MAX,
-        400, "INVALID_LIMIT", "读取条数须为1至1000的整数");
+    require(limit == null || limit >= 1 && limit <= MAX, 400, "INVALID_LIMIT", "读取条数须为1至1000的整数");
     return limit == null ? DEFAULT : limit;
   }
 }

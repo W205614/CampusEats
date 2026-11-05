@@ -23,8 +23,11 @@ public final class OperationsAccess {
     try {
       Mac mac = Mac.getInstance("HmacSHA256");
       mac.init(new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256"));
-      expected = HexFormat.of().formatHex(mac.doFinal(
-          "campuseats:operations-read:v1".getBytes(StandardCharsets.UTF_8))).getBytes(StandardCharsets.US_ASCII);
+      expected =
+          HexFormat.of()
+              .formatHex(
+                  mac.doFinal("campuseats:operations-read:v1".getBytes(StandardCharsets.UTF_8)))
+              .getBytes(StandardCharsets.US_ASCII);
     } catch (GeneralSecurityException ex) {
       throw new IllegalStateException("Cannot initialize operations credential", ex);
     }
@@ -36,7 +39,8 @@ public final class OperationsAccess {
         || !LOOPBACK.contains(request.getRemoteAddr())
         || request.getHeader("Authorization") != null) return null;
     String key = request.getHeader("X-Campus-Operations-Key");
-    if (key == null || key.length() != 64
+    if (key == null
+        || key.length() != 64
         || !MessageDigest.isEqual(expected, key.getBytes(StandardCharsets.US_ASCII))) return null;
     return new Actor(0, "ADMIN", "PLATFORM_ADMIN", "operations-read", false);
   }

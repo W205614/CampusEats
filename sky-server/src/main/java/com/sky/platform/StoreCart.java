@@ -82,12 +82,15 @@ public class StoreCart {
     var byStore = new HashMap<Long, List<Map<String, Object>>>();
     // Read only actual items, joining both whitelisted product types in one query. Empty version
     // roots deliberately survive clearing: deleting them could make an old version valid again.
-    var items = db.rows("SELECT i.*,COALESCE(d.name,m.name) name,COALESCE(d.price,m.price) price,"
-        + "COALESCE(d.image,m.image) image,COALESCE(d.status,m.status) status,c.id category_exists"
-        + " FROM store_cart_item i LEFT JOIN dish d ON i.item_type='DISH' AND d.id=i.item_id"
-        + " AND d.store_id=i.store_id LEFT JOIN setmeal m ON i.item_type='SETMEAL' AND m.id=i.item_id"
-        + " AND m.store_id=i.store_id LEFT JOIN category c ON c.id=COALESCE(d.category_id,m.category_id)"
-        + " AND c.store_id=i.store_id WHERE i.user_id=? ORDER BY i.store_id,i.item_type,i.item_id,i.flavor_hash", user);
+    var items =
+        db.rows(
+            "SELECT i.*,COALESCE(d.name,m.name) name,COALESCE(d.price,m.price) price,"
+                + "COALESCE(d.image,m.image) image,COALESCE(d.status,m.status) status,c.id category_exists"
+                + " FROM store_cart_item i LEFT JOIN dish d ON i.item_type='DISH' AND d.id=i.item_id"
+                + " AND d.store_id=i.store_id LEFT JOIN setmeal m ON i.item_type='SETMEAL' AND m.id=i.item_id"
+                + " AND m.store_id=i.store_id LEFT JOIN category c ON c.id=COALESCE(d.category_id,m.category_id)"
+                + " AND c.store_id=i.store_id WHERE i.user_id=? ORDER BY i.store_id,i.item_type,i.item_id,i.flavor_hash",
+            user);
     for (var item : items) {
       require(item.remove("category_exists") != null, 404, "NOT_FOUND", "本店商品不存在");
       item.put("flavors", json.flavors(item.get("flavors").toString()));

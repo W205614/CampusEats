@@ -42,7 +42,9 @@ public class RateLimits {
     try {
       count =
           Objects.requireNonNull(
-              access.call(() -> redis.execute(INCR, List.of("campus:rate:" + key), String.valueOf(seconds))));
+              access.call(
+                  () ->
+                      redis.execute(INCR, List.of("campus:rate:" + key), String.valueOf(seconds))));
     } catch (Exception ex) {
       // Already counted above; a timeout/short-circuit must never count the same request twice.
       return;

@@ -28,9 +28,16 @@ public class EvidenceReadLimits {
       @Value("${campus.evidence-read-concurrency:4}") int globalLimit,
       @Value("${campus.evidence-read-account-concurrency:2}") int accountLimit,
       @Value("${campus.evidence-read-per-minute:120}") int perMinute) {
-    require(globalLimit > 0 && globalLimit <= 32 && accountLimit > 0
-        && accountLimit <= globalLimit && perMinute > 0 && perMinute <= 10000,
-        500, "INVALID_EVIDENCE_LIMITS", "举证读取限制配置不正确");
+    require(
+        globalLimit > 0
+            && globalLimit <= 32
+            && accountLimit > 0
+            && accountLimit <= globalLimit
+            && perMinute > 0
+            && perMinute <= 10000,
+        500,
+        "INVALID_EVIDENCE_LIMITS",
+        "举证读取限制配置不正确");
     this.clock = clock;
     this.globalLimit = globalLimit;
     this.accountLimit = accountLimit;
@@ -40,11 +47,11 @@ public class EvidenceReadLimits {
   public synchronized Lease acquire(String account) {
     long now = clock.millis();
     if (accounts.size() >= CAPACITY)
-      accounts.entrySet().removeIf(entry -> entry.getValue().running == 0
-          && now >= entry.getValue().expires);
+      accounts
+          .entrySet()
+          .removeIf(entry -> entry.getValue().running == 0 && now >= entry.getValue().expires);
     var window = accounts.get(account);
-    require(window != null || accounts.size() < CAPACITY,
-        503, "EVIDENCE_BUSY", "举证读取繁忙，请稍后重试");
+    require(window != null || accounts.size() < CAPACITY, 503, "EVIDENCE_BUSY", "举证读取繁忙，请稍后重试");
     if (window == null) {
       window = new Window();
       accounts.put(account, window);
@@ -54,8 +61,11 @@ public class EvidenceReadLimits {
       window.requests = 0;
     }
     require(window.requests < perMinute, 429, "RATE_LIMITED", "举证读取过于频繁，请稍后重试");
-    require(running < globalLimit && window.running < accountLimit,
-        503, "EVIDENCE_BUSY", "举证读取繁忙，请稍后重试");
+    require(
+        running < globalLimit && window.running < accountLimit,
+        503,
+        "EVIDENCE_BUSY",
+        "举证读取繁忙，请稍后重试");
     window.requests++;
     window.running++;
     running++;

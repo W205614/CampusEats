@@ -19,7 +19,8 @@ public class PlatformAftersaleController {
   private final EvidenceService evidence;
   private final PlatformJobs jobs;
 
-  public PlatformAftersaleController(AftersaleService aftersale, EvidenceService evidence, PlatformJobs jobs) {
+  public PlatformAftersaleController(
+      AftersaleService aftersale, EvidenceService evidence, PlatformJobs jobs) {
     this.aftersale = aftersale;
     this.evidence = evidence;
     this.jobs = jobs;
@@ -76,10 +77,14 @@ public class PlatformAftersaleController {
   }
 
   @GetMapping(value = "/evidence/{id}", produces = MediaType.IMAGE_PNG_VALUE)
-  @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200",
-      description = "OK", content = @io.swagger.v3.oas.annotations.media.Content(
-          mediaType = MediaType.IMAGE_PNG_VALUE,
-          schema = @io.swagger.v3.oas.annotations.media.Schema(type = "string", format = "binary")))
+  @io.swagger.v3.oas.annotations.responses.ApiResponse(
+      responseCode = "200",
+      description = "OK",
+      content =
+          @io.swagger.v3.oas.annotations.media.Content(
+              mediaType = MediaType.IMAGE_PNG_VALUE,
+              schema =
+                  @io.swagger.v3.oas.annotations.media.Schema(type = "string", format = "binary")))
   public void evidence(@PathVariable String id, jakarta.servlet.http.HttpServletResponse response)
       throws java.io.IOException {
     try (var read = evidence.open(id)) {

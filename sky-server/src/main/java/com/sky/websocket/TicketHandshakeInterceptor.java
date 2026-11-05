@@ -22,18 +22,24 @@ final class TicketHandshakeInterceptor implements HandshakeInterceptor {
   }
 
   @Override
-  public boolean beforeHandshake(ServerHttpRequest req, ServerHttpResponse res,
-      WebSocketHandler handler, Map<String, Object> attributes) {
+  public boolean beforeHandshake(
+      ServerHttpRequest req,
+      ServerHttpResponse res,
+      WebSocketHandler handler,
+      Map<String, Object> attributes) {
     if (!origins.contains(req.getHeaders().getOrigin())) {
       res.setStatusCode(HttpStatus.FORBIDDEN);
       return false;
     }
     try {
       var remote = req.getRemoteAddress();
-      String address = remote == null || remote.getAddress() == null
-          ? "unknown" : remote.getAddress().getHostAddress();
+      String address =
+          remote == null || remote.getAddress() == null
+              ? "unknown"
+              : remote.getAddress().getHostAddress();
       limits.check("ws-handshake-ip:" + address, 60, 60);
-      String ticket = UriComponentsBuilder.fromUri(req.getURI()).build().getQueryParams().getFirst("ticket");
+      String ticket =
+          UriComponentsBuilder.fromUri(req.getURI()).build().getQueryParams().getFirst("ticket");
       var actor = tickets.consume(ticket);
       if (actor == null) {
         res.setStatusCode(HttpStatus.UNAUTHORIZED);
@@ -52,6 +58,6 @@ final class TicketHandshakeInterceptor implements HandshakeInterceptor {
   }
 
   @Override
-  public void afterHandshake(ServerHttpRequest req, ServerHttpResponse res,
-      WebSocketHandler handler, Exception ex) {}
+  public void afterHandshake(
+      ServerHttpRequest req, ServerHttpResponse res, WebSocketHandler handler, Exception ex) {}
 }

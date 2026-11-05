@@ -25,18 +25,25 @@ import org.testcontainers.junit.jupiter.*;
 import org.testcontainers.mysql.MySQLContainer;
 
 /** Personnel writes revalidate real sessions after their database lock wait. */
-@SpringBootTest(properties = {
-    "spring.profiles.active=demo",
-    "campus.jwt-secret=staff-authorization-test-secret-thirty-two-bytes",
-    "campus.demo-admin-password=TestAdmin!2026",
-    "campus.tasks-enabled=false"
-})
+@SpringBootTest(
+    properties = {
+      "spring.profiles.active=demo",
+      "campus.jwt-secret=staff-authorization-test-secret-thirty-two-bytes",
+      "campus.demo-admin-password=TestAdmin!2026",
+      "campus.tasks-enabled=false"
+    })
 @Testcontainers
 class StaffAuthorizationIntegrationTest {
-  @Container static final MySQLContainer mysql = new MySQLContainer("mysql:8.4")
-      .withDatabaseName("staff_authorization_test").withUsername("test").withPassword("test")
-      .withCreateContainerCmdModifier(c -> c.getHostConfig().withMemory(768L * 1024 * 1024));
-  @Container static final GenericContainer<?> redis =
+  @Container
+  static final MySQLContainer mysql =
+      new MySQLContainer("mysql:8.4")
+          .withDatabaseName("staff_authorization_test")
+          .withUsername("test")
+          .withPassword("test")
+          .withCreateContainerCmdModifier(c -> c.getHostConfig().withMemory(768L * 1024 * 1024));
+
+  @Container
+  static final GenericContainer<?> redis =
       new GenericContainer<>("redis:7.4-alpine").withExposedPorts(6379);
 
   @DynamicPropertySource
@@ -62,8 +69,19 @@ class StaffAuthorizationIntegrationTest {
   long campus, store, otherCampus, otherStore, first, second, shopManager, operator;
   Actor administrator, stale, manager;
 
-  enum Change { DISABLE, DEMOTE, RESET }
-  enum SessionChange { REVOKED, EXPIRED, WRONG_SUBJECT, WRONG_TYPE, VERSION }
+  enum Change {
+    DISABLE,
+    DEMOTE,
+    RESET
+  }
+
+  enum SessionChange {
+    REVOKED,
+    EXPIRED,
+    WRONG_SUBJECT,
+    WRONG_TYPE,
+    VERSION
+  }
 
   @BeforeEach
   void fixture() {
@@ -73,7 +91,8 @@ class StaffAuthorizationIntegrationTest {
     campus = db.insert("INSERT INTO campus(name) VALUES(?)", prefix);
     store = db.insert("INSERT INTO store(campus_id,name) VALUES(?,?)", campus, prefix);
     otherCampus = db.insert("INSERT INTO campus(name) VALUES(?)", prefix + "_other");
-    otherStore = db.insert("INSERT INTO store(campus_id,name) VALUES(?,?)", otherCampus, prefix + "_other");
+    otherStore =
+        db.insert("INSERT INTO store(campus_id,name) VALUES(?,?)", otherCampus, prefix + "_other");
     first = employee("_a", "PLATFORM_ADMIN", null, null);
     second = employee("_b", "PLATFORM_ADMIN", null, null);
     shopManager = employee("_manager", "SHOP_MANAGER", store, campus);
@@ -90,7 +109,8 @@ class StaffAuthorizationIntegrationTest {
     SecurityContextHolder.clearContext();
     var ids = db.rows("SELECT id FROM employee WHERE username LIKE ?", prefix + "%");
     for (var row : ids) {
-      db.update("DELETE FROM auth_session WHERE subject_type='ADMIN' AND subject_id=?", row.get("id"));
+      db.update(
+          "DELETE FROM auth_session WHERE subject_type='ADMIN' AND subject_id=?", row.get("id"));
       db.update("DELETE FROM employee WHERE id=?", row.get("id"));
     }
     db.update("DELETE FROM store WHERE id IN(?,?)", store, otherStore);
@@ -98,9 +118,15 @@ class StaffAuthorizationIntegrationTest {
   }
 
   private long employee(String suffix, String role, Long ownedStore, Long ownedCampus) {
-    return db.insert("INSERT INTO employee(name,username,password,role,store_id,campus_id,status,"
+    return db.insert(
+        "INSERT INTO employee(name,username,password,role,store_id,campus_id,status,"
             + "must_change_password,phone,sex,id_number) VALUES(?,?,?,?,?,?,1,false,'','','')",
-        prefix + suffix, prefix + suffix, encoded, role, ownedStore, ownedCampus);
+        prefix + suffix,
+        prefix + suffix,
+        encoded,
+        role,
+        ownedStore,
+        ownedCampus);
   }
 
   private Actor session(long employee) {
@@ -108,47 +134,71 @@ class StaffAuthorizationIntegrationTest {
   }
 
   private void act(Actor actor) {
-    SecurityContextHolder.getContext().setAuthentication(
-        new UsernamePasswordAuthenticationToken(actor, null, List.of()));
+    SecurityContextHolder.getContext()
+        .setAuthentication(new UsernamePasswordAuthenticationToken(actor, null, List.of()));
   }
 
-  private PlatformCommands.Staff input(long employee, String role, Long ownedStore,
-      Long ownedCampus, boolean enabled, String password) {
-    String username = db.one("SELECT username FROM employee WHERE id=?", employee).get("username").toString();
-    return new PlatformCommands.Staff(username, "已保存的员工", role, ownedStore, ownedCampus, enabled, password);
+  private PlatformCommands.Staff input(
+      long employee,
+      String role,
+      Long ownedStore,
+      Long ownedCampus,
+      boolean enabled,
+      String password) {
+    String username =
+        db.one("SELECT username FROM employee WHERE id=?", employee).get("username").toString();
+    return new PlatformCommands.Staff(
+        username, "已保存的员工", role, ownedStore, ownedCampus, enabled, password);
   }
 
   private void changeSecond(Change change) {
     act(administrator);
-    directory.staff(second, input(second, change == Change.DEMOTE ? "OPERATOR" : "PLATFORM_ADMIN",
-        change == Change.DEMOTE ? store : null, change == Change.DEMOTE ? campus : null,
-        change != Change.DISABLE, change == Change.RESET ? RESET : null));
+    directory.staff(
+        second,
+        input(
+            second,
+            change == Change.DEMOTE ? "OPERATOR" : "PLATFORM_ADMIN",
+            change == Change.DEMOTE ? store : null,
+            change == Change.DEMOTE ? campus : null,
+            change != Change.DISABLE,
+            change == Change.RESET ? RESET : null));
   }
 
   /** Pause only the already-authenticated request, before its first personnel lock. */
-  private BusinessException delayed(Actor actor, Runnable command, Runnable change) throws Exception {
+  private BusinessException delayed(Actor actor, Runnable command, Runnable change)
+      throws Exception {
     var beforeLock = new CountDownLatch(1);
     var continueRequest = new CountDownLatch(1);
     var worker = new AtomicReference<Thread>();
     var once = new AtomicBoolean();
-    doAnswer(call -> {
-      if (Thread.currentThread() == worker.get() && once.compareAndSet(false, true)) {
-        beforeLock.countDown();
-        assertTrue(continueRequest.await(10, TimeUnit.SECONDS));
-      }
-      return call.callRealMethod();
-    }).when(db).rows(ADMIN_LOCK);
+    doAnswer(
+            call -> {
+              if (Thread.currentThread() == worker.get() && once.compareAndSet(false, true)) {
+                beforeLock.countDown();
+                assertTrue(continueRequest.await(10, TimeUnit.SECONDS));
+              }
+              return call.callRealMethod();
+            })
+        .when(db)
+        .rows(ADMIN_LOCK);
     try (var executor = Executors.newSingleThreadExecutor()) {
-      var pending = executor.submit(() -> {
-        worker.set(Thread.currentThread());
-        act(actor);
-        try { return assertThrows(BusinessException.class, command::run); }
-        finally { SecurityContextHolder.clearContext(); }
-      });
+      var pending =
+          executor.submit(
+              () -> {
+                worker.set(Thread.currentThread());
+                act(actor);
+                try {
+                  return assertThrows(BusinessException.class, command::run);
+                } finally {
+                  SecurityContextHolder.clearContext();
+                }
+              });
       try {
         assertTrue(beforeLock.await(10, TimeUnit.SECONDS));
         change.run();
-      } finally { continueRequest.countDown(); }
+      } finally {
+        continueRequest.countDown();
+      }
       return pending.get(10, TimeUnit.SECONDS);
     } finally {
       continueRequest.countDown();
@@ -163,26 +213,42 @@ class StaffAuthorizationIntegrationTest {
 
   @ParameterizedTest
   @EnumSource(Change.class)
-  void authenticatedSelfSaveCannotReverseDisableDemotionOrPasswordReset(Change change) throws Exception {
-    var selfSave = input(second, "PLATFORM_ADMIN", null, null, true,
-        change == Change.RESET ? ATTEMPTED : null);
+  void authenticatedSelfSaveCannotReverseDisableDemotionOrPasswordReset(Change change)
+      throws Exception {
+    var selfSave =
+        input(
+            second, "PLATFORM_ADMIN", null, null, true, change == Change.RESET ? ATTEMPTED : null);
     var committed = new AtomicReference<Map<String, Object>>();
 
-    unauthorized(delayed(stale, () -> directory.staff(second, selfSave), () -> {
-      changeSecond(change);
-      committed.set(db.one("SELECT * FROM employee WHERE id=?", second));
-    }));
+    unauthorized(
+        delayed(
+            stale,
+            () -> directory.staff(second, selfSave),
+            () -> {
+              changeSecond(change);
+              committed.set(db.one("SELECT * FROM employee WHERE id=?", second));
+            }));
 
     assertEquals(committed.get(), db.one("SELECT * FROM employee WHERE id=?", second));
-    assertEquals(0, db.count("SELECT COUNT(*) FROM audit_log WHERE actor_id=? AND action='STAFF_SAVE'", second));
-    assertEquals(401, assertThrows(BusinessException.class, () -> auth.authenticate(staleToken)).status());
+    assertEquals(
+        0,
+        db.count(
+            "SELECT COUNT(*) FROM audit_log WHERE actor_id=? AND action='STAFF_SAVE'", second));
+    assertEquals(
+        401, assertThrows(BusinessException.class, () -> auth.authenticate(staleToken)).status());
     var oldSession = db.one("SELECT revoked FROM auth_session WHERE jti=?", stale.jti());
     assertTrue(Db.bool(oldSession, "revoked"));
     if (change == Change.RESET) {
       String username = prefix + "_b";
-      assertEquals("BAD_CREDENTIALS", assertThrows(BusinessException.class,
-          () -> auth.login(new Commands.Login(username, ATTEMPTED))).code());
-      var renewed = auth.authenticate(auth.login(new Commands.Login(username, RESET)).get("token").toString());
+      assertEquals(
+          "BAD_CREDENTIALS",
+          assertThrows(
+                  BusinessException.class,
+                  () -> auth.login(new Commands.Login(username, ATTEMPTED)))
+              .code());
+      var renewed =
+          auth.authenticate(
+              auth.login(new Commands.Login(username, RESET)).get("token").toString());
       assertEquals("PLATFORM_ADMIN", renewed.role());
       assertTrue(renewed.mustChangePassword());
     }
@@ -190,21 +256,37 @@ class StaffAuthorizationIntegrationTest {
 
   @Test
   void passwordResetAlsoStopsAnInFlightReplacementAdministratorCreation() throws Exception {
-    var newAdministrator = new PlatformCommands.Staff(prefix + "_replacement", "拒绝的替代管理员",
-        "PLATFORM_ADMIN", null, null, true, ATTEMPTED);
-    unauthorized(delayed(stale, () -> directory.staff(null, newAdministrator), () -> changeSecond(Change.RESET)));
-    assertEquals(0, db.count("SELECT COUNT(*) FROM employee WHERE username=?", prefix + "_replacement"));
-    assertEquals(0, db.count("SELECT COUNT(*) FROM audit_log WHERE actor_id=? AND action='STAFF_SAVE'", second));
+    var newAdministrator =
+        new PlatformCommands.Staff(
+            prefix + "_replacement", "拒绝的替代管理员", "PLATFORM_ADMIN", null, null, true, ATTEMPTED);
+    unauthorized(
+        delayed(
+            stale,
+            () -> directory.staff(null, newAdministrator),
+            () -> changeSecond(Change.RESET)));
+    assertEquals(
+        0, db.count("SELECT COUNT(*) FROM employee WHERE username=?", prefix + "_replacement"));
+    assertEquals(
+        0,
+        db.count(
+            "SELECT COUNT(*) FROM audit_log WHERE actor_id=? AND action='STAFF_SAVE'", second));
   }
 
   @Test
   void transferredManagerCannotUseThePreviousStoreScopeAfterAuthentication() throws Exception {
     var operatorEdit = input(operator, "OPERATOR", store, campus, true, null);
-    unauthorized(delayed(manager, () -> directory.staff(operator, operatorEdit), () -> {
-      act(administrator);
-      directory.staff(shopManager, input(shopManager, "SHOP_MANAGER", otherStore, otherCampus, true, null));
-    }));
-    assertEquals(prefix + "_operator", db.one("SELECT name FROM employee WHERE id=?", operator).get("name"));
+    unauthorized(
+        delayed(
+            manager,
+            () -> directory.staff(operator, operatorEdit),
+            () -> {
+              act(administrator);
+              directory.staff(
+                  shopManager,
+                  input(shopManager, "SHOP_MANAGER", otherStore, otherCampus, true, null));
+            }));
+    assertEquals(
+        prefix + "_operator", db.one("SELECT name FROM employee WHERE id=?", operator).get("name"));
     assertEquals(otherStore, db.count("SELECT store_id FROM employee WHERE id=?", shopManager));
   }
 
@@ -213,41 +295,72 @@ class StaffAuthorizationIntegrationTest {
   void invalidOriginalSessionCannotAuthorizeAnyPersonnelWrite(SessionChange change) {
     switch (change) {
       case REVOKED -> auth.logout(stale);
-      case EXPIRED -> db.update("UPDATE auth_session SET expires_at=? WHERE jti=?",
-          LocalDateTime.now(clock).withNano(0), stale.jti());
-      case WRONG_SUBJECT -> db.update("UPDATE auth_session SET subject_id=? WHERE jti=?", first, stale.jti());
-      case WRONG_TYPE -> db.update("UPDATE auth_session SET subject_type='USER' WHERE jti=?", stale.jti());
-      case VERSION -> db.update("UPDATE employee SET auth_version=auth_version+1 WHERE id=?", second);
+      case EXPIRED ->
+          db.update(
+              "UPDATE auth_session SET expires_at=? WHERE jti=?",
+              LocalDateTime.now(clock).withNano(0),
+              stale.jti());
+      case WRONG_SUBJECT ->
+          db.update("UPDATE auth_session SET subject_id=? WHERE jti=?", first, stale.jti());
+      case WRONG_TYPE ->
+          db.update("UPDATE auth_session SET subject_type='USER' WHERE jti=?", stale.jti());
+      case VERSION ->
+          db.update("UPDATE employee SET auth_version=auth_version+1 WHERE id=?", second);
     }
     var before = db.one("SELECT * FROM employee WHERE id=?", operator);
     act(stale);
-    unauthorized(assertThrows(BusinessException.class,
-        () -> directory.staff(operator, input(operator, "OPERATOR", store, campus, true, null))));
+    unauthorized(
+        assertThrows(
+            BusinessException.class,
+            () ->
+                directory.staff(operator, input(operator, "OPERATOR", store, campus, true, null))));
     assertEquals(before, db.one("SELECT * FROM employee WHERE id=?", operator));
   }
 
   @Test
   void emptySyntheticJtiIsNeverAProductionAuthorizationBypass() {
     act(new Actor(first, "ADMIN", "PLATFORM_ADMIN", "", false));
-    unauthorized(assertThrows(BusinessException.class,
-        () -> directory.staff(operator, input(operator, "OPERATOR", store, campus, true, null))));
+    unauthorized(
+        assertThrows(
+            BusinessException.class,
+            () ->
+                directory.staff(operator, input(operator, "OPERATOR", store, campus, true, null))));
   }
 
   @Test
   void realAdministratorAndManagerSessionsRetainNormalPersonnelManagementBoundaries() {
     act(administrator);
-    long created = directory.staff(null, new PlatformCommands.Staff(prefix + "_new_operator", "新运营员",
-        "OPERATOR", store, campus, true, INITIAL));
+    long created =
+        directory.staff(
+            null,
+            new PlatformCommands.Staff(
+                prefix + "_new_operator", "新运营员", "OPERATOR", store, campus, true, INITIAL));
     act(manager);
     directory.staff(created, input(created, "OPERATOR", store, campus, true, null));
     assertEquals("已保存的员工", db.one("SELECT name FROM employee WHERE id=?", created).get("name"));
-    assertEquals("FORBIDDEN", assertThrows(BusinessException.class,
-        () -> directory.staff(null, new PlatformCommands.Staff(prefix + "_forbidden", "拒绝的管理员",
-            "PLATFORM_ADMIN", null, null, true, INITIAL))).code());
-    assertEquals(0, db.count("SELECT COUNT(*) FROM employee WHERE username=?", prefix + "_forbidden"));
+    assertEquals(
+        "FORBIDDEN",
+        assertThrows(
+                BusinessException.class,
+                () ->
+                    directory.staff(
+                        null,
+                        new PlatformCommands.Staff(
+                            prefix + "_forbidden",
+                            "拒绝的管理员",
+                            "PLATFORM_ADMIN",
+                            null,
+                            null,
+                            true,
+                            INITIAL)))
+            .code());
+    assertEquals(
+        0, db.count("SELECT COUNT(*) FROM employee WHERE username=?", prefix + "_forbidden"));
     act(session(operator));
-    var denied = assertThrows(BusinessException.class,
-        () -> directory.staff(created, input(created, "OPERATOR", store, campus, true, null)));
+    var denied =
+        assertThrows(
+            BusinessException.class,
+            () -> directory.staff(created, input(created, "OPERATOR", store, campus, true, null)));
     assertEquals(403, denied.status());
     assertEquals("FORBIDDEN", denied.code());
   }
@@ -258,12 +371,17 @@ class StaffAuthorizationIntegrationTest {
     try {
       db.update("UPDATE employee SET status=0 WHERE role='PLATFORM_ADMIN' AND id<>?", first);
       act(administrator);
-      var failure = assertThrows(BusinessException.class,
-          () -> directory.staff(first, input(first, "PLATFORM_ADMIN", null, null, false, null)));
+      var failure =
+          assertThrows(
+              BusinessException.class,
+              () ->
+                  directory.staff(first, input(first, "PLATFORM_ADMIN", null, null, false, null)));
       assertEquals("LAST_PLATFORM_ADMIN", failure.code());
-      assertEquals(1, db.count("SELECT COUNT(*) FROM employee WHERE role='PLATFORM_ADMIN' AND status=1"));
+      assertEquals(
+          1, db.count("SELECT COUNT(*) FROM employee WHERE role='PLATFORM_ADMIN' AND status=1"));
     } finally {
-      for (var row : previous) db.update("UPDATE employee SET status=? WHERE id=?", row.get("status"), row.get("id"));
+      for (var row : previous)
+        db.update("UPDATE employee SET status=? WHERE id=?", row.get("status"), row.get("id"));
     }
   }
 
@@ -281,12 +399,17 @@ class StaffAuthorizationIntegrationTest {
     }
   }
 
-  private String invalidManagerEdit(CountDownLatch start, Actor actor, long target) throws Exception {
+  private String invalidManagerEdit(CountDownLatch start, Actor actor, long target)
+      throws Exception {
     start.await();
     act(actor);
     try {
-      return assertThrows(BusinessException.class,
-          () -> directory.staff(target, input(target, "OPERATOR", store, campus, true, null))).code();
-    } finally { SecurityContextHolder.clearContext(); }
+      return assertThrows(
+              BusinessException.class,
+              () -> directory.staff(target, input(target, "OPERATOR", store, campus, true, null)))
+          .code();
+    } finally {
+      SecurityContextHolder.clearContext();
+    }
   }
 }

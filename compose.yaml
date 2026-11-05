@@ -2,8 +2,8 @@ name: campuseats-v1
 x-logging: &bounded-logging
   driver: json-file
   options:
-    max-size: "10m"
-    max-file: "3"
+    max-size: '10m'
+    max-file: '3'
 services:
   mysql:
     logging: *bounded-logging
@@ -18,10 +18,14 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:?Run scripts/start.ps1}
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:?Run scripts/start.ps1}
       TZ: Asia/Shanghai
-    command: ["--character-set-server=utf8mb4","--collation-server=utf8mb4_unicode_ci"]
-    volumes: ["mysql-data:/var/lib/mysql"]
+    command: ['--character-set-server=utf8mb4', '--collation-server=utf8mb4_unicode_ci']
+    volumes: ['mysql-data:/var/lib/mysql']
     healthcheck:
-      test: ["CMD-SHELL","MYSQL_PWD=$$MYSQL_PASSWORD mysql -h 127.0.0.1 -u campus sky_take_out -Nse 'SELECT 1' >/dev/null"]
+      test:
+        [
+          'CMD-SHELL',
+          "MYSQL_PWD=$$MYSQL_PASSWORD mysql -h 127.0.0.1 -u campus sky_take_out -Nse 'SELECT 1' >/dev/null",
+        ]
       interval: 5s
       timeout: 5s
       retries: 30
@@ -32,10 +36,15 @@ services:
     restart: unless-stopped
     environment:
       REDIS_PASSWORD: ${REDIS_PASSWORD:?Run scripts/start.ps1}
-    command: ["sh","-c","exec redis-server --appendonly yes --maxmemory 80mb --maxmemory-policy allkeys-lru --requirepass \"$$REDIS_PASSWORD\""]
-    volumes: ["redis-data:/data"]
+    command:
+      [
+        'sh',
+        '-c',
+        'exec redis-server --appendonly yes --maxmemory 80mb --maxmemory-policy allkeys-lru --requirepass "$$REDIS_PASSWORD"',
+      ]
+    volumes: ['redis-data:/data']
     healthcheck:
-      test: ["CMD-SHELL","REDISCLI_AUTH=$$REDIS_PASSWORD redis-cli ping | grep -q PONG"]
+      test: ['CMD-SHELL', 'REDISCLI_AUTH=$$REDIS_PASSWORD redis-cli ping | grep -q PONG']
       interval: 5s
       timeout: 3s
       retries: 20
@@ -65,14 +74,14 @@ services:
       SEARCH_REQUESTS_PER_MINUTE: ${SEARCH_REQUESTS_PER_MINUTE:-1200}
       CATALOG_REQUESTS_PER_MINUTE: ${CATALOG_REQUESTS_PER_MINUTE:-3000}
       TZ: Asia/Shanghai
-    volumes: ["uploads:/app/uploads"]
+    volumes: ['uploads:/app/uploads']
     depends_on:
       mysql:
         condition: service_healthy
       redis:
         condition: service_healthy
     healthcheck:
-      test: ["CMD","curl","-fsS","http://localhost:8080/actuator/health/readiness"]
+      test: ['CMD', 'curl', '-fsS', 'http://localhost:8080/actuator/health/readiness']
       interval: 10s
       timeout: 5s
       retries: 20
@@ -85,12 +94,16 @@ services:
       context: .
       dockerfile: deploy/web.Dockerfile
     restart: unless-stopped
-    ports: ["${BIND_ADDRESS:-127.0.0.1}:${WEB_PORT:-18083}:80"]
+    ports: ['${BIND_ADDRESS:-127.0.0.1}:${WEB_PORT:-18083}:80']
     depends_on:
       server:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL","wget -q -O /dev/null http://127.0.0.1/admin/ && wget -q -O /dev/null http://127.0.0.1/api/v1/user/campuses"]
+      test:
+        [
+          'CMD-SHELL',
+          'wget -q -O /dev/null http://127.0.0.1/admin/ && wget -q -O /dev/null http://127.0.0.1/api/v1/user/campuses',
+        ]
       interval: 10s
       timeout: 5s
       retries: 10

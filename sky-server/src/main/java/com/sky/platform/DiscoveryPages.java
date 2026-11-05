@@ -21,8 +21,13 @@ public class DiscoveryPages {
   private final DirectoryService directory;
   private final StoreCatalog catalog;
 
-  public DiscoveryPages(Db db, Json json, Clock clock, DiscoveryCursor cursors,
-      DirectoryService directory, StoreCatalog catalog) {
+  public DiscoveryPages(
+      Db db,
+      Json json,
+      Clock clock,
+      DiscoveryCursor cursors,
+      DirectoryService directory,
+      StoreCatalog catalog) {
     this.db = db;
     this.json = json;
     this.clock = clock;
@@ -31,13 +36,18 @@ public class DiscoveryPages {
     this.catalog = catalog;
   }
 
-  public Page stores(Long campus, String query, Boolean open, String cursor, Integer limit, boolean admin) {
+  public Page stores(
+      Long campus, String query, Boolean open, String cursor, Integer limit, boolean admin) {
     int size = limit(limit);
     query = query(query);
     require(campus == null || campus > 0, 400, "INVALID_CAMPUS", "校区编号不正确");
     Actor actor = admin ? Actor.employee() : null;
-    if (admin) require(Set.of("PLATFORM_ADMIN", "SHOP_MANAGER", "OPERATOR").contains(actor.role()),
-        403, "FORBIDDEN", "无店铺管理权限");
+    if (admin)
+      require(
+          Set.of("PLATFORM_ADMIN", "SHOP_MANAGER", "OPERATOR").contains(actor.role()),
+          403,
+          "FORBIDDEN",
+          "无店铺管理权限");
     String scope = scope("stores", campus, query, open, admin ? actor : "public");
     var position = cursors.decode(cursor, scope);
     var params = parameters(query, open, now());
@@ -53,29 +63,40 @@ public class DiscoveryPages {
       filter += " AND s.campus_id=:campus";
       params.put("campus", campus);
     }
-    var rows = db.named.queryForList(
-        "SELECT s.*,c.name campus_name FROM store s JOIN campus c ON c.id=s.campus_id"
-            + " WHERE s.id>:after" + filter
-            + " AND LOCATE(CAST(:query AS BINARY),CAST(s.name AS BINARY))>0"
-            + openFilter(open) + " ORDER BY s.id LIMIT :fetchLimit", params);
+    var rows =
+        db.named.queryForList(
+            "SELECT s.*,c.name campus_name FROM store s JOIN campus c ON c.id=s.campus_id"
+                + " WHERE s.id>:after"
+                + filter
+                + " AND LOCATE(CAST(:query AS BINARY),CAST(s.name AS BINARY))>0"
+                + openFilter(open)
+                + " ORDER BY s.id LIMIT :fetchLimit",
+            params);
     boolean more = rows.size() > size;
     var selected = new ArrayList<>(rows.subList(0, Math.min(size, rows.size())));
-    String next = more ? cursors.encode(scope, new DiscoveryCursor.Position(0, 0,
-        Db.id(selected.getLast(), "id"))) : null;
+    String next =
+        more
+            ? cursors.encode(
+                scope, new DiscoveryCursor.Position(0, 0, Db.id(selected.getLast(), "id")))
+            : null;
     decorateStores(selected, (LocalDateTime) params.get("at"));
     return new Page(selected, next, more);
   }
 
   public Map<String, Object> store(long id) {
     require(id > 0, 400, "INVALID_STORE", "店铺编号不正确");
-    var row = db.one("SELECT s.*,c.name campus_name FROM store s JOIN campus c ON c.id=s.campus_id"
-        + " WHERE s.id=? AND s.enabled=true AND c.enabled=true", id);
+    var row =
+        db.one(
+            "SELECT s.*,c.name campus_name FROM store s JOIN campus c ON c.id=s.campus_id"
+                + " WHERE s.id=? AND s.enabled=true AND c.enabled=true",
+            id);
     require(row != null, 404, "NOT_FOUND", "店铺不存在或已停用");
     decorateStores(List.of(row), now());
     return row;
   }
 
-  public Page search(long campus, String query, Long category, Boolean open, String cursor, Integer limit) {
+  public Page search(
+      long campus, String query, Long category, Boolean open, String cursor, Integer limit) {
     int size = limit(limit);
     query = query(query);
     require(campus > 0 && (category == null || category > 0), 400, "INVALID_QUERY", "搜索范围不正确");
@@ -97,29 +118,47 @@ public class DiscoveryPages {
       String table = PlatformScope.table(type);
       // Product-first index order lets broad matches stop at K instead of sorting every match.
       // Literal substring searches with few/no matches can still scan the remaining index range.
-      branches.add("(SELECT STRAIGHT_JOIN p.id,p.store_id,'" + type + "' item_type," + rank
-          + " item_rank,s.name store_name FROM " + table
-          + " p FORCE INDEX(ix_" + table + "_search_order) JOIN store s ON s.id=p.store_id"
-          + " JOIN category c ON c.id=p.category_id AND c.store_id=p.store_id"
-          + " JOIN campus campus ON campus.id=s.campus_id"
-          + " WHERE s.campus_id=:campus AND s.enabled=true AND campus.enabled=true"
-          + " AND p.status=1 AND c.status=1"
-          + (category == null ? "" : " AND p.category_id=:category")
-          + " AND (p.store_id>:afterStore OR (p.store_id=:afterStore AND (" + rank
-          + ">:afterRank OR (" + rank + "=:afterRank AND p.id>:afterId))))"
-          + " AND (LOCATE(CAST(:query AS BINARY),CAST(p.name AS BINARY))>0"
-          + " OR LOCATE(CAST(:query AS BINARY),CAST(s.name AS BINARY))>0)" + openFilter(open)
-          + " ORDER BY p.store_id,p.id LIMIT :fetchLimit)");
+      branches.add(
+          "(SELECT STRAIGHT_JOIN p.id,p.store_id,'"
+              + type
+              + "' item_type,"
+              + rank
+              + " item_rank,s.name store_name FROM "
+              + table
+              + " p FORCE INDEX(ix_"
+              + table
+              + "_search_order) JOIN store s ON s.id=p.store_id"
+              + " JOIN category c ON c.id=p.category_id AND c.store_id=p.store_id"
+              + " JOIN campus campus ON campus.id=s.campus_id"
+              + " WHERE s.campus_id=:campus AND s.enabled=true AND campus.enabled=true"
+              + " AND p.status=1 AND c.status=1"
+              + (category == null ? "" : " AND p.category_id=:category")
+              + " AND (p.store_id>:afterStore OR (p.store_id=:afterStore AND ("
+              + rank
+              + ">:afterRank OR ("
+              + rank
+              + "=:afterRank AND p.id>:afterId))))"
+              + " AND (LOCATE(CAST(:query AS BINARY),CAST(p.name AS BINARY))>0"
+              + " OR LOCATE(CAST(:query AS BINARY),CAST(s.name AS BINARY))>0)"
+              + openFilter(open)
+              + " ORDER BY p.store_id,p.id LIMIT :fetchLimit)");
     }
-    var rows = db.named.queryForList("SELECT * FROM (" + String.join(" UNION ALL ", branches)
-        + ") candidates ORDER BY store_id,item_rank,id LIMIT :fetchLimit", params);
+    var rows =
+        db.named.queryForList(
+            "SELECT * FROM ("
+                + String.join(" UNION ALL ", branches)
+                + ") candidates ORDER BY store_id,item_rank,id LIMIT :fetchLimit",
+            params);
     boolean more = rows.size() > size;
     var selected = new ArrayList<>(rows.subList(0, Math.min(size, rows.size())));
     String next = null;
     if (more) {
       var last = selected.getLast();
-      next = cursors.encode(scope, new DiscoveryCursor.Position(Db.id(last, "store_id"),
-          Db.integer(last, "item_rank"), Db.id(last, "id")));
+      next =
+          cursors.encode(
+              scope,
+              new DiscoveryCursor.Position(
+                  Db.id(last, "store_id"), Db.integer(last, "item_rank"), Db.id(last, "id")));
     }
     return new Page(catalog.searchDetails(selected, at), next, more);
   }
@@ -142,9 +181,11 @@ public class DiscoveryPages {
 
   // Slots are validated zero-padded HH:mm-HH:mm values, so comparison also supports 24:00.
   private String openFilter(Boolean open) {
-    return open == null ? "" : " AND (s.enabled=true AND s.open=true AND EXISTS"
-        + " (SELECT 1 FROM JSON_TABLE(s.hours,'$[*]' COLUMNS(slot varchar(11) PATH '$')) h"
-        + " WHERE :time>=LEFT(h.slot,5) AND :time<SUBSTRING(h.slot,7,5)))=:open";
+    return open == null
+        ? ""
+        : " AND (s.enabled=true AND s.open=true AND EXISTS"
+            + " (SELECT 1 FROM JSON_TABLE(s.hours,'$[*]' COLUMNS(slot varchar(11) PATH '$')) h"
+            + " WHERE :time>=LEFT(h.slot,5) AND :time<SUBSTRING(h.slot,7,5)))=:open";
   }
 
   private String scope(Object... values) {

@@ -251,11 +251,13 @@ class FinanceIntegrationTest {
   void reconciliationRestoresTheConnectionTemporaryTableBudget() {
     var transaction = new TransactionTemplate(manager);
     transaction.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
-    transaction.executeWithoutResult(status -> {
-      var before = db.jdbc.queryForObject("SELECT @@session.tmp_table_size", Long.class);
-      finance.reconcile(store, LocalDate.of(2026, 10, 27), LocalDate.of(2026, 10, 28));
-      assertEquals(before, db.jdbc.queryForObject("SELECT @@session.tmp_table_size", Long.class));
-    });
+    transaction.executeWithoutResult(
+        status -> {
+          var before = db.jdbc.queryForObject("SELECT @@session.tmp_table_size", Long.class);
+          finance.reconcile(store, LocalDate.of(2026, 10, 27), LocalDate.of(2026, 10, 28));
+          assertEquals(
+              before, db.jdbc.queryForObject("SELECT @@session.tmp_table_size", Long.class));
+        });
   }
 
   @Test

@@ -52,14 +52,28 @@ class PlatformViewFactoryTest {
     var setmeal = new LinkedHashMap<String, Object>();
     setmeal.put("id", 2L);
     setmeal.put("item_type", "SETMEAL");
-    setmeal.put("components", List.of(Map.of("dish_id", 1L, "setmeal_id", 2L, "copies", 1,
-        "price", new BigDecimal("10.00"), "current_name", "当前餐品")));
-    setmeal.put("promotion", Map.of("id", 20L, "price_cents", 800L,
-        "ends_at", LocalDateTime.of(2026, 10, 27, 12, 0)));
+    setmeal.put(
+        "components",
+        List.of(
+            Map.of(
+                "dish_id",
+                1L,
+                "setmeal_id",
+                2L,
+                "copies",
+                1,
+                "price",
+                new BigDecimal("10.00"),
+                "current_name",
+                "当前餐品")));
+    setmeal.put(
+        "promotion",
+        Map.of("id", 20L, "price_cents", 800L, "ends_at", LocalDateTime.of(2026, 10, 27, 12, 0)));
     var page = new DiscoveryPages.Page(List.of(dish, setmeal), "signed-cursor", true);
     assertEquals(ApiAdvice.wire(page), ApiAdvice.wire(PlatformViewFactory.search(page)));
-    var store = Map.<String, Object>of("id", 1L, "campus_id", 2L, "enabled", true,
-        "hours", List.of("00:00-24:00"));
+    var store =
+        Map.<String, Object>of(
+            "id", 1L, "campus_id", 2L, "enabled", true, "hours", List.of("00:00-24:00"));
     var stores = new DiscoveryPages.Page(List.of(store), null, false);
     assertEquals(ApiAdvice.wire(stores), ApiAdvice.wire(PlatformViewFactory.stores(stores)));
   }
@@ -80,17 +94,21 @@ class PlatformViewFactoryTest {
     row.put("created_at", LocalDateTime.of(2026, 10, 25, 12, 0));
     row.put("succeeded_at", null);
     row.put("success_time_source", "ACTUAL");
-    assertEquals(ApiAdvice.wire(List.of(row)), ApiAdvice.wire(PlatformViewFactory.refunds(List.of(row))));
+    assertEquals(
+        ApiAdvice.wire(List.of(row)), ApiAdvice.wire(PlatformViewFactory.refunds(List.of(row))));
   }
 
   @Test
   void unmappedFieldsAndWrongTypesFailRatherThanSilentlyDrifting() {
-    var error = assertThrows(IllegalStateException.class,
-        () -> PlatformViewFactory.order(Map.of("unexpected_business_field", "new")));
+    var error =
+        assertThrows(
+            IllegalStateException.class,
+            () -> PlatformViewFactory.order(Map.of("unexpected_business_field", "new")));
     assertTrue(error.getMessage().contains("unexpectedBusinessField"));
-    assertThrows(IllegalStateException.class,
+    assertThrows(
+        IllegalStateException.class,
         () -> PlatformViewFactory.order(Map.of("details", List.of(Map.of("unmapped", 1)))));
-    assertThrows(IllegalStateException.class,
-        () -> PlatformViewFactory.order(Map.of("status", "3")));
+    assertThrows(
+        IllegalStateException.class, () -> PlatformViewFactory.order(Map.of("status", "3")));
   }
 }

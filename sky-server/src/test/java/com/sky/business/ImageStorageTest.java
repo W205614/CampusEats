@@ -71,8 +71,9 @@ class ImageStorageTest {
 
   @Test
   void truncatedPngRemainsAnInputErrorAndReleasesAdmission() throws Exception {
-    var broken = new MockMultipartFile("file", "truncated.png", "image/png",
-        java.util.Arrays.copyOf(image().getBytes(), 33));
+    var broken =
+        new MockMultipartFile(
+            "file", "truncated.png", "image/png", java.util.Arrays.copyOf(image().getBytes(), 33));
     var storage = storage(100000, 0);
     var failure = assertThrows(BusinessException.class, () -> storage.stage(broken));
     assertEquals(400, failure.status());
