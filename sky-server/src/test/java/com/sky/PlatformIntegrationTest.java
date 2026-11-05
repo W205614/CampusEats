@@ -459,7 +459,8 @@ class PlatformIntegrationTest {
                 LocalDateTime.now(clock).plusHours(1),
                 true));
     act(user(user));
-    long owned = marketing.claim(coupon), platformOwned = marketing.claim(platformCoupon);
+    long owned = marketing.claim(coupon);
+    long platformOwned = marketing.claim(platformCoupon);
     add(1, 2, 2);
     add(3, dish3, 1);
     var in = input();
@@ -493,7 +494,8 @@ class PlatformIntegrationTest {
     fulfillment.action(order, "ready", new PlatformCommands.Action(2, null, null, null));
     fulfillment.action(order, "publish", new PlatformCommands.Action(3, null, null, null));
     long task = db.count("SELECT id FROM delivery_task WHERE order_id=?", order);
-    Actor a = staff("courier1"), b = staff("courier1b");
+    Actor a = staff("courier1");
+    Actor b = staff("courier1b");
     var ready = new CountDownLatch(2);
     var start = new CountDownLatch(1);
     var success = new AtomicInteger();
@@ -602,7 +604,8 @@ class PlatformIntegrationTest {
   @Test
   void platformReassignRecoversDisabledCourierAndPreservesPickedClock() {
     long id = assignedDelivery(true);
-    Actor old = staff("courier1"), replacement = staff("courier1b");
+    Actor old = staff("courier1");
+    Actor replacement = staff("courier1b");
     var before = db.one("SELECT * FROM orders WHERE id=?", id);
     db.update("UPDATE orders SET delivery_overdue=true WHERE id=?", id);
     db.update("UPDATE employee SET status=0,campus_id=2 WHERE id=?", old.id());

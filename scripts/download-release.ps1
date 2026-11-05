@@ -13,28 +13,47 @@ function Read-GitHubReleaseToken {
  # Ask the configured Git credential helper for this repository only. Never write its output,
  # token or authenticated URLs to the terminal, command arguments, logs or disk.
  $git=(Get-Command git -ErrorAction Stop).Source
- $process=[Diagnostics.Process]::new();$process.StartInfo=[Diagnostics.ProcessStartInfo]::new($git)
- $process.StartInfo.UseShellExecute=$false;$process.StartInfo.CreateNoWindow=$true
- $process.StartInfo.RedirectStandardInput=$true;$process.StartInfo.RedirectStandardOutput=$true;$process.StartInfo.RedirectStandardError=$true
+ $process = [Diagnostics.Process]::new()
+ $process.StartInfo = [Diagnostics.ProcessStartInfo]::new($git)
+ $process.StartInfo.UseShellExecute = $false
+ $process.StartInfo.CreateNoWindow = $true
+ $process.StartInfo.RedirectStandardInput = $true
+ $process.StartInfo.RedirectStandardOutput = $true
+ $process.StartInfo.RedirectStandardError = $true
  $process.StartInfo.WorkingDirectory=$root
- $process.StartInfo.Environment['GIT_TERMINAL_PROMPT']='0';$process.StartInfo.Environment['GCM_INTERACTIVE']='never'
- $process.StartInfo.ArgumentList.Add('credential');$process.StartInfo.ArgumentList.Add('fill')
+ $process.StartInfo.Environment['GIT_TERMINAL_PROMPT'] = '0'
+ $process.StartInfo.Environment['GCM_INTERACTIVE'] = 'never'
+ $process.StartInfo.ArgumentList.Add('credential')
+ $process.StartInfo.ArgumentList.Add('fill')
  try {
-  [void]$process.Start();$output=$process.StandardOutput.ReadToEndAsync();$errorText=$process.StandardError.ReadToEndAsync()
-  $process.StandardInput.Write("protocol=https`nhost=github.com`npath=W205614/CampusEats.git`n`n");$process.StandardInput.Close()
-  if(!$process.WaitForExit(10000)){$process.Kill($true);throw 'GitHub credential helper timed out.'}
-  $filled=$output.GetAwaiter().GetResult();[void]$errorText.GetAwaiter().GetResult()
+  [void]$process.Start()
+  $output = $process.StandardOutput.ReadToEndAsync()
+  $errorText = $process.StandardError.ReadToEndAsync()
+  $process.StandardInput.Write("protocol=https`nhost=github.com`npath=W205614/CampusEats.git`n`n")
+  $process.StandardInput.Close()
+  if (!$process.WaitForExit(10000)) {
+    $process.Kill($true)
+    throw 'GitHub credential helper timed out.'
+  }
+  $filled = $output.GetAwaiter().GetResult()
+  [void]$errorText.GetAwaiter().GetResult()
   if($process.ExitCode -ne 0){throw 'GitHub Actions read credentials are unavailable.'}
-  $match=[regex]::Match($filled,'(?m)^password=([^\r\n]+)');$filled=$null
+  $match = [regex]::Match($filled,'(?m)^password=([^\r\n]+)')
+  $filled = $null
   if(!$match.Success){throw 'Provide CAMPUS_GITHUB_TOKEN with Actions read access.'}
   return $match.Groups[1].Value
  }finally{$process.Dispose()}
 }
-$token=$null;$client=$null;$handler=$null;$response=$null
+$token = $null
+$client = $null
+$handler = $null
+$response = $null
 try {
  $token=Read-GitHubReleaseToken
- $handler=[Net.Http.HttpClientHandler]::new();$handler.AllowAutoRedirect=$false
- $client=[Net.Http.HttpClient]::new($handler);$client.Timeout=[TimeSpan]::FromSeconds(90)
+ $handler = [Net.Http.HttpClientHandler]::new()
+ $handler.AllowAutoRedirect = $false
+ $client = [Net.Http.HttpClient]::new($handler)
+ $client.Timeout = [TimeSpan]::FromSeconds(90)
  $client.DefaultRequestHeaders.UserAgent.ParseAdd('CampusEats-release/1.0')
  $client.DefaultRequestHeaders.Accept.ParseAdd('application/vnd.github+json')
  $client.DefaultRequestHeaders.Authorization=[Net.Http.Headers.AuthenticationHeaderValue]::new('Bearer',$token)
@@ -64,11 +83,20 @@ try {
    if($total -gt 8589934592 -or $entry.FullName -match '(^[/\\]|^[a-zA-Z]:|(^|[/\\])\.\.([/\\]|$))' -or (($entry.ExternalAttributes -shr 16) -band 61440) -eq 40960){throw 'Unsafe or oversized release ZIP.'}
    $target=[IO.Path]::GetFullPath((Join-Path $destinationPath $entry.FullName))
    if(!$target.StartsWith($destinationPath+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)){throw 'Release ZIP escapes destination.'}
-   if($entry.FullName.EndsWith('/')){New-SecureDirectory -Path $target | Out-Null;continue}
+   if ($entry.FullName.EndsWith('/')) {
+     New-SecureDirectory -Path $target | Out-Null
+     continue
+   }
    New-SecureDirectory -Path (Split-Path $target -Parent) | Out-Null
    Write-SecureTextFile -Path $target -Content ''
-   $inputStream=$entry.Open();$out=[IO.File]::Open($target,[IO.FileMode]::Create)
-   try {$inputStream.CopyTo($out)}finally{$inputStream.Dispose();$out.Dispose()}
+   $inputStream = $entry.Open()
+   $out = [IO.File]::Open($target,[IO.FileMode]::Create)
+   try {
+     $inputStream.CopyTo($out)
+   } finally {
+     $inputStream.Dispose()
+     $out.Dispose()
+   }
   }
  }finally{$archive.Dispose()}
  $manifest=Read-VerifiedReleaseBundle -Directory $destinationPath -ExpectedSourceSha $SourceSha -ExpectedRunId $RunId -ExpectedManifestSha256 $ManifestSha256
@@ -78,4 +106,15 @@ try {
  Move-ProjectFileToRecycleBin -Path $zip
  Write-Host "Matching successful CI bundle downloaded and strictly verified: $destinationPath"
 }catch{throw 'Release download or verification failed. No deployment was performed; retained partial files are not usable releases.'}
-finally{if($response){$response.Dispose()};if($client){$client.Dispose()};if($handler){$handler.Dispose()};$token=$null}
+finally {
+  if ($response) {
+    $response.Dispose()
+  }
+  if ($client) {
+    $client.Dispose()
+  }
+  if ($handler) {
+    $handler.Dispose()
+  }
+  $token = $null
+}

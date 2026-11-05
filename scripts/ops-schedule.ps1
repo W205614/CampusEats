@@ -31,7 +31,17 @@ foreach($definition in $definitions){
  if($IsWindows){
   # Parse with the native scheduler's definition API without registering any task.
   $scheduler=New-Object -ComObject 'Schedule.Service'
-  try {$scheduler.Connect();$task=$scheduler.NewTask(0);try{$task.XmlText=$xml}finally{if($task){[void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($task)}}}
+  try {
+    $scheduler.Connect()
+    $task = $scheduler.NewTask(0)
+    try {
+      $task.XmlText = $xml
+    } finally {
+      if ($task) {
+        [void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($task)
+      }
+    }
+  }
   finally {[void][Runtime.InteropServices.Marshal]::FinalReleaseComObject($scheduler)}
  }
  Write-SecureTextFile -Path (Join-Path $destination ($ProjectName+'-'+$definition.name+'.xml')) -Content $xml

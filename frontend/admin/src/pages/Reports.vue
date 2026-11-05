@@ -21,8 +21,12 @@ const session = useSession(),
   report = ref<Report>(),
   applied = ref<{ path: string; label: string }>(),
   loading = ref(false);
-let sequence = 0, mounted = true;
-onBeforeUnmount(() => { mounted = false; sequence++; });
+let sequence = 0,
+  mounted = true;
+onBeforeUnmount(() => {
+  mounted = false;
+  sequence++;
+});
 const names: Record<string, string> = {
   paymentCount: '合单支付笔数',
   childOrderCount: '店铺子订单数',
@@ -71,8 +75,11 @@ async function download() {
 }
 onMounted(async () => {
   if (session.session?.role === 'PLATFORM_ADMIN')
-    try { campuses.value = await request<Campus[]>('/platform/campuses'); }
-    catch (e) { if (mounted) notifyError(e); }
+    try {
+      campuses.value = await request<Campus[]>('/platform/campuses');
+    } catch (e) {
+      if (mounted) notifyError(e);
+    }
   if (mounted) await load();
 });
 </script>
@@ -90,41 +97,47 @@ onMounted(async () => {
         v-if="session.session?.role === 'PLATFORM_ADMIN'"
         v-model="level"
         style="width: 160px"
-        ><el-option value="STORE" label="当前店铺" /><el-option
-          value="PLATFORM"
-          label="平台 / 校区" /></el-select
-      ><el-select v-if="level === 'PLATFORM'" v-model="campus" clearable placeholder="全部校区"
-        ><el-option v-for="c in campuses" :key="c.id" :value="c.id" :label="c.name" /></el-select
-      ><input type="date" v-model="begin" /><span>至</span
-      ><input type="date" v-model="end" /><el-button type="primary" @click="load">查询</el-button>
+      >
+        <el-option value="STORE" label="当前店铺" />
+        <el-option value="PLATFORM" label="平台 / 校区" />
+      </el-select>
+      <el-select v-if="level === 'PLATFORM'" v-model="campus" clearable placeholder="全部校区">
+        <el-option v-for="c in campuses" :key="c.id" :value="c.id" :label="c.name" />
+      </el-select>
+      <input type="date" v-model="begin" />
+      <span>至</span>
+      <input type="date" v-model="end" />
+      <el-button type="primary" @click="load">查询</el-button>
     </div>
   </section>
-  <p v-if="applied" class="muted" data-testid="report-applied">当前结果：{{ applied.label }}；导出使用当前结果的筛选条件。</p>
-  <p v-if="report?.generatedAt" class="muted">数据快照：{{ report.generatedAt }}；支付汇总、每日及店铺分布来自同一数据库快照。</p>
+  <p v-if="applied" class="muted" data-testid="report-applied"
+    >当前结果：{{ applied.label }}；导出使用当前结果的筛选条件。</p
+  >
+  <p v-if="report?.generatedAt" class="muted"
+    >数据快照：{{ report.generatedAt }}；支付汇总、每日及店铺分布来自同一数据库快照。</p
+  >
   <div v-if="report" class="metrics">
     <section class="metric" v-for="(value, key) in report.metrics" :key="key">
-      <span>{{ names[key] || key }}</span
-      ><strong>{{ String(key).endsWith('Cents') ? '¥' + cents(value) : value }}</strong>
+      <span>{{ names[key] || key }}</span>
+      <strong>{{ String(key).endsWith('Cents') ? '¥' + cents(value) : value }}</strong>
     </section>
   </div>
   <section class="panel" v-if="report">
     <h2>每日支付</h2>
-    <el-table :data="report.daily"
-      ><el-table-column prop="date" label="日期" /><el-table-column
-        prop="paymentCount"
-        label="支付笔数"
-      /><el-table-column label="支付额"
-        ><template #default="{ row }">¥{{ cents(row.paidCents) }}</template></el-table-column
-      ></el-table
-    >
+    <el-table :data="report.daily">
+      <el-table-column prop="date" label="日期" />
+      <el-table-column prop="paymentCount" label="支付笔数" />
+      <el-table-column label="支付额">
+        <template #default="{ row }">¥{{ cents(row.paidCents) }}</template>
+      </el-table-column>
+    </el-table>
     <h2>店铺分布</h2>
-    <el-table :data="report.stores"
-      ><el-table-column prop="storeName" label="店铺" /><el-table-column
-        prop="childOrderCount"
-        label="子订单数"
-      /><el-table-column label="支付额"
-        ><template #default="{ row }">¥{{ cents(row.paidCents) }}</template></el-table-column
-      ></el-table
-    >
+    <el-table :data="report.stores">
+      <el-table-column prop="storeName" label="店铺" />
+      <el-table-column prop="childOrderCount" label="子订单数" />
+      <el-table-column label="支付额">
+        <template #default="{ row }">¥{{ cents(row.paidCents) }}</template>
+      </el-table-column>
+    </el-table>
   </section>
 </template>

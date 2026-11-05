@@ -23,6 +23,9 @@ function Exit-OperationsLock {
  param($Lease)
  if($Lease -and $Lease.Owned -and $global:CampusOperationsLocks.ContainsKey($Lease.Path)){
   $held=$global:CampusOperationsLocks[$Lease.Path]
-  if($held.Token -ceq $Lease.Token){$held.Stream.Dispose();$global:CampusOperationsLocks.Remove($Lease.Path)}
+  if ($held.Token -ceq $Lease.Token) {
+    $held.Stream.Dispose()
+    $global:CampusOperationsLocks.Remove($Lease.Path)
+  }
  }
 }

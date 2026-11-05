@@ -20,8 +20,17 @@ if(!$TrivyExecutable){
  # Always verify the pinned archive before extracting, including cached installations.
  if(!(Test-Path -LiteralPath $archive)){Invoke-WebRequest -Uri "https://github.com/aquasecurity/trivy/releases/download/v$version/$asset" -OutFile $archive -TimeoutSec 120}
  if((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant() -cne $expected){throw 'Pinned Trivy archive checksum mismatch.'}
- if($IsWindows){Expand-Archive -LiteralPath $archive -DestinationPath $tools -Force;$TrivyExecutable=Join-Path $tools 'trivy.exe'}
- else {& tar -xzf $archive -C $tools trivy;if($LASTEXITCODE -ne 0){throw 'Cannot extract pinned Trivy.'};$TrivyExecutable=Join-Path $tools 'trivy'}
+ if ($IsWindows) {
+   Expand-Archive -LiteralPath $archive -DestinationPath $tools -Force
+   $TrivyExecutable = Join-Path $tools 'trivy.exe'
+ }
+ else {
+   & tar -xzf $archive -C $tools trivy
+   if ($LASTEXITCODE -ne 0) {
+     throw 'Cannot extract pinned Trivy.'
+   }
+   $TrivyExecutable = Join-Path $tools 'trivy'
+ }
 }
 $detected=& $TrivyExecutable --version 2>&1
 if($LASTEXITCODE -ne 0 -or ($detected -join "`n") -notmatch ('(?m)^Version:\s*'+[regex]::Escape($version)+'\s*$')){throw 'The scanner must be the pinned Trivy version.'}
@@ -54,7 +63,10 @@ function Test-VulnerabilityGate([string]$Report,[string]$Gate,[string]$ExpectedC
   }
  }})
  [ordered]@{policy='All reported vulnerabilities, including unfixed, plus unresolved Expat CVE-2025-66382 inventory';count=$findings.Count;findings=$findings} | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $Gate -Encoding utf8
- if($findings.Count){return 1};return 0
+ if ($findings.Count) {
+   return 1
+ }
+ return 0
 }
 
 function Export-ImageRuntimeBom([string]$ImageId,[string]$Log){

@@ -36,10 +36,16 @@ $securityOutput=New-SecureDirectory -Path (Join-Path $output 'security')
 foreach($name in @('summary.json','server-runtime-sbom.cdx.json','server-runtime-manifest.sha256','server-runtime-provenance.json','server-os-sbom.cdx.json','web-os-sbom.cdx.json','mysql-os-sbom.cdx.json','redis-os-sbom.cdx.json','server-os-gate.json','web-os-gate.json','mysql-os-gate.json','redis-os-gate.json','server-java-gate.json','server-os-vulnerabilities.json','web-os-vulnerabilities.json','mysql-os-vulnerabilities.json','redis-os-vulnerabilities.json','server-java-vulnerabilities.json')){
  Copy-Item -LiteralPath (Join-Path $security $name) -Destination $securityOutput -ErrorAction Stop
 }
-$migrations=@(Get-ChildItem -LiteralPath (Join-Path $root 'sky-server/src/main/resources/db/migration') -Filter 'V*.sql' | Sort-Object Name | ForEach-Object {if($_.Name -notmatch '^V(\d+)__'){throw 'Unexpected migration name.'};@{name=$_.Name;version=[int]$Matches[1];sha256=(Get-ReleaseMigrationHash -Path $_.FullName);fileSha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash}})
+$migrations = @(Get-ChildItem -LiteralPath (Join-Path $root 'sky-server/src/main/resources/db/migration') -Filter 'V*.sql' | Sort-Object Name | ForEach-Object {
+  if ($_.Name -notmatch '^V(\d+)__') {
+    throw 'Unexpected migration name.'
+  }
+  @{name = $_.Name;version = [int]$Matches[1];sha256 = (Get-ReleaseMigrationHash -Path $_.FullName);fileSha256 = (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash}
+})
 $files=@(Get-ChildItem -LiteralPath $output -File -Recurse | ForEach-Object {@{path=[IO.Path]::GetRelativePath($output,$_.FullName).Replace('\','/');bytes=$_.Length;sha256=(Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash}})
 $manifest=@{schemaVersion=3;imageIdentityFormat='oci-uncompressed-v1';repository='W205614/CampusEats';sourceSha=$SourceSha;runId=$RunId;runAttempt=[int]$env:GITHUB_RUN_ATTEMPT;createdAt=[DateTimeOffset]::UtcNow.ToString('o');platform='linux/amd64';archive='application-images.tar';images=$images;migrationHashFormat='utf8-lf-v1';migrations=$migrations;files=$files}
-$path=Join-Path $output 'release-manifest.json';Write-OperationsJson -Path $path -Value $manifest
+$path = Join-Path $output 'release-manifest.json'
+Write-OperationsJson -Path $path -Value $manifest
 $hash=(Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash
 [void](Read-VerifiedReleaseBundle -Directory $output -ExpectedSourceSha $SourceSha -ExpectedRunId $RunId -ExpectedManifestSha256 $hash)
 Write-Host "RELEASE_MANIFEST_SHA256=$hash"

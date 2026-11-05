@@ -135,7 +135,10 @@ class WalletExpiryIntegrationTest {
     String cursor = null;
     do {
       var result = page("EXPIRED", cursor);
-      for (var row : result.records()) { assertEquals("EXPIRED", row.state()); assertTrue(ids.add(row.id())); }
+      for (var row : result.records()) {
+        assertEquals("EXPIRED", row.state());
+        assertTrue(ids.add(row.id()));
+      }
       cursor = result.nextCursor();
     } while (cursor != null);
     assertEquals(205, ids.size());

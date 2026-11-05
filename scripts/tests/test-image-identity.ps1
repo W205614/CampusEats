@@ -5,7 +5,8 @@ $scriptsDir = Split-Path $PSScriptRoot -Parent
 . (Join-Path $PSScriptRoot 'oci-image-fixture.ps1')
 $root=Split-Path $scriptsDir -Parent
 $fixture=New-SecureDirectory -Path (Join-Path $root ('.local/image-identity-test-'+[guid]::NewGuid().ToString('N')))
-$archive=Join-Path $fixture 'images.tar';$sha='a'*40
+$archive = Join-Path $fixture 'images.tar'
+$sha = 'a'*40
 $expected=@(New-ReleaseOciFixture -Path $archive -SourceSha $sha)
 $graph=@(Read-ReleaseImageGraph -Archive $archive -SourceSha $sha)
 if($graph.Count -ne 2){throw 'OCI fixture graph was incomplete.'}
@@ -19,20 +20,35 @@ foreach($image in $expected){
  foreach($fault in @('unknown-id','layers','platform','revision','descriptor')){
   $actual=@{Id=$image.platformManifestDigest;Os='linux';Architecture='amd64';Config=@{Labels=@{'org.opencontainers.image.revision'=$sha}};RootFS=@{Type='layers';Layers=@($image.diffIds)};Descriptor=@{digest=$image.platformManifestDigest}}
   switch($fault){'unknown-id'{$actual.Id='sha256:'+('f'*64)};'layers'{$actual.RootFS.Layers=@('sha256:'+('e'*64))};'platform'{$actual.Architecture='arm64'};'revision'{$actual.Config.Labels.'org.opencontainers.image.revision'='b'*40};'descriptor'{$actual.Descriptor.digest='sha256:'+('f'*64)}}
-  $rejected=$false;try{Resolve-ReleaseImageIdentity -Expected $image -Actual ([pscustomobject]$actual) | Out-Null}catch{$rejected=$true}
+  $rejected = $false
+  try {
+    Resolve-ReleaseImageIdentity -Expected $image -Actual ([pscustomobject]$actual) | Out-Null
+  } catch {
+    $rejected = $true
+  }
   if(!$rejected){throw "Unverified loaded image accepted: $fault"}
  }
 }
 foreach($fault in @('layer-bytes','config-bytes','mapping','diff-id','layer-size','auxiliary-unknown','auxiliary-id','auxiliary-bytes')){
  [void](New-ReleaseOciFixture -Path $archive -SourceSha $sha -Fault $fault)
- $rejected=$false;try{Read-ReleaseImageGraph -Archive $archive -SourceSha $sha | Out-Null}catch{$rejected=$true}
+ $rejected = $false
+ try {
+   Read-ReleaseImageGraph -Archive $archive -SourceSha $sha | Out-Null
+ } catch {
+   $rejected = $true
+ }
  if(!$rejected){throw "Corrupt OCI graph accepted: $fault"}
 }
 $three=@('mysql','server','web')
 [void](New-ReleaseOciFixture -Path $archive -SourceSha $sha -Services $three)
 if(@(Read-ReleaseImageGraph -Archive $archive -SourceSha $sha -ExpectedServices $three).Count -ne 3){throw 'Explicit MySQL image was not verified.'}
 foreach($services in @(@('server','web'),@('mysql','server','server'))){
- $rejected=$false;try{Read-ReleaseImageGraph -Archive $archive -SourceSha $sha -ExpectedServices $services | Out-Null}catch{$rejected=$true}
+ $rejected = $false
+ try {
+   Read-ReleaseImageGraph -Archive $archive -SourceSha $sha -ExpectedServices $services | Out-Null
+ } catch {
+   $rejected = $true
+ }
  if(!$rejected){throw 'Unexpected or duplicate services were accepted.'}
 }
 Write-Host 'Image identity: exact two/three-image layouts and config/manifest IDs resolve; substituted services, bytes, layers and source identities fail closed. No Docker used.'

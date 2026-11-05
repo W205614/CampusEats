@@ -19,7 +19,8 @@ $capture=Join-Path $fixture 'http-payloads.jsonl'
 '{"status":204}' | Set-Content -LiteralPath $httpConfig
 $httpProcess=[Diagnostics.Process]::new()
 $httpProcess.StartInfo=[Diagnostics.ProcessStartInfo]::new($pwsh)
-$httpProcess.StartInfo.UseShellExecute=$false;$httpProcess.StartInfo.CreateNoWindow=$true
+$httpProcess.StartInfo.UseShellExecute = $false
+$httpProcess.StartInfo.CreateNoWindow = $true
 foreach($argument in @('-NoProfile','-File',(Join-Path $PSScriptRoot 'alert-http-fixture.ps1'),'-ConfigFile',$httpConfig,'-ReadyFile',$ready,'-CaptureFile',$capture)){$httpProcess.StartInfo.ArgumentList.Add($argument)}
 . (Join-Path $scriptsDir 'operations-lock.ps1')
 . (Join-Path $scriptsDir 'operations-support.ps1')
@@ -40,7 +41,12 @@ function Invoke-Runner([string]$Action='Check'){
  if($joined -match 'fixture-private|token-secret'){throw 'Runner output leaked fixture data.'}
  return @{report=($joined | ConvertFrom-Json);code=$code}
 }
-function Payload-Count {if(Test-Path -LiteralPath $capture){return @(Get-Content -LiteralPath $capture).Count};return 0}
+function Payload-Count {
+  if (Test-Path -LiteralPath $capture) {
+    return @(Get-Content -LiteralPath $capture).Count
+  }
+  return 0
+}
 try {
  # Cross-process contention and same-process nested token both exercise the OS lock, not a mock.
  $lease=Enter-OperationsLock -Root $fixture -ProjectName 'campuseats-v1'
@@ -59,7 +65,8 @@ try {$lease=Enter-OperationsLock -Root $Root -ProjectName 'campuseats-v1';Exit-O
   try {Enter-OperationsLock -Root $fixture -ProjectName 'campuseats-v1' -Token 'incorrect' | Out-Null} catch {$invalid=$true}
   if(!$invalid){throw 'An invalid reentry token was accepted.'}
  } finally {Exit-OperationsLock $lease}
- $again=Enter-OperationsLock -Root $fixture -ProjectName 'campuseats-v1';Exit-OperationsLock $again
+ $again = Enter-OperationsLock -Root $fixture -ProjectName 'campuseats-v1'
+ Exit-OperationsLock $again
  $source=Join-Path $fixture '.local/backups/source'
  New-FixtureBackup $source
  $replica=Copy-VerifiedBackupReplica -Source $source -ReplicaDirectory $replicaRoot -ProjectName 'campuseats-v1'
@@ -74,7 +81,8 @@ try {$lease=Enter-OperationsLock -Root $Root -ProjectName 'campuseats-v1';Exit-O
  try {Find-VerifiedBackupReplica -ReplicaDirectory $replicaRoot -ProjectName 'campuseats-v1' | Out-Null} catch {$rejected=$true}
  if(!$rejected){throw 'Corrupt replica appeared verified.'}
  # Recreate a valid source/copy for runner state and HTTP tests.
- $source2=Join-Path $fixture '.local/backups/source2';New-FixtureBackup $source2
+ $source2 = Join-Path $fixture '.local/backups/source2'
+ New-FixtureBackup $source2
  $fixtureAge=Get-PinnedAge
  # The copied runner has its own tool cache. Reuse the verified archive for its backup.
  $ageVersionDir = (Get-Item -LiteralPath $fixtureAge).Directory.Parent
@@ -86,7 +94,8 @@ try {$lease=Enter-OperationsLock -Root $Root -ProjectName 'campuseats-v1';Exit-O
  $fixtureIdentity=Join-Path $fixture 'identity.txt'
  $fixturePrivate=(& $fixtureKeygen 2>$null) -join "`n"
  if($LASTEXITCODE -ne 0){throw 'Fixture identity failed.'}
- Write-SecureTextFile -Path $fixtureIdentity -Content $fixturePrivate;$fixturePrivate=$null
+ Write-SecureTextFile -Path $fixtureIdentity -Content $fixturePrivate
+ $fixturePrivate = $null
  $fixtureRecipient=(& $fixtureKeygen -y $fixtureIdentity) -join ''
  Copy-EncryptedBackupReplica -Source $source2 -ReplicaDirectory $replicaRoot -ProjectName 'campuseats-v1' -Recipient $fixtureRecipient -AgeExecutable $fixtureAge | Out-Null
  $unconfigured=Invoke-Runner
@@ -139,6 +148,9 @@ try {New-FixtureBackup $Destination} finally {Exit-OperationsLock $lease}
  if($sent -or $timer.Elapsed.TotalSeconds -gt 3){throw 'HTTP timeout was not bounded.'}
  Write-Host 'Operations runner: real lock contention/reentry, hidden atomic replicas, corruption rejection, unconfigured integrations, change/recovery alerts, retry and timeout passed.'
 } finally {
- if($httpProcess.Id -and !$httpProcess.HasExited){$httpProcess.Kill($true);$httpProcess.WaitForExit()}
+ if ($httpProcess.Id -and !$httpProcess.HasExited) {
+   $httpProcess.Kill($true)
+   $httpProcess.WaitForExit()
+ }
  $httpProcess.Dispose()
 }

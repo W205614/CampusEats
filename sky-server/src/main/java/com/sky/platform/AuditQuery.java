@@ -35,9 +35,18 @@ public record AuditQuery(
 
   public String conditions(List<Object> args) {
     String sql = "";
-    if (beforeId != null) { sql += " AND id<?"; args.add(beforeId); }
-    if (actorId != null) { sql += " AND actor_id=?"; args.add(actorId); }
-    if (action != null) { sql += " AND action=?"; args.add(action); }
+    if (beforeId != null) {
+      sql += " AND id<?";
+      args.add(beforeId);
+    }
+    if (actorId != null) {
+      sql += " AND actor_id=?";
+      args.add(actorId);
+    }
+    if (action != null) {
+      sql += " AND action=?";
+      args.add(action);
+    }
     if (begin != null) {
       sql += " AND created_at>=? AND created_at<?";
       args.add(begin.atStartOfDay());

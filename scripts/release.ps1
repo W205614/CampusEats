@@ -19,7 +19,8 @@ try {
  foreach($migration in $manifest.migrations){
   if($migration.name -notmatch '^V\d+__[a-zA-Z0-9_]+\.sql$' -or (Get-ReleaseMigrationHash -Path (Join-Path $migrationDirectory $migration.name)) -ine $migration.sha256){throw 'Checkout migration differs from the tested release.'}
  }
- $envPath=[IO.Path]::GetFullPath($EnvFile,$root);Set-SecurePathPermissions -Path $envPath
+ $envPath = [IO.Path]::GetFullPath($EnvFile,$root)
+ Set-SecurePathPermissions -Path $envPath
  $compose=@('compose','--env-file',$envPath,'-p',$ProjectName)
  & docker @compose config --quiet
  if($LASTEXITCODE -ne 0){throw 'Compose configuration is invalid.'}
@@ -30,7 +31,8 @@ try {
   # Resolve names rather than assuming project labels exist. A manually created or foreign
   # same-name volume must never be silently reused. Compose JSON includes credentials, so
   # keep it in memory, extract only non-sensitive names/ports and never echo or persist it.
-  $configurationText=$null;$configuration=$null
+  $configurationText = $null
+  $configuration = $null
   try {
    $configurationText=(& docker @compose config --format json) -join "`n"
    if($LASTEXITCODE -ne 0){throw 'Configuration resolution failed.'}
@@ -39,7 +41,10 @@ try {
    $publishedHostPorts=@($configuration.services.PSObject.Properties | ForEach-Object {$_.Value.ports} | Where-Object {$null -ne $_.published} | ForEach-Object {[string]$_.published} | Sort-Object -Unique)
    if(!$resolvedVolumeNames.Count -or @($resolvedVolumeNames | Where-Object {$_ -notmatch '^[a-zA-Z0-9][a-zA-Z0-9_.-]*$'}).Count){throw 'Invalid resolved volume inventory.'}
   }catch{throw 'Cannot safely resolve isolated volume names.'}
-  finally{$configurationText=$null;$configuration=$null}
+  finally {
+    $configurationText = $null
+    $configuration = $null
+  }
   $allExistingVolumeNames=@(& docker volume ls --format '{{.Name}}')
   if($LASTEXITCODE -ne 0){throw 'Cannot inspect existing volume names.'}
   if(@($resolvedVolumeNames | Where-Object {$_ -cin $allExistingVolumeNames}).Count){throw 'Initialization refuses an existing resolved volume name, regardless of ownership labels.'}
@@ -49,10 +54,16 @@ try {
  & docker image load --input (Join-Path ([IO.Path]::GetFullPath($BundleDirectory)) $manifest.archive)
  if($LASTEXITCODE -ne 0){throw 'Cannot import the tested image archive.'}
  $resolvedImages=@(Assert-LoadedReleaseImages -Manifest $manifest)
- $id=[guid]::NewGuid().ToString('N');$releaseRoot=New-SecureDirectory -Path (Join-Path $root ('.local/releases/artifact-'+$id))
+ $id = [guid]::NewGuid().ToString('N')
+ $releaseRoot = New-SecureDirectory -Path (Join-Path $root ('.local/releases/artifact-'+$id))
  $override=Join-Path $releaseRoot 'candidate.json'
  $gateOverride=Join-Path $releaseRoot 'migration-gate.json'
- $imageMap=@{};$identityMap=@{};foreach($image in $resolvedImages){$imageMap[$image.service]=$image.runtimeId;$identityMap[$image.service]=$image}
+ $imageMap = @{}
+ $identityMap = @{}
+ foreach ($image in $resolvedImages) {
+   $imageMap[$image.service] = $image.runtimeId
+   $identityMap[$image.service] = $image
+ }
  $candidateServices=@{server=@{image=$imageMap.server};web=@{image=$imageMap.web}}
  if($imageMap.ContainsKey('mysql')){$candidateServices.mysql=@{image=$imageMap.mysql}}
  Write-OperationsJson -Path $override -Value @{services=$candidateServices}
@@ -85,7 +96,8 @@ try {
    & (Join-Path $PSScriptRoot 'safe-backup.ps1') -ProjectName $ProjectName -EnvFile $envPath -Destination $before -OperationToken $lease.Token
   }catch{
    if($writers.Count){& docker @compose start @writers | Out-Null}
-   $record.outcome='backup_failed';Write-OperationsJson -Path (Join-Path $releaseRoot 'release.json') -Value $record
+   $record.outcome = 'backup_failed'
+   Write-OperationsJson -Path (Join-Path $releaseRoot 'release.json') -Value $record
    throw 'Pre-release recovery verification failed; original writer state was requested and no migration was started.'
   }
   $record.beforeBackup=$before
@@ -111,7 +123,8 @@ try {
   else {$config+="`n"+$key+'='+$pinned[$key]+"`n"}
  }
  Write-SecureTextFile -Path $envPath -Content $config
- $record.outcome='starting';Write-OperationsJson -Path (Join-Path $releaseRoot 'release.json') -Value $record
+ $record.outcome = 'starting'
+ Write-OperationsJson -Path (Join-Path $releaseRoot 'release.json') -Value $record
  try {
   # Flyway runs with all application jobs disabled and no Web ingress. Readiness proves only
   # that migration and DB access completed; it does not open traffic or permit background writes.
@@ -136,7 +149,8 @@ try {
    & (Join-Path $PSScriptRoot 'safe-backup.ps1') -ProjectName $ProjectName -EnvFile $envPath -Destination $currentBackup -OperationToken $lease.Token
    $record.currentBackup=$currentBackup
    $uploads=Compare-ReleaseUploads -BeforeBackup $record.beforeBackup -CurrentBackup $currentBackup
-   $record['uploadedFilesUnchanged']=$uploads.unchanged;$record['uploadedFilesAdded']=$uploads.added
+   $record['uploadedFilesUnchanged'] = $uploads.unchanged
+   $record['uploadedFilesAdded'] = $uploads.added
    $record['uploadsVerification']='passed'
   }
   # Only verified data and a verified current recovery set permit restoring normal task settings
@@ -146,16 +160,27 @@ try {
   foreach($service in @('server','web')){
    $container=(& docker @compose ps -a -q $service) -join ''
    Assert-ReleaseContainerImage -ContainerId $container -Image $identityMap[$service]
-   if(!$Initialize -and $service -ceq 'server'){Assert-ReleaseUploadsMount -Expected $record.uploadsMount -ContainerId $container;$record['uploadsMountVerification']='passed'}
+   if (!$Initialize -and $service -ceq 'server') {
+     Assert-ReleaseUploadsMount -Expected $record.uploadsMount -ContainerId $container
+     $record['uploadsMountVerification'] = 'passed'
+   }
   }
-  $record.outcome='healthy';$record.completedAt=[DateTimeOffset]::UtcNow.ToString('o')
+  $record.outcome = 'healthy'
+  $record.completedAt = [DateTimeOffset]::UtcNow.ToString('o')
   Write-OperationsJson -Path (Join-Path $releaseRoot 'release.json') -Value $record
-  if($record.currentBackup){Write-OperationsJson -Path (Join-Path $root '.local/backups/LATEST.json') -Value @{directory=$record.currentBackup;sourceSha=$ExpectedSourceSha;runId=$ExpectedRunId};[IO.File]::WriteAllText((Join-Path $root '.local/backups/LATEST.txt'),$record.currentBackup)}
+  if ($record.currentBackup) {
+    Write-OperationsJson -Path (Join-Path $root '.local/backups/LATEST.json') -Value @{directory = $record.currentBackup;sourceSha = $ExpectedSourceSha;runId = $ExpectedRunId}
+    [IO.File]::WriteAllText((Join-Path $root '.local/backups/LATEST.txt'),$record.currentBackup)
+  }
   Write-Host "Tested CI artifact deployed; release record: $releaseRoot"
  }catch{
   & docker @compose stop web server | Out-Null
-  $record.outcome='failed_paused';$record.completedAt=[DateTimeOffset]::UtcNow.ToString('o')
+  $record.outcome = 'failed_paused'
+  $record.completedAt = [DateTimeOffset]::UtcNow.ToString('o')
   Write-OperationsJson -Path (Join-Path $releaseRoot 'release.json') -Value $record
   throw 'Artifact deployment or data verification failed. Writers remain paused; preserve the pre-release recovery set and inspect the release record. No build or unsafe image rollback was attempted.'
  }
-}finally{Pop-Location;Exit-OperationsLock $lease}
+} finally {
+  Pop-Location
+  Exit-OperationsLock $lease
+}

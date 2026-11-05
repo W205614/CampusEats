@@ -62,8 +62,14 @@ class OperationsAccessTest {
         .andExpect(status().isOk());
     mvc.perform(local(get("/actuator/health/operations")).header("X-Campus-Operations-Key", "0".repeat(64)))
         .andExpect(status().isUnauthorized());
-    mvc.perform(get("/actuator/health/operations").with(req -> { req.setRemoteAddr("192.0.2.4"); return req; })
-        .header("X-Campus-Operations-Key", key)).andExpect(status().isUnauthorized());
+    mvc.perform(
+            get("/actuator/health/operations")
+                .with(req -> {
+                  req.setRemoteAddr("192.0.2.4");
+                  return req;
+                })
+                .header("X-Campus-Operations-Key", key))
+        .andExpect(status().isUnauthorized());
     mvc.perform(local(get("/actuator/prometheus")).header("X-Campus-Operations-Key", key))
         .andExpect(status().isUnauthorized());
     mvc.perform(local(get("/api/v1/platform/private")).header("X-Campus-Operations-Key", key))
@@ -77,7 +83,10 @@ class OperationsAccessTest {
   }
 
   private static MockHttpServletRequestBuilder local(MockHttpServletRequestBuilder builder) {
-    return builder.with(req -> { req.setRemoteAddr("127.0.0.1"); return req; });
+    return builder.with(req -> {
+      req.setRemoteAddr("127.0.0.1");
+      return req;
+    });
   }
 
   private static String key() throws Exception {

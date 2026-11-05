@@ -17,13 +17,18 @@ const { stores, storeHasMore, storeLoading, loadStores, clearStores } = useStore
 let loadSequence = 0;
 const role = computed(() => session.session?.role || '');
 async function load() {
-  const current = ++loadSequence, token = session.session?.token;
+  const current = ++loadSequence,
+    token = session.session?.token;
   storesLoaded.value = false;
   if (!session.session || session.session.mustChangePassword || role.value === 'DELIVERER') return;
   try {
-    if (!await loadStores(true)) return;
-    while (selectedStore.value && !stores.value.some(s => s.id === selectedStore.value) && storeHasMore.value) {
-      if (!await loadStores()) return;
+    if (!(await loadStores(true))) return;
+    while (
+      selectedStore.value &&
+      !stores.value.some((s) => s.id === selectedStore.value) &&
+      storeHasMore.value
+    ) {
+      if (!(await loadStores())) return;
       if (current !== loadSequence || token !== session.session?.token) return;
     }
     if (current !== loadSequence || token !== session.session?.token) return;
@@ -34,9 +39,20 @@ async function load() {
     if (current === loadSequence && token === session.session?.token) notifyError(e);
   }
 }
-watch(() => session.session?.token, () => { clearStores(); void load(); }, { immediate: true });
+watch(
+  () => session.session?.token,
+  () => {
+    clearStores();
+    void load();
+  },
+  { immediate: true },
+);
 async function moreStores() {
-  try { await loadStores(); } catch (e) { notifyError(e); }
+  try {
+    await loadStores();
+  } catch (e) {
+    notifyError(e);
+  }
 }
 watch(selectedStore, (v) => localStorage.setItem('campus-store', v));
 async function login() {
@@ -63,7 +79,11 @@ async function logout() {
   router.push('/');
 }
 const links = computed(() => {
-  if (role.value === 'DELIVERER') return [['/orders', '抢单与配送'],['/messages','站内消息']];
+  if (role.value === 'DELIVERER')
+    return [
+      ['/orders', '抢单与配送'],
+      ['/messages', '站内消息'],
+    ];
   const base = [
     ['/', '校区与店铺'],
     ['/orders', '订单履约'],
@@ -83,7 +103,8 @@ const links = computed(() => {
       ['/finance', '模拟账务'],
       ['/operations/audit', '操作记录'],
     );
-  if (role.value === 'PLATFORM_ADMIN') base.push(['/operations/buildings', '校区楼栋'],['/users','用户账号']);
+  if (role.value === 'PLATFORM_ADMIN')
+    base.push(['/operations/buildings', '校区楼栋'], ['/users', '用户账号']);
   return base;
 });
 </script>
@@ -103,17 +124,33 @@ const links = computed(() => {
         <p class="muted">平台管理员、店长、运营员及配送员统一登录。</p>
         <el-form label-position="top" @submit.prevent="login">
           <el-form-item label="账户" for="staff-username">
-            <el-input id="staff-username" v-model="username" autocomplete="username" placeholder="请输入工作账户" required />
+            <el-input
+              id="staff-username"
+              v-model="username"
+              autocomplete="username"
+              placeholder="请输入工作账户"
+              required
+            />
           </el-form-item>
           <el-form-item label="密码" for="staff-password">
-            <el-input id="staff-password" v-model="password" type="password" show-password autocomplete="current-password" placeholder="请输入密码" required />
+            <el-input
+              id="staff-password"
+              v-model="password"
+              type="password"
+              show-password
+              autocomplete="current-password"
+              placeholder="请输入密码"
+              required
+            />
           </el-form-item>
-          <el-button class="wide" type="primary" native-type="submit" :loading="busy">登录工作台</el-button>
+          <el-button class="wide" type="primary" native-type="submit" :loading="busy"
+            >登录工作台</el-button
+          >
         </el-form>
         <p class="login-help">演示账号使用本机生成的初始密码，首次员工登录须改密。</p>
         <div class="login-customer">
           <span>想给自己点一餐？</span>
-          <a href="/app/">用户点餐 <span aria-hidden="true">→</span></a>
+          <a href="/app/">用户点餐 <span aria-hidden="true">→</span> </a>
         </div>
       </section>
     </div>
@@ -121,7 +158,7 @@ const links = computed(() => {
   <div v-else class="workspace">
     <aside class="sidebar">
       <div class="brand">
-        C<span>CampusEats<small>校园供餐平台</small></span>
+        C<span>CampusEats<small>校园供餐平台</small> </span>
       </div>
       <nav>
         <router-link v-for="link in links" :key="link[0]" :to="link[0]!">{{ link[1] }}</router-link>
@@ -135,23 +172,43 @@ const links = computed(() => {
           v-model="selectedStore"
           placeholder="选择店铺"
           style="width: 260px"
-          ><el-option
+        >
+          <el-option
             v-for="s in stores"
             :key="s.id"
             :value="s.id"
-            :label="s.campusName + ' / ' + s.name" /></el-select
-        ><span v-else>校区配送工作台</span>
-        <el-button v-if="role !== 'DELIVERER' && storeHasMore" :loading="storeLoading" @click="moreStores">加载更多店铺</el-button>
+            :label="s.campusName + ' / ' + s.name"
+          />
+        </el-select>
+        <span v-else>校区配送工作台</span>
+        <el-button
+          v-if="role !== 'DELIVERER' && storeHasMore"
+          :loading="storeLoading"
+          @click="moreStores"
+          >加载更多店铺</el-button
+        >
         <div>
           {{ session.session.name }} · {{ roles[role] }}
           <a href="/app/" style="margin-left: 12px">去点餐</a>
-          <el-button text @click="router.push('/password')">改密</el-button
-          ><el-button text @click="logout">退出</el-button>
+          <el-button text @click="router.push('/password')">改密</el-button>
+          <el-button text @click="logout">退出</el-button>
         </div>
       </header>
       <div class="content">
-        <router-view v-if="router.currentRoute.value.path === '/password' || (role === 'DELIVERER' ? ['/orders','/messages'].includes(router.currentRoute.value.path) : storesLoaded)" :key="router.currentRoute.value.path + selectedStore" @stores-changed="load" />
-        <section v-else class="panel"><p>正在读取授权店铺；加载失败时可重试。</p><el-button @click="load">重新加载店铺</el-button></section>
+        <router-view
+          v-if="
+            router.currentRoute.value.path === '/password' ||
+            (role === 'DELIVERER'
+              ? ['/orders', '/messages'].includes(router.currentRoute.value.path)
+              : storesLoaded)
+          "
+          :key="router.currentRoute.value.path + selectedStore"
+          @stores-changed="load"
+        />
+        <section v-else class="panel">
+          <p>正在读取授权店铺；加载失败时可重试。</p>
+          <el-button @click="load">重新加载店铺</el-button>
+        </section>
       </div>
     </main>
   </div>

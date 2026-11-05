@@ -189,7 +189,8 @@ class CommerceIntegrationTest {
   record Request(long user, String key, Submit input) {}
 
   Request request(int n) {
-    long user = user(n), address = address(user);
+    long user = user(n);
+    long address = address(user);
     add(user, 0, "DISH", 2, Map.of(), 1);
     Quote quote = commands.preview(user, new Preview(address, 1L));
     return new Request(
@@ -366,7 +367,8 @@ class CommerceIntegrationTest {
   @Test
   void acceptAndCancelOnlyOneWins() throws Exception {
     var row = paid(1);
-    long id = Db.id(row, "id"), u = Db.id(row, "user_id");
+    long id = Db.id(row, "id");
+    long u = Db.id(row, "user_id");
     var results =
         parallel(
             2,
@@ -437,7 +439,8 @@ class CommerceIntegrationTest {
 
   @Test
   void setmealReservationsAreAtomic() {
-    long u = user(1), a = address(u);
+    long u = user(1);
+    long a = address(u);
     add(u, 0, "SETMEAL", 1, Map.of(), 2);
     var q = commands.preview(u, new Preview(a, 1L));
     quotas.configure(LocalDate.now(clock), new Quota(3L, 1, false));
@@ -585,7 +588,8 @@ class CommerceIntegrationTest {
 
   @Test
   void shopBuildingAndFlavorsAreChecked() {
-    long u = user(1), a = address(u);
+    long u = user(1);
+    long a = address(u);
     failure(409, () -> add(u, 0, "DISH", 1, Map.of("辣度", "不支持"), 1));
     add(u, 0, "DISH", 2, Map.of(), 1);
     db.update("UPDATE campus_building SET enabled=false WHERE id=1");

@@ -10,10 +10,24 @@ try {
    $stream=$connection.GetStream()
    $reader=[IO.StreamReader]::new($stream,[Text.Encoding]::UTF8,$false,1024,$true)
    $length=0
-   while($true){$line=$reader.ReadLine();if($null -eq $line -or $line -eq ''){break};if($line -match '^Content-Length:\s*(\d+)$'){$length=[int]$Matches[1]}}
+   while ($true) {
+     $line = $reader.ReadLine()
+     if ($null -eq $line -or $line -eq '') {
+       break
+     }
+     if ($line -match '^Content-Length:\s*(\d+)$') {
+       $length = [int]$Matches[1]
+     }
+   }
    $buffer=New-Object char[] $length
    $offset=0
-   while($offset -lt $length){$read=$reader.Read($buffer,$offset,$length-$offset);if(!$read){break};$offset+=$read}
+   while ($offset -lt $length) {
+     $read = $reader.Read($buffer,$offset,$length-$offset)
+     if (!$read) {
+       break
+     }
+     $offset += $read
+   }
    [IO.File]::AppendAllText($CaptureFile,((-join $buffer)+"`n"))
    $config=Get-Content -LiteralPath $ConfigFile -Raw | ConvertFrom-Json
    if($config.delayMilliseconds){[Threading.Thread]::Sleep([int]$config.delayMilliseconds)}

@@ -25,7 +25,10 @@ public class AuditHistory {
     int pageLimit = query.validate();
     var args = new ArrayList<Object>();
     String filter = "";
-    if (store != null) { filter = " AND store_id=?"; args.add(store); }
+    if (store != null) {
+      filter = " AND store_id=?";
+      args.add(store);
+    }
     filter += query.conditions(args);
     args.add(pageLimit);
     return db.rows("SELECT id,actor_type,actor_id,action,target_id,detail,created_at,store_id,campus_id"

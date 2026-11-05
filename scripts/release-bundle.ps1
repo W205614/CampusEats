@@ -15,7 +15,8 @@ function Get-ReleaseMigrationHash {
 function Read-VerifiedReleaseBundle {
  param([Parameter(Mandatory)][string]$Directory,[Parameter(Mandatory)][string]$ExpectedSourceSha,[Parameter(Mandatory)][string]$ExpectedRunId,[Parameter(Mandatory)][string]$ExpectedManifestSha256)
  if($ExpectedSourceSha -notmatch '^[a-f0-9]{40}$' -or $ExpectedRunId -notmatch '^[0-9]+$' -or $ExpectedManifestSha256 -notmatch '^[a-fA-F0-9]{64}$'){throw 'Exact commit, run and trusted manifest hash are required.'}
- $directoryPath=[IO.Path]::GetFullPath($Directory);Assert-NoSecurePathLinks -Path $directoryPath
+ $directoryPath = [IO.Path]::GetFullPath($Directory)
+ Assert-NoSecurePathLinks -Path $directoryPath
  $manifest=Join-Path $directoryPath 'release-manifest.json'
  if((Get-FileHash -LiteralPath $manifest -Algorithm SHA256).Hash -ine $ExpectedManifestSha256){throw 'Release manifest hash does not match the trusted CI result.'}
  $record=Get-Content -LiteralPath $manifest -Raw | ConvertFrom-Json
@@ -31,9 +32,13 @@ function Read-VerifiedReleaseBundle {
  $files=@{}
  foreach($file in $record.files){
   if($file.path -notmatch '^[a-zA-Z0-9][a-zA-Z0-9._/-]*$' -or $file.path -match '(^|/)\.\.(/|$)' -or $file.sha256 -notmatch '^[a-fA-F0-9]{64}$'){throw 'Invalid release member.'}
-  $path=[IO.Path]::GetFullPath((Join-Path $directoryPath $file.path));Assert-NoSecurePathLinks -Path $path
+  $path = [IO.Path]::GetFullPath((Join-Path $directoryPath $file.path))
+  Assert-NoSecurePathLinks -Path $path
   if(!$path.StartsWith($directoryPath+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase) -or (Get-Item -LiteralPath $path -Force).Length -ne $file.bytes -or (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ine $file.sha256){throw 'Release member hash or size mismatch.'}
-  if($files.ContainsKey($file.path)){throw 'Duplicate release member.'};$files[$file.path]=$true
+  if ($files.ContainsKey($file.path)) {
+    throw 'Duplicate release member.'
+  }
+  $files[$file.path] = $true
  }
  if(!$files.ContainsKey('application-images.tar') -or !$files.ContainsKey('security/summary.json') -or !$files.ContainsKey('security/server-runtime-sbom.cdx.json')){throw 'Required image archive or security evidence is missing.'}
  # Version 1 is accepted only by deriving identities from its hash-verified OCI graph.

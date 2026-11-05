@@ -1,31 +1,35 @@
 <script setup lang="ts">
-import { onBeforeUnmount, ref } from "vue";
-import { api, body, notifyError } from "../api";
-import { useSession } from "../stores/session";
-import { ElMessage } from "element-plus";
-const oldPassword = ref(""),
-  password = ref(""),
+import { onBeforeUnmount, ref } from 'vue';
+import { api, body, notifyError } from '../api';
+import { useSession } from '../stores/session';
+import { ElMessage } from 'element-plus';
+const oldPassword = ref(''),
+  password = ref(''),
   busy = ref(false),
   store = useSession();
-function clearPasswords() { oldPassword.value = password.value = ""; }
+function clearPasswords() {
+  oldPassword.value = password.value = '';
+}
 onBeforeUnmount(clearPasswords);
 async function save() {
   if (busy.value) return;
   if (password.value.length < 12 || password.value.length > 128) {
-    notifyError(new Error("新密码须为12至128个字符")); return;
+    notifyError(new Error('新密码须为12至128个字符'));
+    return;
   }
   if (oldPassword.value === password.value) {
-    notifyError(new Error("新密码不能与原密码相同")); return;
+    notifyError(new Error('新密码不能与原密码相同'));
+    return;
   }
   busy.value = true;
   try {
-    await api("/auth/password", {
-      method: "POST",
+    await api('/auth/password', {
+      method: 'POST',
       body: body({ oldPassword: oldPassword.value, password: password.value }),
     });
     clearPasswords();
     store.set(null);
-    ElMessage.success("密码已更新，请重新登录");
+    ElMessage.success('密码已更新，请重新登录');
   } catch (e) {
     notifyError(e);
   } finally {
@@ -41,20 +45,14 @@ async function save() {
     </div>
   </div>
   <div class="panel" style="max-width: 500px">
-    <el-form label-position="top" @submit.prevent="save"
-      ><el-form-item label="原密码"
-        ><el-input
-          v-model="oldPassword"
-          type="password"
-          show-password /></el-form-item
-      ><el-form-item label="新密码（12至128个字符）"
-        ><el-input
-          v-model="password"
-          type="password"
-          show-password /></el-form-item
-      ><el-button type="primary" native-type="submit" :loading="busy"
-        >更新并重新登录</el-button
-      ></el-form
-    >
+    <el-form label-position="top" @submit.prevent="save">
+      <el-form-item label="原密码">
+        <el-input v-model="oldPassword" type="password" show-password />
+      </el-form-item>
+      <el-form-item label="新密码（12至128个字符）">
+        <el-input v-model="password" type="password" show-password />
+      </el-form-item>
+      <el-button type="primary" native-type="submit" :loading="busy">更新并重新登录</el-button>
+    </el-form>
   </div>
 </template>

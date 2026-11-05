@@ -23,13 +23,24 @@ $global:restoreOwnershipNested=$false
 $global:restoreOwnershipSecondFailed=$false
 $global:restoreOwnershipScript=Join-Path $scriptsDir 'restore-check.ps1'
 $global:restoreOwnershipSecond=Join-Path $fixture 'second'
-function global:Get-Date {param([string]$Format);$date=[datetime]::new(2026,10,26,3,0,0);if($Format){return $date.ToString($Format)};return $date}
+function global:Get-Date {
+  param([string]$Format)
+  $date = [datetime]::new(2026,10,26,3,0,0)
+  if ($Format) {
+    return $date.ToString($Format)
+  }
+  return $date
+}
 function global:docker {
- $global:LASTEXITCODE=0;$a=@($args)
+ $global:LASTEXITCODE = 0
+ $a = @($args)
  if($a[0] -eq 'run'){
   $name=$a[[Array]::IndexOf($a,'--name')+1]
   $global:restoreOwnershipNames.Add($name)
-  if($global:restoreOwnershipNested){$global:LASTEXITCODE=1;return}
+  if ($global:restoreOwnershipNested) {
+    $global:LASTEXITCODE = 1
+    return
+  }
   $label=@($a | Where-Object {$_ -like 'campuseats.restore-token=*'})
   if($label.Count -ne 1){throw 'A unique recovery token was not supplied.'}
   $global:restoreOwnershipToken=$label[0].Substring('campuseats.restore-token='.Length)
@@ -38,7 +49,8 @@ function global:docker {
   $global:restoreOwnershipNested=$true
   try {& $global:restoreOwnershipScript -BackupDirectory $global:restoreOwnershipSecond}catch{$global:restoreOwnershipSecondFailed=$true}
   if(!$global:restoreOwnershipSecondFailed -or $global:restoreOwnershipRemoved.Count){throw 'Failed concurrent creation removed another recovery context.'}
-  $global:restoreOwnershipNested=$false;$global:LASTEXITCODE=0
+  $global:restoreOwnershipNested = $false
+  $global:LASTEXITCODE = 0
   return $global:restoreOwnershipFirstId
  }
  if($a[0] -eq 'exec'){
@@ -55,7 +67,8 @@ function global:docker {
  }
  if($a[0] -eq 'rm'){
   if($a[-1] -cne $global:restoreOwnershipFirstId){throw 'Cleanup removed an unrelated resource.'}
-  $global:restoreOwnershipRemoved.Add($a[-1]);return
+  $global:restoreOwnershipRemoved.Add($a[-1])
+  return
  }
  throw 'Unexpected recovery Docker request.'
 }

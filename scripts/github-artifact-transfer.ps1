@@ -31,33 +31,45 @@ function Receive-GitHubArtifactRanges {
  }
  $budgetMilliseconds=[long][Math]::Floor($OverallTimeout.TotalMilliseconds)
  $remaining={ $budgetMilliseconds-[long](& $ElapsedMilliseconds) }.GetNewClosure()
- $confirmed=0L;$buffer=[byte[]]::new(65536)
+ $confirmed = 0L
+ $buffer = [byte[]]::new(65536)
  $output=[IO.File]::Open($target,[IO.FileMode]::Open,[IO.FileAccess]::Write,[IO.FileShare]::None)
  try {
   while($confirmed -lt $ExpectedBytes){
    if((& $remaining) -le 0){throw 'Artifact transfer exceeded its overall time budget.'}
    $last=[Math]::Min($confirmed+[long]$ChunkBytes-1,$ExpectedBytes-1)
-   $chunkLength=$last-$confirmed+1;$accepted=$false
+   $chunkLength = $last-$confirmed+1
+   $accepted = $false
    for($attempt=1;$attempt -le $MaxAttempts -and !$accepted;$attempt++){
     $left=[long](& $remaining)
     if($left -le 0){throw 'Artifact transfer exceeded its overall time budget.'}
     $milliseconds=[Math]::Min($left,[long][Math]::Floor($RequestTimeout.TotalMilliseconds))
     $cancellation=[Threading.CancellationTokenSource]::new([TimeSpan]::FromMilliseconds($milliseconds))
-    $storageHandler=[Net.Http.HttpClientHandler]::new();$storageHandler.AllowAutoRedirect=$false
+    $storageHandler = [Net.Http.HttpClientHandler]::new()
+    $storageHandler.AllowAutoRedirect = $false
     $storageClient=[Net.Http.HttpClient]::new($storageHandler)
     # The cancellation token covers both headers and body; HttpClient.Timeout alone
     # ceases to protect the body when ResponseHeadersRead is used.
     $storageClient.Timeout=[Threading.Timeout]::InfiniteTimeSpan
     $rangeRequest=[Net.Http.HttpRequestMessage]::new([Net.Http.HttpMethod]::Get,$StorageUri)
     $rangeRequest.Headers.Range=[Net.Http.Headers.RangeHeaderValue]::new($confirmed,$last)
-    $rangeResponse=$null;$rangeStream=$null;$invalidResponse=$false
+    $rangeResponse = $null
+    $rangeStream = $null
+    $invalidResponse = $false
     try {
      $rangeResponse=& $SendRange $storageClient $rangeRequest $cancellation.Token
-     if($rangeResponse -isnot [Net.Http.HttpResponseMessage]){$invalidResponse=$true;throw 'Invalid artifact storage response.'}
+     if ($rangeResponse -isnot [Net.Http.HttpResponseMessage]) {
+       $invalidResponse = $true
+       throw 'Invalid artifact storage response.'
+     }
      $range=$rangeResponse.Content.Headers.ContentRange
-     if([int]$rangeResponse.StatusCode -ne 206 -or $null -eq $range -or $range.Unit -ine 'bytes' -or !$range.HasRange -or !$range.HasLength -or $range.From -ne $confirmed -or $range.To -ne $last -or $range.Length -ne $ExpectedBytes -or $rangeResponse.Content.Headers.ContentLength -ne $chunkLength){$invalidResponse=$true;throw 'Artifact range headers do not match the trusted request.'}
+     if ([int]$rangeResponse.StatusCode -ne 206 -or $null -eq $range -or $range.Unit -ine 'bytes' -or !$range.HasRange -or !$range.HasLength -or $range.From -ne $confirmed -or $range.To -ne $last -or $range.Length -ne $ExpectedBytes -or $rangeResponse.Content.Headers.ContentLength -ne $chunkLength) {
+       $invalidResponse = $true
+       throw 'Artifact range headers do not match the trusted request.'
+     }
      $rangeStream=$rangeResponse.Content.ReadAsStreamAsync($cancellation.Token).GetAwaiter().GetResult()
-     $output.Position=$confirmed;$received=0L
+     $output.Position = $confirmed
+     $received = 0L
      while($received -lt $chunkLength){
       if((& $remaining) -le 0){throw 'Artifact transfer exceeded its overall time budget.'}
       $cancellation.Token.ThrowIfCancellationRequested()
@@ -67,20 +79,33 @@ function Receive-GitHubArtifactRanges {
       $received+=$count
      }
      if((& $remaining) -le 0){throw 'Artifact transfer exceeded its overall time budget.'}
-     if($rangeStream.ReadAsync($buffer,0,1,$cancellation.Token).GetAwaiter().GetResult() -ne 0){$invalidResponse=$true;throw 'Artifact range exceeded its declared length.'}
+     if ($rangeStream.ReadAsync($buffer,0,1,$cancellation.Token).GetAwaiter().GetResult() -ne 0) {
+       $invalidResponse = $true
+       throw 'Artifact range exceeded its declared length.'
+     }
      $cancellation.Token.ThrowIfCancellationRequested()
      if((& $remaining) -le 0){throw 'Artifact transfer exceeded its overall time budget.'}
-     $output.Flush();$accepted=$true
+     $output.Flush()
+     $accepted = $true
     }catch{
      # The only resumable prefix is the one confirmed inside THIS invocation. A
      # partially received chunk is removed before a bounded retry of that same range.
-     $output.SetLength($confirmed);$output.Position=$confirmed
+     $output.SetLength($confirmed)
+     $output.Position = $confirmed
      if($invalidResponse){throw 'Artifact storage returned invalid range metadata or length.'}
      if((& $remaining) -le 0){throw 'Artifact transfer exceeded its overall time budget.'}
      if($attempt -eq $MaxAttempts){throw 'Artifact range transfer failed after bounded retries.'}
     }finally{
-     if($rangeStream){$rangeStream.Dispose()};if($rangeResponse){$rangeResponse.Dispose()}
-     $rangeRequest.Dispose();$storageClient.Dispose();$storageHandler.Dispose();$cancellation.Dispose()
+     if ($rangeStream) {
+       $rangeStream.Dispose()
+     }
+     if ($rangeResponse) {
+       $rangeResponse.Dispose()
+     }
+     $rangeRequest.Dispose()
+     $storageClient.Dispose()
+     $storageHandler.Dispose()
+     $cancellation.Dispose()
     }
    }
    $confirmed=$last+1

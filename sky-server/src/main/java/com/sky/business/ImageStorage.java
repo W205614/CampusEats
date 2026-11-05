@@ -115,7 +115,8 @@ public class ImageStorage {
       try {
         reader.setInput(input);
         String format = reader.getFormatName().toLowerCase(Locale.ROOT);
-        int w = reader.getWidth(0), h = reader.getHeight(0);
+        int w = reader.getWidth(0);
+        int h = reader.getHeight(0);
         require(
             Set.of("png", "jpeg", "jpg").contains(format)
                 && w > 0 && h > 0 && w <= 4096 && h <= 4096,

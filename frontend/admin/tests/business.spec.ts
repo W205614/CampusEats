@@ -142,7 +142,7 @@ test('user selects two campuses and mixed fulfillment entirely through H5 checko
       hours: ['00:00-24:00'],
       phone: store.phone,
     });
-  const room='UI-'+randomUUID().slice(0,8);
+  const room = 'UI-' + randomUUID().slice(0, 8);
   const buildings = await call<{ id: string }[]>(request, '/user/campuses/2/buildings', u);
   await call(request, '/user/addresses', u, 'POST', {
     buildingId: buildings[0]!.id,
@@ -226,7 +226,20 @@ test('merchant creates a coupon using the visible marketing form', async ({
   await expect(page.getByText(name, { exact: true })).toBeVisible();
 });
 
-test('favorite navigation changes the retained menu page to the favorite campus',async({page,request,userSession})=>{
-  await call(request,'/user/stores/3/favorites/STORE/3',userSession.token,'POST');
-  await asSession(page,userSession,true);await page.goto('/app/');await page.getByText('默认校区 ▾',{exact:true}).waitFor();await page.getByText('领券与我的收藏',{exact:true}).click();const favorite=page.locator('uni-view.card').filter({has:page.getByText('东区食堂 · 东区食堂',{exact:true})});await favorite.getByText('进入店铺',{exact:true}).click();await expect(page.getByText('东校区 ▾',{exact:true})).toBeVisible();await expect(page.getByText('东区食堂 ▾',{exact:true})).toBeVisible();
+test('favorite navigation changes the retained menu page to the favorite campus', async ({
+  page,
+  request,
+  userSession,
+}) => {
+  await call(request, '/user/stores/3/favorites/STORE/3', userSession.token, 'POST');
+  await asSession(page, userSession, true);
+  await page.goto('/app/');
+  await page.getByText('默认校区 ▾', { exact: true }).waitFor();
+  await page.getByText('领券与我的收藏', { exact: true }).click();
+  const favorite = page
+    .locator('uni-view.card')
+    .filter({ has: page.getByText('东区食堂 · 东区食堂', { exact: true }) });
+  await favorite.getByText('进入店铺', { exact: true }).click();
+  await expect(page.getByText('东校区 ▾', { exact: true })).toBeVisible();
+  await expect(page.getByText('东区食堂 ▾', { exact: true })).toBeVisible();
 });

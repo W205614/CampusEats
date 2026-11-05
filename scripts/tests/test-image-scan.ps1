@@ -56,14 +56,18 @@ function global:docker {
  if($a[0] -eq 'cp'){
   $source=($a[1] -split ':',2)[1]
   if($a[1] -notlike ($global:fixtureSbomContainer+':/app/*')){throw 'Copy targeted an unrelated container.'}
-  if($env:CAMPUS_TRIVY_FIXTURE_MODE -eq 'missing-bom'){$global:LASTEXITCODE=1;return}
+  if ($env:CAMPUS_TRIVY_FIXTURE_MODE -eq 'missing-bom') {
+    $global:LASTEXITCODE = 1
+    return
+  }
   Copy-Item -LiteralPath (Join-Path $global:fixtureSbomRoot (Split-Path $source -Leaf)) -Destination $a[2]
   if($env:CAMPUS_TRIVY_FIXTURE_MODE -eq 'tampered-bom' -and $source -like '*.json'){'{}' | Set-Content -LiteralPath $a[2]}
   return
  }
  if($a[0] -eq 'rm'){
   if($a.Count -ne 2 -or $a[1] -cne $global:fixtureSbomContainer){throw 'Cleanup was not restricted to the newly created ID without volume deletion.'}
-  $global:fixtureRemoved++;return
+  $global:fixtureRemoved++
+  return
  }
  throw 'Unexpected Docker operation in SBOM extraction fixture.'
 }
@@ -89,4 +93,8 @@ try {
  }
  if($global:fixtureRemoved -lt 7){throw 'Owned extraction containers were not cleaned after both success and failure.'}
  Write-Host 'Image scan gate: four services, clean acceptance, all severities and unfixed rejection, exact-image BOM/JAR hashes, scanner/report/missing/tampered BOM failures, and scoped non-running cleanup passed.'
-} finally {$env:CAMPUS_TRIVY_FIXTURE_MODE=$originalMode;Remove-Item Function:\docker -ErrorAction SilentlyContinue;Remove-Variable fixtureSbomImage,fixtureSbomContainer,fixtureSbomRoot,fixtureRemoved -Scope Global -ErrorAction SilentlyContinue}
+} finally {
+  $env:CAMPUS_TRIVY_FIXTURE_MODE = $originalMode
+  Remove-Item Function:\docker -ErrorAction SilentlyContinue
+  Remove-Variable fixtureSbomImage,fixtureSbomContainer,fixtureSbomRoot,fixtureRemoved -Scope Global -ErrorAction SilentlyContinue
+}

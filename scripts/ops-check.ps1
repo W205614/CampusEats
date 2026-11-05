@@ -25,7 +25,10 @@ function Read-OperationsHealth {
  if($secretText.Length -lt 32){throw 'Operations credential unavailable.'}
  $hmac=[Security.Cryptography.HMACSHA256]::new([Text.Encoding]::UTF8.GetBytes($secretText))
  try {$key=[Convert]::ToHexString($hmac.ComputeHash([Text.Encoding]::UTF8.GetBytes('campuseats:operations-read:v1'))).ToLowerInvariant()}
- finally {$hmac.Dispose();$secretText=$null}
+ finally {
+   $hmac.Dispose()
+   $secretText = $null
+ }
  Read-Docker -Arguments ($composeArgs+@('exec','-T','server','sh','-c','curl --config - --silent --show-error --connect-timeout 2 --max-time 5 http://localhost:8080/actuator/health/operations')) -InputText ('header = "X-Campus-Operations-Key: '+$key+'"'+"`n")
 }
 Push-Location $taskRoot
@@ -37,7 +40,10 @@ try {
    $state=if($ids.Count){@(Read-Docker -Arguments @('inspect','--format','{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{end}}',$ids[0])) -join ''}else{'missing'}
    $checks[$service]=$state
    if($state -ne 'running healthy'){$issues.Add("$service is not healthy")}
-  } catch {$checks[$service]='unknown';$issues.Add("$service container check failed")}
+  } catch {
+    $checks[$service] = 'unknown'
+    $issues.Add("$service container check failed")
+  }
  }
  if($checks.mysql -eq 'running healthy'){
   try {
@@ -63,8 +69,14 @@ SELECT COUNT(*) FROM orders o LEFT JOIN order_stage s ON s.order_id=o.id WHERE o
   if($checks.refundFailed -gt 0 -or $checks.legacyRefundFailed -gt 0){$issues.Add('Failed refund requests need attention')}
   if($checks.outboxFailed -gt 0 -or $checks.outboxBacklog -gt $MaxOutboxBacklog){$issues.Add('Notification backlog needs attention')}
   foreach($name in $names[5..12]){if($checks[$name] -gt 0){$issues.Add("$name needs attention")}}
-  } catch {$checks.databaseOperationalState='unknown';$issues.Add('Database operational check failed')}
- } else {$checks.databaseOperationalState='unknown';$issues.Add('Database operational check unavailable')}
+  } catch {
+    $checks.databaseOperationalState = 'unknown'
+    $issues.Add('Database operational check failed')
+  }
+ } else {
+   $checks.databaseOperationalState = 'unknown'
+   $issues.Add('Database operational check unavailable')
+ }
  if($checks.server -eq 'running healthy') {
   try {
    $healthText=@(Read-OperationsHealth) -join "`n"
@@ -87,7 +99,10 @@ SELECT COUNT(*) FROM orders o LEFT JOIN order_stage s ON s.order_id=o.id WHERE o
    }
    # Codes and exception details supplied by the application are deliberately not echoed.
    if($health.status -ne 'UP' -or $runtime.status -ne 'UP' -or @($details.issues).Count){$issues.Add('Runtime operations health needs attention')}
-  } catch {$checks.operationsHealth='unknown';$issues.Add('Runtime operations check failed')}
+  } catch {
+    $checks.operationsHealth = 'unknown'
+    $issues.Add('Runtime operations check failed')
+  }
   try {
   $disk=@(Read-Server 'df -Pk /app/uploads')
   $parts=$disk[-1].Trim() -split '\s+'
@@ -98,10 +113,14 @@ SELECT COUNT(*) FROM orders o LEFT JOIN order_stage s ON s.order_id=o.id WHERE o
   $quota=@(Read-Server 'printf %s "${CAMPUS_UPLOAD_QUOTA_BYTES:-2147483648}"')[0]
   $minimum=@(Read-Server 'printf %s "${CAMPUS_UPLOAD_MIN_FREE_BYTES:-268435456}"')[0]
   if($usage -notmatch '^\d+$' -or $quota -notmatch '^\d+$' -or $minimum -notmatch '^\d+$'){throw 'Invalid upload limits.'}
-  $checks.uploadUsedBytes=[long]$usage;$checks.uploadQuotaBytes=[long]$quota
+  $checks.uploadUsedBytes = [long]$usage
+  $checks.uploadQuotaBytes = [long]$quota
   if([long]$usage -ge [long]$quota){$issues.Add('Upload byte quota reached')}
   if($free -lt [long]$minimum){$issues.Add('Upload disk free space is low')}
-  } catch {$checks.uploadStorageState='unknown';$issues.Add('Upload disk check failed')}
+  } catch {
+    $checks.uploadStorageState = 'unknown'
+    $issues.Add('Upload disk check failed')
+  }
   try {
   if($checks.mysql -ne 'running healthy'){throw 'Database unavailable.'}
   # Filesystem inventory only; never delete images or reveal customer paths/content.
@@ -139,8 +158,15 @@ done
   $checks.temporaryFiles=$temporary
   if($checks.missingEvidence -gt 0 -or $checks.missingProductImages -gt 0){$issues.Add('Referenced images are missing')}
   if($checks.suspectedOrphanEvidence -gt 0 -or $checks.temporaryFiles -gt 0){$issues.Add('Unreferenced or temporary images need manual review')}
-  } catch {$checks.imageInventoryState='unknown';$issues.Add('Image reference check failed')}
- } else {$checks.operationsHealth='unknown';$checks.imageInventoryState='unknown';$issues.Add('Server operational checks unavailable')}
+  } catch {
+    $checks.imageInventoryState = 'unknown'
+    $issues.Add('Image reference check failed')
+  }
+ } else {
+   $checks.operationsHealth = 'unknown'
+   $checks.imageInventoryState = 'unknown'
+   $issues.Add('Server operational checks unavailable')
+ }
  $markers=@(Get-ChildItem -LiteralPath (Join-Path $taskRoot '.local/backups') -Filter verified.json -File -Recurse -Force -ErrorAction SilentlyContinue | Sort-Object LastWriteTimeUtc -Descending)
  $latest=$null
  foreach($markerFile in $markers){
@@ -153,9 +179,15 @@ done
    $complete=$true
    foreach($entry in $entries){
     $path=[IO.Path]::GetFullPath((Join-Path $markerFile.DirectoryName $entry.path))
-    if(!$path.StartsWith($markerFile.DirectoryName+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)){$complete=$false;break}
+    if (!$path.StartsWith($markerFile.DirectoryName+[IO.Path]::DirectorySeparatorChar,[StringComparison]::OrdinalIgnoreCase)) {
+      $complete = $false
+      break
+    }
     # The protected .env snapshot is hidden on Linux (and may have the Hidden attribute on Windows).
-    if(!(Test-Path -LiteralPath $path -PathType Leaf) -or (Get-Item -LiteralPath $path -Force).Length -ne $entry.bytes){$complete=$false;break}
+    if (!(Test-Path -LiteralPath $path -PathType Leaf) -or (Get-Item -LiteralPath $path -Force).Length -ne $entry.bytes) {
+      $complete = $false
+      break
+    }
    }
    if(!$complete){continue}
    $latest=if($marker.verifiedAt -is [DateTime]){[DateTimeOffset]::new($marker.verifiedAt)}else{[DateTimeOffset]::Parse([string]$marker.verifiedAt,[Globalization.CultureInfo]::InvariantCulture)}
@@ -167,5 +199,8 @@ done
  [ordered]@{project=$ProjectName;checks=$checks;issues=@($issues.ToArray())} | ConvertTo-Json -Depth 7
  if($issues.Count){exit 1}
  exit 0
-} catch {Write-Error 'Operational check failed; inspect container state locally.';exit 1}
+} catch {
+  Write-Error 'Operational check failed; inspect container state locally.'
+  exit 1
+}
 finally {Pop-Location}

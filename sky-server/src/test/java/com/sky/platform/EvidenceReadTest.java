@@ -135,11 +135,13 @@ class EvidenceReadTest {
     var second = limits.acquire("USER:2");
     assertEquals("EVIDENCE_BUSY", assertThrows(BusinessException.class,
         () -> limits.acquire("USER:3")).code());
-    first.close(); first.close();
+    first.close();
+    first.close();
     var third = limits.acquire("USER:3");
     assertEquals("EVIDENCE_BUSY", assertThrows(BusinessException.class,
         () -> limits.acquire("USER:4")).code());
-    second.close(); third.close();
+    second.close();
+    third.close();
     try (var next = limits.acquire("USER:1")) { assertNotNull(next); }
   }
 
@@ -152,7 +154,8 @@ class EvidenceReadTest {
       @Override public Instant instant() { return Instant.ofEpochMilli(now.get()); }
     };
     var limits = new EvidenceReadLimits(clock, 2, 1, 2);
-    limits.acquire("USER:1").close(); limits.acquire("USER:1").close();
+    limits.acquire("USER:1").close();
+    limits.acquire("USER:1").close();
     assertEquals("RATE_LIMITED", assertThrows(BusinessException.class,
         () -> limits.acquire("USER:1")).code());
     limits.acquire("USER:2").close();

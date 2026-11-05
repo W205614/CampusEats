@@ -1,8 +1,12 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { checkAudit } from './check-client-audit.mjs';
-const clean = () => ({ vulnerabilities: {}, metadata: { vulnerabilities: { info: 0, low: 0, moderate: 0, high: 0, critical: 0, total: 0 } } });
-test('zero findings pass without an exception file', () => assert.match(checkAudit(clean()), /zero known vulnerabilities/));
+const clean = () => ({
+  vulnerabilities: {},
+  metadata: { vulnerabilities: { info: 0, low: 0, moderate: 0, high: 0, critical: 0, total: 0 } },
+});
+test('zero findings pass without an exception file', () =>
+  assert.match(checkAudit(clean()), /zero known vulnerabilities/));
 for (const severity of ['info', 'low', 'moderate', 'high', 'critical']) {
   test(`a ${severity} finding fails the strict gate`, () => {
     const report = clean();
@@ -13,7 +17,12 @@ for (const severity of ['info', 'low', 'moderate', 'high', 'critical']) {
   });
 }
 test('missing, failed and malformed reports fail closed', () => {
-  for (const report of [{}, null, { ...clean(), error: { code: 'EAUDIT' } }, { ...clean(), vulnerabilities: [] }])
+  for (const report of [
+    {},
+    null,
+    { ...clean(), error: { code: 'EAUDIT' } },
+    { ...clean(), vulnerabilities: [] },
+  ])
     assert.throws(() => checkAudit(report), /valid report/);
   const bad = clean();
   delete bad.metadata.vulnerabilities.high;

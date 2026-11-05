@@ -1,5 +1,11 @@
 {
   "printWidth": 100,
   "singleQuote": true,
-  "vueIndentScriptAndStyle": false
+  "vueIndentScriptAndStyle": false,
+  "overrides": [
+    {
+      "files": "*.vue",
+      "options": { "htmlWhitespaceSensitivity": "strict" }
+    }
+  ]
 }

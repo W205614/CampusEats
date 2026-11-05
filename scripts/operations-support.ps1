@@ -152,9 +152,17 @@ function Send-OperationsAlert {
     $response=$client.SendAsync($request,[Net.Http.HttpCompletionOption]::ResponseHeadersRead).GetAwaiter().GetResult()
     if($response.IsSuccessStatusCode){return $true}
     # Do not echo response bodies, request URLs, headers, or exception details.
-   } catch {} finally {if($response){$response.Dispose()};$request.Dispose()}
+   } catch {} finally {
+     if ($response) {
+       $response.Dispose()
+     }
+     $request.Dispose()
+   }
    if($attempt -lt $MaxAttempts){[Threading.Thread]::Sleep(200)}
   }
   return $false
- } finally {$client.Dispose();$handler.Dispose()}
+ } finally {
+   $client.Dispose()
+   $handler.Dispose()
+ }
 }

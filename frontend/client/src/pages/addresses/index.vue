@@ -64,25 +64,28 @@ async function remove(a: Address) {
 onShow(load);
 </script>
 <template>
-  <view class="screen"
-    ><view class="title">校园收货地址</view
-    ><view class="subtitle">每家店只能配送到所在校区；跨校区合单可逐店选择地址。</view
-    ><button class="primary" @click="edit()">新增地址</button
-    ><view class="card" v-for="a in addresses" :key="a.id"
-      ><view
+  <view class="screen">
+    <view class="title">校园收货地址</view>
+    <view class="subtitle">每家店只能配送到所在校区；跨校区合单可逐店选择地址。</view>
+    <button class="primary" @click="edit()">新增地址</button>
+    <view class="card" v-for="a in addresses" :key="a.id">
+      <view
         >{{ campuses.find((c) => c.id === a.campusId)?.name || '历史校区' }} · {{ a.buildingName }}
         {{ a.room }}</view
-      ><view>{{ a.consignee }} {{ a.phone }}</view
-      ><view class="row"
-        ><text class="tap" @click="edit(a)">编辑</text
-        ><text class="tap" @click="remove(a)">删除</text></view
-      ></view
-    ><view class="modal" v-if="dialog" @click="dialog = false"
-      ><view class="card" @click.stop
-        ><view class="row"
-          ><text class="section-title">{{ editing ? '编辑地址' : '新增地址' }}</text
-          ><text class="tap" @click="dialog = false">关闭</text></view
-        ><picker
+      >
+      <view>{{ a.consignee }} {{ a.phone }}</view>
+      <view class="row">
+        <text class="tap" @click="edit(a)">编辑</text>
+        <text class="tap" @click="remove(a)">删除</text>
+      </view>
+    </view>
+    <view class="modal" v-if="dialog" @click="dialog = false">
+      <view class="card" @click.stop>
+        <view class="row">
+          <text class="section-title">{{ editing ? '编辑地址' : '新增地址' }}</text>
+          <text class="tap" @click="dialog = false">关闭</text>
+        </view>
+        <picker
           :range="campuses.map((c) => c.name)"
           :value="campuses.findIndex((c) => c.id === campus)"
           @change="
@@ -90,28 +93,25 @@ onShow(load);
             form.buildingId = '';
             loadBuildings();
           "
-          ><view class="field-label tap"
+        >
+          <view class="field-label tap"
             >校区：{{ campuses.find((c) => c.id === campus)?.name }} ▾</view
-          ></picker
-        ><picker
+          >
+        </picker>
+        <picker
           :range="buildings.map((b) => b.name)"
           :value="buildings.findIndex((b) => b.id === form.buildingId)"
           @change="form.buildingId = buildings[Number($event.detail.value)]!.id"
-          ><view class="field-label tap"
-            >楼栋：{{ buildings.find((b) => b.id === form.buildingId)?.name || '请选择' }} ▾</view
-          ></picker
-        ><input v-model="form.room" placeholder="房间号" maxlength="32" /><input
-          v-model="form.consignee"
-          placeholder="收货人"
-          maxlength="32"
-        /><input v-model="form.phone" placeholder="手机号码" maxlength="11" /><button
-          class="primary"
-          :disabled="!form.buildingId"
-          @click="save"
         >
-          保存地址
-        </button></view
-      ></view
-    ></view
-  >
+          <view class="field-label tap"
+            >楼栋：{{ buildings.find((b) => b.id === form.buildingId)?.name || '请选择' }} ▾</view
+          >
+        </picker>
+        <input v-model="form.room" placeholder="房间号" maxlength="32" />
+        <input v-model="form.consignee" placeholder="收货人" maxlength="32" />
+        <input v-model="form.phone" placeholder="手机号码" maxlength="11" />
+        <button class="primary" :disabled="!form.buildingId" @click="save"> 保存地址 </button>
+      </view>
+    </view>
+  </view>
 </template>

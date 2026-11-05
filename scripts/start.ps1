@@ -10,9 +10,18 @@ Push-Location $taskRoot
 try {
     docker info --format '{{.ServerVersion}}' | Out-Null
     if ($LASTEXITCODE -ne 0) { throw 'Docker Desktop Linux engine is unavailable.' }
-    function New-TaskSecret { $bytes = New-Object byte[] 32; [Security.Cryptography.RandomNumberGenerator]::Fill($bytes); return -join ($bytes | ForEach-Object { $_.ToString('x2') }) }
+    function New-TaskSecret {
+      $bytes = New-Object byte[] 32
+      [Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+      return -join ($bytes | ForEach-Object {
+        $_.ToString('x2')
+      })
+    }
     $envPath=[IO.Path]::GetFullPath($EnvFile,$taskRoot)
-    if (Test-Path -LiteralPath $envPath) {Set-SecurePathPermissions -Path $envPath;$config=[IO.File]::ReadAllText($envPath)}
+    if (Test-Path -LiteralPath $envPath) {
+      Set-SecurePathPermissions -Path $envPath
+      $config = [IO.File]::ReadAllText($envPath)
+    }
     else {$config=[IO.File]::ReadAllText((Join-Path $taskRoot '.env.example'))}
     if($config -match '(?m)^SERVER_IMAGE=campuseats-server:sha-[a-f0-9]{40}\s*$'){throw 'This environment uses tested CI artifacts. Upgrade with scripts/release.ps1; source rebuilding must not overwrite immutable release references.'}
     foreach ($placeholder in @('root-password','app-password','redis-password','admin-signing-key','demo-password')) { $config = $config.Replace("replace-with-random-$placeholder", (New-TaskSecret)) }
@@ -106,9 +115,15 @@ try {
         # Stop the failed candidate before observing schema: no candidate may migrate after this check.
         & docker @composeArgs stop web server | Out-Null
         $paused=$LASTEXITCODE -eq 0
-        $after=$null;$afterSchema=$null
+        $after = $null
+        $afterSchema = $null
         if($paused){
-            try {$afterSchema=Read-ReleaseSchema -ComposeArguments $composeArgs;$after=$afterSchema.version} catch {$after=$null}
+            try {
+              $afterSchema = Read-ReleaseSchema -ComposeArguments $composeArgs
+              $after = $afterSchema.version
+            } catch {
+              $after = $null
+            }
         }
         $releaseRecord.schemaAfter=$after
         if($afterSchema){$releaseRecord.schemaFingerprintAfter=$afterSchema.fingerprint}
@@ -127,11 +142,15 @@ try {
         if($releaseRecord.rollback -eq 'healthy'){throw 'Deployment failed; previous images are healthy again. Inspect the release record before retrying.'}
         throw 'Deployment failed; automatic image rollback was unsafe or unsuccessful. Preserve the release record, database and files for manual recovery.'
     }
-    $portMatch = [regex]::Match($config,'(?m)^WEB_PORT=(\d+)'); $port=18083
+    $portMatch = [regex]::Match($config,'(?m)^WEB_PORT=(\d+)')
+    $port = 18083
     if ($portMatch.Success) { $port=[int]$portMatch.Groups[1].Value }
     Write-Host "Ordering: http://localhost:$port/"
     Write-Host "Staff workbench: http://localhost:$port/admin/"
     Write-Host "H5 direct link: http://localhost:$port/app/"
     Write-Host "Initial demo credentials: $credentialsFile (local only)."
     Write-Host 'Uses project-scoped persistent volumes. Before schema upgrades, writers are paused and a backup is independently restored.'
-} finally { Pop-Location;Exit-OperationsLock $operationLease }
+} finally {
+  Pop-Location
+  Exit-OperationsLock $operationLease
+}

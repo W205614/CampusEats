@@ -77,7 +77,8 @@ public class FinanceService {
             "SELECT COALESCE(SUM(paid_cents-refunded_cents),0) FROM finance_opening WHERE"
                 + " store_id=?",
             store);
-    long paid = Db.id(totals, "paid"), refunded = Db.id(totals, "refunded");
+    long paid = Db.id(totals, "paid");
+    long refunded = Db.id(totals, "refunded");
     return new FinanceViews.FinancePreview(
         store,
         day,
@@ -120,7 +121,8 @@ public class FinanceService {
     if (existing != null) return settlement(existing);
     var period = period(day);
     var totals = totals(store, period.start, period.end);
-    long paid = Db.id(totals, "paid"), refunded = Db.id(totals, "refunded");
+    long paid = Db.id(totals, "paid");
+    long refunded = Db.id(totals, "refunded");
     long id =
         db.insert(
             "INSERT INTO"

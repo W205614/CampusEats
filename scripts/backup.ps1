@@ -43,4 +43,7 @@ try {
  Set-SecurePathPermissions -Path $backupRoot
  Get-ChildItem -LiteralPath $backupRoot -Recurse -Force | ForEach-Object {Set-SecurePathPermissions -Path $_.FullName}
  Write-Host "Verified backup files saved: $backupRoot"
-} finally { Pop-Location;Exit-OperationsLock $operationLease }
+} finally {
+  Pop-Location
+  Exit-OperationsLock $operationLease
+}

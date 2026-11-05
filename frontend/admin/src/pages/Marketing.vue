@@ -14,15 +14,45 @@ const session = useSession(),
   mode = ref('coupon'),
   editing = ref(''),
   busy = ref(false);
-type Promotion = { id: string; itemType: string; itemId: string; priceCents: string; startsAt: string; endsAt: string; enabled: boolean };
-const couponQuery = ref(''), couponState = ref(''), appliedCouponQuery = ref(''), appliedCouponState = ref('');
-const promotionQuery = ref(''), promotionState = ref(''), appliedPromotionQuery = ref(''), appliedPromotionState = ref('');
-const filters = (query: string, state: string) => new URLSearchParams({ query, ...(state ? { state } : {}) }).toString();
-const couponPage = usePagedList<Coupon>(() => base() + '/page?' + filters(appliedCouponQuery.value, appliedCouponState.value), row => row.id);
-const promotionPage = usePagedList<Promotion>(() => '/merchant/stores/' + selectedStore.value + '/promotions/page?' + filters(appliedPromotionQuery.value, appliedPromotionState.value), row => row.id);
-const coupons = couponPage.records, promotions = promotionPage.records;
-const couponMore = couponPage.hasMore, couponLoading = couponPage.loading, promotionMore = promotionPage.hasMore, promotionLoading = promotionPage.loading;
-let loadSequence = 0, active = true;
+type Promotion = {
+  id: string;
+  itemType: string;
+  itemId: string;
+  priceCents: string;
+  startsAt: string;
+  endsAt: string;
+  enabled: boolean;
+};
+const couponQuery = ref(''),
+  couponState = ref(''),
+  appliedCouponQuery = ref(''),
+  appliedCouponState = ref('');
+const promotionQuery = ref(''),
+  promotionState = ref(''),
+  appliedPromotionQuery = ref(''),
+  appliedPromotionState = ref('');
+const filters = (query: string, state: string) =>
+  new URLSearchParams({ query, ...(state ? { state } : {}) }).toString();
+const couponPage = usePagedList<Coupon>(
+  () => base() + '/page?' + filters(appliedCouponQuery.value, appliedCouponState.value),
+  (row) => row.id,
+);
+const promotionPage = usePagedList<Promotion>(
+  () =>
+    '/merchant/stores/' +
+    selectedStore.value +
+    '/promotions/page?' +
+    filters(appliedPromotionQuery.value, appliedPromotionState.value),
+  (row) => row.id,
+);
+const coupons = couponPage.records,
+  promotions = promotionPage.records;
+const couponMore = couponPage.hasMore,
+  couponLoading = couponPage.loading,
+  promotionMore = promotionPage.hasMore,
+  promotionLoading = promotionPage.loading;
+let loadSequence = 0,
+  active = true;
 const now = new Date(),
   local = (d: Date) =>
     new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 16);
@@ -52,23 +82,44 @@ const promotion = ref({
   endsAt: local(new Date(now.getTime() + 86400000)),
   enabled: true,
 });
-function base() { return level.value === 'PLATFORM'
+function base() {
+  return level.value === 'PLATFORM'
     ? '/platform/coupons'
-    : '/merchant/stores/' + selectedStore.value + '/coupons'; }
+    : '/merchant/stores/' + selectedStore.value + '/coupons';
+}
 async function load() {
-  const current = ++loadSequence, token = session.session?.token, store = selectedStore.value;
+  const current = ++loadSequence,
+    token = session.session?.token,
+    store = selectedStore.value;
   try {
-    await Promise.all([couponPage.load(), store ? promotionPage.load() : Promise.resolve(promotionPage.clear())]);
+    await Promise.all([
+      couponPage.load(),
+      store ? promotionPage.load() : Promise.resolve(promotionPage.clear()),
+    ]);
     if (store) {
       const loaded = await request<Product[]>('/merchant/stores/' + store + '/products');
-      if (active && current === loadSequence && token === session.session?.token && store === selectedStore.value) products.value = loaded;
+      if (
+        active &&
+        current === loadSequence &&
+        token === session.session?.token &&
+        store === selectedStore.value
+      )
+        products.value = loaded;
     }
   } catch (e) {
     if (active && current === loadSequence && token === session.session?.token) notifyError(e);
   }
 }
-async function searchCoupons() { appliedCouponQuery.value=couponQuery.value; appliedCouponState.value=couponState.value; await couponPage.load(); }
-async function searchPromotions() { appliedPromotionQuery.value=promotionQuery.value; appliedPromotionState.value=promotionState.value; await promotionPage.load(); }
+async function searchCoupons() {
+  appliedCouponQuery.value = couponQuery.value;
+  appliedCouponState.value = couponState.value;
+  await couponPage.load();
+}
+async function searchPromotions() {
+  appliedPromotionQuery.value = promotionQuery.value;
+  appliedPromotionState.value = promotionState.value;
+  await promotionPage.load();
+}
 function create(kind: string) {
   mode.value = kind;
   editing.value = '';
@@ -155,8 +206,15 @@ async function stop(c: Coupon) {
   }
 }
 onMounted(load);
-watch([() => session.session?.token, selectedStore], () => { ++loadSequence; products.value=[]; if(active) void load(); });
-onUnmounted(() => { active=false; ++loadSequence; });
+watch([() => session.session?.token, selectedStore], () => {
+  ++loadSequence;
+  products.value = [];
+  if (active) void load();
+});
+onUnmounted(() => {
+  active = false;
+  ++loadSequence;
+});
 </script>
 <template>
   <section class="page-head">
@@ -169,104 +227,155 @@ onUnmounted(() => { active=false; ++loadSequence; });
   <section class="panel">
     <div class="toolbar">
       <h2>优惠券</h2>
-      <el-select v-if="platform" v-model="level" @change="couponPage.load()" style="width: 160px"
-        ><el-option value="STORE" label="当前店铺券" /><el-option value="PLATFORM" label="平台券"
-      /></el-select>
+      <el-select v-if="platform" v-model="level" @change="couponPage.load()" style="width: 160px">
+        <el-option value="STORE" label="当前店铺券" />
+        <el-option value="PLATFORM" label="平台券" />
+      </el-select>
     </div>
-    <el-form inline @submit.prevent="searchCoupons"><el-form-item label="券名称"><el-input v-model="couponQuery" maxlength="80"/></el-form-item><el-form-item label="发放状态"><el-select v-model="couponState" style="width:140px"><el-option value="" label="全部"/><el-option value="ENABLED" label="启用"/><el-option value="DISABLED" label="停发"/></el-select></el-form-item><el-button native-type="submit" :loading="couponLoading">查询优惠券</el-button></el-form>
-    <el-table :data="coupons"
-      ><el-table-column prop="name" label="名称" /><el-table-column label="规则"
-        ><template #default="{ row }"
+    <el-form inline @submit.prevent="searchCoupons">
+      <el-form-item label="券名称">
+        <el-input v-model="couponQuery" maxlength="80" />
+      </el-form-item>
+      <el-form-item label="发放状态">
+        <el-select v-model="couponState" style="width: 140px">
+          <el-option value="" label="全部" />
+          <el-option value="ENABLED" label="启用" />
+          <el-option value="DISABLED" label="停发" />
+        </el-select>
+      </el-form-item>
+      <el-button native-type="submit" :loading="couponLoading">查询优惠券</el-button>
+    </el-form>
+    <el-table :data="coupons">
+      <el-table-column prop="name" label="名称" />
+      <el-table-column label="规则">
+        <template #default="{ row }"
           >满{{ cents(row.thresholdCents) }}元，{{
             row.kind === 'REDUCTION'
               ? '减' + cents(row.value) + '元'
               : Number(row.value) / 1000 + '折'
           }}</template
-        ></el-table-column
-      ><el-table-column label="领取"
-        ><template #default="{ row }"
-          >{{ row.claimed }} / {{ row.total }}</template
-        ></el-table-column
-      ><el-table-column label="操作"
-        ><template #default="{ row }"
-          ><el-button v-if="!row.claimed" text @click="editCoupon(row)">编辑规则</el-button
-          ><el-button text :disabled="!row.enabled" @click="stop(row)">{{
+        >
+      </el-table-column>
+      <el-table-column label="领取">
+        <template #default="{ row }">{{ row.claimed }} / {{ row.total }}</template>
+      </el-table-column>
+      <el-table-column label="操作">
+        <template #default="{ row }">
+          <el-button v-if="!row.claimed" text @click="editCoupon(row)">编辑规则</el-button>
+          <el-button text :disabled="!row.enabled" @click="stop(row)">{{
             row.enabled ? '停发' : '已停发'
-          }}</el-button></template
-        ></el-table-column
-      ></el-table
+          }}</el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+    <el-button v-if="couponMore" :loading="couponLoading" @click="couponPage.load(false)"
+      >加载更多优惠券</el-button
     >
-    <el-button v-if="couponMore" :loading="couponLoading" @click="couponPage.load(false)">加载更多优惠券</el-button>
   </section>
   <section class="panel">
     <div class="toolbar">
       <h2>商品活动价</h2>
       <el-button @click="create('promotion')">新增活动</el-button>
     </div>
-    <el-form inline @submit.prevent="searchPromotions"><el-form-item label="商品名称"><el-input v-model="promotionQuery" maxlength="80"/></el-form-item><el-form-item label="活动状态"><el-select v-model="promotionState" style="width:140px"><el-option value="" label="全部"/><el-option value="ENABLED" label="启用"/><el-option value="DISABLED" label="停用"/></el-select></el-form-item><el-button native-type="submit" :loading="promotionLoading">查询活动</el-button></el-form>
-    <el-table :data="promotions"
-      ><el-table-column label="商品"
-        ><template #default="{ row }">{{
+    <el-form inline @submit.prevent="searchPromotions">
+      <el-form-item label="商品名称">
+        <el-input v-model="promotionQuery" maxlength="80" />
+      </el-form-item>
+      <el-form-item label="活动状态">
+        <el-select v-model="promotionState" style="width: 140px">
+          <el-option value="" label="全部" />
+          <el-option value="ENABLED" label="启用" />
+          <el-option value="DISABLED" label="停用" />
+        </el-select>
+      </el-form-item>
+      <el-button native-type="submit" :loading="promotionLoading">查询活动</el-button>
+    </el-form>
+    <el-table :data="promotions">
+      <el-table-column label="商品">
+        <template #default="{ row }">{{
           products.find((p) => p.id === row.itemId && p.itemType === row.itemType)?.name ||
           row.itemId
-        }}</template></el-table-column
-      ><el-table-column label="活动价"
-        ><template #default="{ row }">¥{{ cents(row.priceCents) }}</template></el-table-column
-      ><el-table-column prop="startsAt" label="开始" /><el-table-column
-        prop="endsAt"
-        label="结束"
-      /><el-table-column label="操作"
-        ><template #default="{ row }"
-          ><el-button text @click="editPromotion(row)">编辑 / 停用</el-button></template
-        ></el-table-column
-      ></el-table
+        }}</template>
+      </el-table-column>
+      <el-table-column label="活动价">
+        <template #default="{ row }">¥{{ cents(row.priceCents) }}</template>
+      </el-table-column>
+      <el-table-column prop="startsAt" label="开始" />
+      <el-table-column prop="endsAt" label="结束" />
+      <el-table-column label="操作">
+        <template #default="{ row }">
+          <el-button text @click="editPromotion(row)">编辑 / 停用</el-button>
+        </template>
+      </el-table-column>
+    </el-table>
+    <el-button v-if="promotionMore" :loading="promotionLoading" @click="promotionPage.load(false)"
+      >加载更多活动</el-button
     >
-    <el-button v-if="promotionMore" :loading="promotionLoading" @click="promotionPage.load(false)">加载更多活动</el-button>
   </section>
   <el-dialog
     v-model="dialog"
     :title="mode === 'coupon' ? '优惠券规则' : '限时商品活动价'"
     width="560px"
-    ><el-form label-position="top"
-      ><template v-if="mode === 'coupon'"
-        ><el-form-item label="名称"><el-input v-model="coupon.name" maxlength="80" /></el-form-item
-        ><el-form-item label="优惠类型"
-          ><el-select v-model="coupon.kind"
-            ><el-option value="REDUCTION" label="满减" /><el-option
-              value="DISCOUNT"
-              label="折扣" /></el-select></el-form-item
-        ><el-form-item label="使用门槛 / 元"
-          ><el-input-number v-model="coupon.threshold" :min="0" :precision="2" /></el-form-item
-        ><el-form-item
+  >
+    <el-form label-position="top">
+      <template v-if="mode === 'coupon'">
+        <el-form-item label="名称">
+          <el-input v-model="coupon.name" maxlength="80" />
+        </el-form-item>
+        <el-form-item label="优惠类型">
+          <el-select v-model="coupon.kind">
+            <el-option value="REDUCTION" label="满减" />
+            <el-option value="DISCOUNT" label="折扣" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="使用门槛 / 元">
+          <el-input-number v-model="coupon.threshold" :min="0" :precision="2" />
+        </el-form-item>
+        <el-form-item
           :label="coupon.kind === 'REDUCTION' ? '减免金额 / 元' : '折扣，例如8代表八折'"
-          ><el-input-number v-model="coupon.value" :min="0.01" :precision="2" /></el-form-item
-        ><el-form-item label="优惠上限 / 元，0表示不限制"
-          ><el-input-number v-model="coupon.cap" :min="0" :precision="2" /></el-form-item
-        ><el-form-item label="发行数量"
-          ><el-input-number v-model="coupon.total" :min="1" /></el-form-item
-        ><el-form-item label="每人最多领取"
-          ><el-input-number v-model="coupon.perUser" :min="1" :max="100" /></el-form-item
-        ><el-form-item label="有效期"
-          ><input type="datetime-local" v-model="coupon.startsAt" /> 至
-          <input type="datetime-local" v-model="coupon.endsAt" /></el-form-item></template
-      ><template v-else
-        ><el-form-item label="商品"
-          ><el-select v-model="productKey" :disabled="!!editing" @change="chooseProduct"
-            ><el-option
+        >
+          <el-input-number v-model="coupon.value" :min="0.01" :precision="2" />
+        </el-form-item>
+        <el-form-item label="优惠上限 / 元，0表示不限制">
+          <el-input-number v-model="coupon.cap" :min="0" :precision="2" />
+        </el-form-item>
+        <el-form-item label="发行数量">
+          <el-input-number v-model="coupon.total" :min="1" />
+        </el-form-item>
+        <el-form-item label="每人最多领取">
+          <el-input-number v-model="coupon.perUser" :min="1" :max="100" />
+        </el-form-item>
+        <el-form-item label="有效期">
+          <input type="datetime-local" v-model="coupon.startsAt" /> 至
+          <input type="datetime-local" v-model="coupon.endsAt" />
+        </el-form-item>
+      </template>
+      <template v-else>
+        <el-form-item label="商品">
+          <el-select v-model="productKey" :disabled="!!editing" @change="chooseProduct">
+            <el-option
               v-for="p in products"
               :key="p.itemType + p.id"
               :value="p.itemType + ':' + p.id"
-              :label="p.name + ' (' + p.itemType + ')'" /></el-select></el-form-item
-        ><el-form-item label="活动价 / 元"
-          ><el-input-number v-model="promotion.price" :min="0.01" :precision="2" /></el-form-item
-        ><el-form-item label="活动时间"
-          ><input type="datetime-local" v-model="promotion.startsAt" /> 至
-          <input type="datetime-local" v-model="promotion.endsAt" /></el-form-item
-        ><el-form-item label="启用"
-          ><el-switch v-model="promotion.enabled" /></el-form-item></template></el-form
-    ><template #footer
-      ><el-button @click="dialog = false">取消</el-button
-      ><el-button type="primary" :loading="busy" @click="save">保存</el-button></template
-    ></el-dialog
-  >
+              :label="p.name + ' (' + p.itemType + ')'"
+            />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="活动价 / 元">
+          <el-input-number v-model="promotion.price" :min="0.01" :precision="2" />
+        </el-form-item>
+        <el-form-item label="活动时间">
+          <input type="datetime-local" v-model="promotion.startsAt" /> 至
+          <input type="datetime-local" v-model="promotion.endsAt" />
+        </el-form-item>
+        <el-form-item label="启用">
+          <el-switch v-model="promotion.enabled" />
+        </el-form-item>
+      </template>
+    </el-form>
+    <template #footer>
+      <el-button @click="dialog = false">取消</el-button>
+      <el-button type="primary" :loading="busy" @click="save">保存</el-button>
+    </template>
+  </el-dialog>
 </template>

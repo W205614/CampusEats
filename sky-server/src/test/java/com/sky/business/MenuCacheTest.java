@@ -29,7 +29,10 @@ class MenuCacheTest {
     ValueOperations<String, String> values = mock(ValueOperations.class);
     when(redis.opsForValue()).thenReturn(values);
     when(values.get(anyString())).thenAnswer(call -> stored.get(call.getArgument(0)));
-    doAnswer(call -> { stored.put(call.getArgument(0), call.getArgument(1)); return null; })
+    doAnswer(call -> {
+      stored.put(call.getArgument(0), call.getArgument(1));
+      return null;
+    })
         .when(values).set(anyString(), anyString(), any(Duration.class));
     var json = new Json(new ObjectMapper());
     var cache = new MenuCache(redis, json, mock(Db.class), Clock.systemUTC(),
@@ -253,7 +256,10 @@ class MenuCacheTest {
     @SuppressWarnings("unchecked") ValueOperations<String, String> values = mock(ValueOperations.class);
     when(redis.opsForValue()).thenReturn(values);
     when(values.get(anyString())).thenAnswer(call -> stored.get(call.getArgument(0)));
-    doAnswer(call -> { stored.put(call.getArgument(0), call.getArgument(1)); return null; })
+    doAnswer(call -> {
+      stored.put(call.getArgument(0), call.getArgument(1));
+      return null;
+    })
         .when(values).set(anyString(), anyString(), any(Duration.class));
     var db = mock(Db.class);
     var cache = new MenuCache(redis, new Json(new ObjectMapper()), db,

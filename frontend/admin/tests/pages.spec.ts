@@ -9,20 +9,31 @@ test('anonymous admin login and H5 campus selector', async ({ page }) => {
   await expect(picture).toBeVisible();
   // uni-app renders H5 pictures as a background on an inner div. A 200 response
   // alone can be the SPA fallback HTML, so verify the rendered image and pixels.
-  await expect.poll(() => picture.evaluate(element =>
-    [...element.querySelectorAll('div')].some(child => getComputedStyle(child).backgroundImage !== 'none'),
-  )).toBeTruthy();
-  const pixels = await picture.evaluate(async element => {
-    const background = [...element.querySelectorAll('div')]
-      .map(child => getComputedStyle(child).backgroundImage).find(value => value !== 'none') || '';
+  await expect
+    .poll(() =>
+      picture.evaluate((element) =>
+        [...element.querySelectorAll('div')].some(
+          (child) => getComputedStyle(child).backgroundImage !== 'none',
+        ),
+      ),
+    )
+    .toBeTruthy();
+  const pixels = await picture.evaluate(async (element) => {
+    const background =
+      [...element.querySelectorAll('div')]
+        .map((child) => getComputedStyle(child).backgroundImage)
+        .find((value) => value !== 'none') || '';
     const source = /^url\(["']?(.*?)["']?\)$/.exec(background)?.[1];
     if (!source) return { width: 0, height: 0, validPath: false };
     const url = new URL(source, location.href);
-    const validPath = url.origin === location.origin && /^\/(demo-images|uploads)\//.test(url.pathname);
+    const validPath =
+      url.origin === location.origin && /^\/(demo-images|uploads)\//.test(url.pathname);
     const image = new Image();
-    const loaded = new Promise<void>(resolve => { image.onload = image.onerror = () => resolve(); });
+    const loaded = new Promise<void>((resolve) => {
+      image.onload = image.onerror = () => resolve();
+    });
     image.src = source;
-    await Promise.race([loaded, new Promise(resolve => setTimeout(resolve, 5000))]);
+    await Promise.race([loaded, new Promise((resolve) => setTimeout(resolve, 5000))]);
     return { width: image.naturalWidth, height: image.naturalHeight, validPath };
   });
   expect(pixels.validPath).toBeTruthy();
@@ -36,7 +47,10 @@ test('platform manages campuses, stores, catalog and marketing pages', async ({
   await asSession(page, adminSession);
   await page.goto('/admin/');
   await expect(page.getByRole('heading', { name: '校区与店铺' })).toBeVisible();
-  const switcher=page.locator('.topbar .el-select__wrapper');await expect.poll(async()=>Math.round((await switcher.boundingBox())?.width||0)).toBeGreaterThan(200);
+  const switcher = page.locator('.topbar .el-select__wrapper');
+  await expect
+    .poll(async () => Math.round((await switcher.boundingBox())?.width || 0))
+    .toBeGreaterThan(200);
   await expect(page.getByText('东校区', { exact: true }).first()).toBeVisible();
   await page.getByRole('button', { name: '新增店铺' }).click();
   await expect(page.getByRole('dialog')).toBeVisible();
@@ -76,6 +90,17 @@ test('H5 wallet, addresses, cart and order pages', async ({ page, userSession })
   }
 });
 
-test('platform switches the active store before catalog operations',async({page,adminSession})=>{
-  await asSession(page,adminSession);await page.goto('/admin/');await page.locator('.topbar .el-select').click();await page.getByRole('option',{name:'东校区 / 东区食堂',exact:true}).click();await expect(page.locator('.topbar')).toContainText('东校区 / 东区食堂');const response=page.waitForResponse(r=>r.url().endsWith('/merchant/stores/3/products'));await page.getByRole('link',{name:'商品与配额'}).click();expect((await response).ok()).toBeTruthy();await expect(page.getByText('番茄鸡蛋饭',{exact:true}).first()).toBeVisible();
+test('platform switches the active store before catalog operations', async ({
+  page,
+  adminSession,
+}) => {
+  await asSession(page, adminSession);
+  await page.goto('/admin/');
+  await page.locator('.topbar .el-select').click();
+  await page.getByRole('option', { name: '东校区 / 东区食堂', exact: true }).click();
+  await expect(page.locator('.topbar')).toContainText('东校区 / 东区食堂');
+  const response = page.waitForResponse((r) => r.url().endsWith('/merchant/stores/3/products'));
+  await page.getByRole('link', { name: '商品与配额' }).click();
+  expect((await response).ok()).toBeTruthy();
+  await expect(page.getByText('番茄鸡蛋饭', { exact: true }).first()).toBeVisible();
 });

@@ -5,11 +5,23 @@ $taskRoot=Split-Path $PSScriptRoot -Parent
 $backupRoot=[IO.Path]::GetFullPath($BackupDirectory)
 if(-not $backupRoot.StartsWith([IO.Path]::GetFullPath((Join-Path $taskRoot '.local'))+[IO.Path]::DirectorySeparatorChar)){throw 'Expected local protected backup.'}
 $manifest=Get-Content -LiteralPath (Join-Path $backupRoot 'sha256.json') -Raw | ConvertFrom-Json
-foreach($file in $manifest){$path=[IO.Path]::GetFullPath((Join-Path $backupRoot $file.path));if(-not $path.StartsWith($backupRoot+[IO.Path]::DirectorySeparatorChar)){throw 'Invalid backup manifest path'};if((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ne $file.sha256){throw "Backup hash mismatch: $($file.path)"}}
+foreach ($file in $manifest) {
+  $path = [IO.Path]::GetFullPath((Join-Path $backupRoot $file.path))
+  if (-not $path.StartsWith($backupRoot+[IO.Path]::DirectorySeparatorChar)) {
+    throw 'Invalid backup manifest path'
+  }
+  if ((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ne $file.sha256) {
+    throw "Backup hash mismatch: $($file.path)"
+  }
+}
 $restoreToken=[guid]::NewGuid().ToString('N')
 $name='campuseats-restore-'+(Get-Date -Format 'yyyyMMddHHmmss')+'-'+$restoreToken.Substring(0,12)
 $createdContainerId=$null
-$bytes=New-Object byte[] 24;[Security.Cryptography.RandomNumberGenerator]::Fill($bytes);$password=-join($bytes|ForEach-Object{$_.ToString('x2')})
+$bytes = New-Object byte[] 24
+[Security.Cryptography.RandomNumberGenerator]::Fill($bytes)
+$password = -join($bytes|ForEach-Object{
+  $_.ToString('x2')
+})
 $secretFile=Join-Path $taskRoot ".local/$name.env"
 Write-SecureTextFile -Path $secretFile -Content "MYSQL_ROOT_PASSWORD=$password`nMYSQL_DATABASE=sky_take_out`n"
 try {
@@ -17,7 +29,14 @@ try {
  if($LASTEXITCODE -ne 0 -or $created -notmatch '^[a-f0-9]{64}$'){throw 'Restore container creation failed'}
  $createdContainerId=$created
  $ready=$false
- for($i=0;$i -lt 60;$i++){docker exec $createdContainerId sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -h 127.0.0.1 -u root sky_take_out -Nse "SELECT 1"' 2>$null | Out-Null;if($LASTEXITCODE -eq 0){$ready=$true;break};Start-Sleep -Seconds 2}
+ for ($i = 0;$i -lt 60;$i++) {
+   docker exec $createdContainerId sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -h 127.0.0.1 -u root sky_take_out -Nse "SELECT 1"' 2>$null | Out-Null
+   if ($LASTEXITCODE -eq 0) {
+     $ready = $true
+     break
+   }
+   Start-Sleep -Seconds 2
+ }
  if(-not $ready){throw 'Restore database did not start'}
  Get-Content -LiteralPath (Join-Path $backupRoot 'database.sql') | docker exec -i $createdContainerId sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" mysql -u root sky_take_out'
  if($LASTEXITCODE -ne 0){throw 'Restore import failed'}
@@ -44,7 +63,14 @@ try {
  }
  $restoreUploads=Join-Path $backupRoot ('restore-files-'+$restoreToken)
  Copy-Item -LiteralPath (Join-Path $backupRoot 'uploads') -Destination $restoreUploads -Recurse -Force
- foreach($file in $manifest | Where-Object {$_.path -like 'uploads*'}){$target=Join-Path $restoreUploads ($file.path -replace '^uploads[/\\]?','');if((Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash -ne $file.sha256){throw 'Restored upload hash mismatch'}}
+ foreach ($file in $manifest | Where-Object {
+   $_.path -like 'uploads*'
+ }) {
+   $target = Join-Path $restoreUploads ($file.path -replace '^uploads[/\\]?','')
+   if ((Get-FileHash -LiteralPath $target -Algorithm SHA256).Hash -ne $file.sha256) {
+     throw 'Restored upload hash mismatch'
+   }
+ }
  $result | Set-Content -LiteralPath (Join-Path $backupRoot 'restore-check.txt') -Encoding utf8
  Write-Host "Restored into independent container $name. Counts and integrity results: restore-check.txt"
 } finally {

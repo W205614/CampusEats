@@ -3,50 +3,101 @@ import { test, expect, type Page } from '@playwright/test';
 // Transport fixtures keep these focused UI checks independent of business data.
 async function workspace(page: Page, role = 'PLATFORM_ADMIN') {
   let order = {
-    id: '501', number: 'EXCEPTION-501', storeId: '1', version: '5', status: 4,
-    fulfillment: 'DELIVERY', ready: true, courierId: '11', amount: '20.00',
-    paidCents: '2000', refundedCents: '0', details: [], refunds: [], aftersales: [],
+    id: '501',
+    number: 'EXCEPTION-501',
+    storeId: '1',
+    version: '5',
+    status: 4,
+    fulfillment: 'DELIVERY',
+    ready: true,
+    courierId: '11',
+    amount: '20.00',
+    paidCents: '2000',
+    refundedCents: '0',
+    details: [],
+    refunds: [],
+    aftersales: [],
     delivery: { state: 'PICKED' },
   };
   const writes: { path: string; body: Record<string, unknown> }[] = [];
-  const state = { failDetails: false, failWrites: false, conflict: false, release: undefined as (() => void) | undefined, hold: false,
-    holdList: false, releaseList: undefined as (() => void) | undefined, listReads: 0 };
+  const state = {
+    failDetails: false,
+    failWrites: false,
+    conflict: false,
+    release: undefined as (() => void) | undefined,
+    hold: false,
+    holdList: false,
+    releaseList: undefined as (() => void) | undefined,
+    listReads: 0,
+  };
   await page.addInitScript((role) => {
-    sessionStorage.setItem('campus-admin', JSON.stringify({ token: 'ui-test', id: '1', name: '测试人员', role, mustChangePassword: false }));
+    sessionStorage.setItem(
+      'campus-admin',
+      JSON.stringify({
+        token: 'ui-test',
+        id: '1',
+        name: '测试人员',
+        role,
+        mustChangePassword: false,
+      }),
+    );
     localStorage.setItem('campus-store', '1');
   }, role);
   await page.route('**/api/v1/**', async (route) => {
     const path = new URL(route.request().url()).pathname.replace('/api/v1', '');
     const ok = (data: unknown) => route.fulfill({ json: { code: 'OK', data } });
-    if (path === '/merchant/stores/page') return ok({ records: [{ id: '1', name: '测试店铺', campusName: '校区' }], nextCursor: null, hasMore: false });
+    if (path === '/merchant/stores/page')
+      return ok({
+        records: [{ id: '1', name: '测试店铺', campusName: '校区' }],
+        nextCursor: null,
+        hasMore: false,
+      });
     if (path === '/merchant/stores/1/orders') {
       state.listReads++;
-      if (state.holdList) await new Promise<void>(resolve => { state.releaseList = resolve; });
+      if (state.holdList)
+        await new Promise<void>((resolve) => {
+          state.releaseList = resolve;
+        });
       return ok([order]);
     }
-    if (path === '/merchant/stores/1/couriers') return ok([{ id: '11', name: '原配送员' }, { id: '12', name: '接管配送员' }]);
+    if (path === '/merchant/stores/1/couriers')
+      return ok([
+        { id: '11', name: '原配送员' },
+        { id: '12', name: '接管配送员' },
+      ]);
     if (path === '/merchant/orders/501') return state.failDetails ? route.abort() : ok(order);
     if (path.startsWith('/platform/orders/501/')) {
       writes.push({ path, body: route.request().postDataJSON() });
-      if (state.hold) await new Promise<void>((resolve) => { state.release = resolve; });
+      if (state.hold)
+        await new Promise<void>((resolve) => {
+          state.release = resolve;
+        });
       if (state.failWrites) return route.abort();
       if (state.conflict) {
         order = { ...order, version: '6' };
         state.conflict = false;
-        return route.fulfill({ status: 409, json: { code: 'VERSION_CONFLICT', message: '订单状态已变化，请刷新' } });
+        return route.fulfill({
+          status: 409,
+          json: { code: 'VERSION_CONFLICT', message: '订单状态已变化，请刷新' },
+        });
       }
       order = { ...order, version: String(Number(order.version) + 1), courierId: '12' };
       return ok(order);
     }
     // Disable websocket setup; Orders retains polling.
-    return route.fulfill({ status: 503, json: { code: 'TEST_UNAVAILABLE', message: 'test unavailable' } });
+    return route.fulfill({
+      status: 503,
+      json: { code: 'TEST_UNAVAILABLE', message: 'test unavailable' },
+    });
   });
   await page.goto('/admin/orders');
   await page.getByRole('button', { name: '处理订单' }).click();
   return { writes, state };
 }
 
-test('platform reassign requires reason, replacement and picked handover; busy submit sends once', async ({ page }) => {
+test('platform reassign requires reason, replacement and picked handover; busy submit sends once', async ({
+  page,
+}) => {
   const { writes, state } = await workspace(page);
   await page.getByRole('button', { name: '平台改派', exact: true }).click();
   const dialog = page.getByRole('dialog', { name: '平台改派' });
@@ -57,13 +108,19 @@ test('platform reassign requires reason, replacement and picked handover; busy s
   await expect(page.getByRole('option', { name: '原配送员', exact: true })).toHaveCount(0);
   await page.getByRole('option', { name: '接管配送员', exact: true }).click();
   await expect(submit).toBeDisabled();
-  await dialog.getByText('我已安排餐品实际交接，配送计时及超时标记继续保留', { exact: true }).click();
+  await dialog
+    .getByText('我已安排餐品实际交接，配送计时及超时标记继续保留', { exact: true })
+    .click();
   await expect(dialog.getByRole('checkbox')).toBeChecked();
   state.hold = true;
   await submit.click();
   await expect(submit).toBeDisabled();
   await expect.poll(() => writes.length).toBe(1);
-  expect(writes[0]?.body).toEqual({ version: '5', courierId: '12', reason: '原配送员临时无法配送' });
+  expect(writes[0]?.body).toEqual({
+    version: '5',
+    courierId: '12',
+    reason: '原配送员临时无法配送',
+  });
   await expect.poll(() => !!state.release).toBeTruthy();
   state.release?.();
   await expect(dialog).not.toBeVisible();
@@ -75,7 +132,9 @@ test('merchant never receives platform exception controls', async ({ page }) => 
   await expect(page.getByRole('button', { name: '异常取消并退款', exact: true })).toHaveCount(0);
 });
 
-test('background synchronization does not swallow an exception dialog and still blocks submission', async ({ page }) => {
+test('background synchronization does not swallow an exception dialog and still blocks submission', async ({
+  page,
+}) => {
   await page.clock.install();
   const { writes, state } = await workspace(page);
   state.holdList = true;
@@ -96,7 +155,9 @@ test('background synchronization does not swallow an exception dialog and still 
   expect(writes[0]?.path).toBe('/platform/orders/501/exception-cancel');
 });
 
-test('exception confirmation pauses new background reads until submission closes the dialog', async ({ page }) => {
+test('exception confirmation pauses new background reads until submission closes the dialog', async ({
+  page,
+}) => {
   await page.clock.install();
   const { writes, state } = await workspace(page);
   const initialReads = state.listReads;

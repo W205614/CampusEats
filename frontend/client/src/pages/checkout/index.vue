@@ -24,30 +24,43 @@ const session = useSession(),
   busy = ref(false),
   pending = ref<{ key: string; body: CheckoutInput }>();
 let active = true;
-const walletPage = usePagedList<Coupon>(() => '/wallet/page?state=AVAILABLE', row => row.id, () => active);
-const wallet = walletPage.records, walletMore = walletPage.hasMore, walletLoading = walletPage.loading;
+const walletPage = usePagedList<Coupon>(
+  () => '/wallet/page?state=AVAILABLE',
+  (row) => row.id,
+  () => active,
+);
+const wallet = walletPage.records,
+  walletMore = walletPage.hasMore,
+  walletLoading = walletPage.loading;
 const pendingKey = () => 'checkout-pending-' + session.session?.id;
-let sessionVersion = 0, loadSequence = 0, quoteSequence = 0;
-watch(() => session.session?.token, () => {
-  sessionVersion++;
-  loadSequence++;
-  carts.value = [];
-  addresses.value = [];
-  walletPage.clear();
-  selections.value = [];
-  platformCoupon.value = null;
-  remark.value = '';
-  pending.value = undefined;
-  busy.value = false;
-  invalidate();
-}, { flush: 'sync' });
+let sessionVersion = 0,
+  loadSequence = 0,
+  quoteSequence = 0;
+watch(
+  () => session.session?.token,
+  () => {
+    sessionVersion++;
+    loadSequence++;
+    carts.value = [];
+    addresses.value = [];
+    walletPage.clear();
+    selections.value = [];
+    platformCoupon.value = null;
+    remark.value = '';
+    pending.value = undefined;
+    busy.value = false;
+    invalidate();
+  },
+  { flush: 'sync' },
+);
 function invalidate() {
   quoteSequence++;
   quote.value = undefined;
 }
 async function load() {
   if (!loggedIn()) return;
-  const owner = sessionVersion, sequence = ++loadSequence;
+  const owner = sessionVersion,
+    sequence = ++loadSequence;
   invalidate();
   try {
     pending.value = uni.getStorageSync(pendingKey()) || undefined;
@@ -102,10 +115,15 @@ const input = (): CheckoutInput => ({
 async function preview() {
   if (busy.value) return;
   invalidate();
-  const owner = sessionVersion, sequence = quoteSequence;
+  const owner = sessionVersion,
+    sequence = quoteSequence;
   busy.value = true;
   try {
-    const result = await api<Quote>('/checkouts/preview', 'POST', JSON.parse(JSON.stringify(input())));
+    const result = await api<Quote>(
+      '/checkouts/preview',
+      'POST',
+      JSON.parse(JSON.stringify(input())),
+    );
     if (owner === sessionVersion && sequence === quoteSequence) quote.value = result;
   } catch (e) {
     if (owner === sessionVersion && sequence === quoteSequence) toast(e);
@@ -172,8 +190,7 @@ async function recover() {
           releaseRejectedRequest(rejected);
           throw rejected;
         }
-      }
-      else throw e;
+      } else throw e;
     }
   } catch (e) {
     if (owner === sessionVersion) toast(e);
@@ -182,90 +199,113 @@ async function recover() {
   }
 }
 const navTo = (url: string) => uni.navigateTo({ url });
-onShow(() => { active = true; void load(); });
-onHide(() => { active = false; ++loadSequence; ++quoteSequence; walletPage.cancel(); });
+onShow(() => {
+  active = true;
+  void load();
+});
+onHide(() => {
+  active = false;
+  ++loadSequence;
+  ++quoteSequence;
+  walletPage.cancel();
+});
 </script>
 <template>
-  <view class="screen"
-    ><view class="title">确认合并订单</view
-    ><view class="notice">一次模拟支付，各店分别履约。任一家店校验失败时整批不创建。</view
-    ><view v-if="pending" class="card"
-      ><view>上次提交结果尚未确认，请先恢复查询。</view
-      ><button class="primary" :loading="busy" @click="recover">查询并恢复原请求</button></view
-    ><template v-else
-      ><view class="card" v-for="(c, index) in carts" :key="c.storeId"
-        ><view class="section-title">{{ c.campusName }} · {{ c.storeName }}</view
-        ><picker
+  <view class="screen">
+    <view class="title">确认合并订单</view>
+    <view class="notice">一次模拟支付，各店分别履约。任一家店校验失败时整批不创建。</view>
+    <view v-if="pending" class="card">
+      <view>上次提交结果尚未确认，请先恢复查询。</view>
+      <button class="primary" :loading="busy" @click="recover">查询并恢复原请求</button>
+    </view>
+    <template v-else>
+      <view class="card" v-for="(c, index) in carts" :key="c.storeId">
+        <view class="section-title">{{ c.campusName }} · {{ c.storeName }}</view>
+        <picker
           :range="['校区配送', '到店自取']"
           :value="selections[index]?.fulfillment === 'PICKUP' ? 1 : 0"
           @change="fulfillment(selections[index]!, $event)"
-          ><view class="row"
-            ><text>履约方式</text
-            ><text class="tap"
+        >
+          <view class="row">
+            <text>履约方式</text>
+            <text class="tap"
               >{{ selections[index]?.fulfillment === 'PICKUP' ? '到店自取' : '校区配送' }} ▾</text
-            ></view
-          ></picker
-        ><picker
+            >
+          </view>
+        </picker>
+        <picker
           v-if="selections[index]?.fulfillment === 'DELIVERY'"
           :range="eligible(c).map((a) => a.buildingName + ' ' + a.room + ' ' + a.consignee)"
           @change="
             selections[index]!.addressId = eligible(c)[Number($event.detail.value)]?.id || null;
             invalidate();
           "
-          ><view class="field-label tap"
+        >
+          <view class="field-label tap"
             >{{
               eligible(c).find((a) => a.id === selections[index]?.addressId)?.buildingName ||
               '选择本校区收货地址'
             }}
             ▾</view
-          ></picker
-        ><picker
+          >
+        </picker>
+        <picker
           :range="['不使用店铺券', ...coupons(c.storeId).map((c) => c.name)]"
           @change="couponChange(selections[index]!, $event)"
-          ><view class="field-label tap"
+        >
+          <view class="field-label tap"
             >店铺优惠券：{{
               wallet.find((w) => w.id === selections[index]?.couponId)?.name || '不使用'
             }}
             ▾</view
-          ></picker
-        ><view class="muted" v-for="i in c.items" :key="i.id"
-          >{{ i.name }} × {{ i.quantity }}</view
-        ></view
-      ><view class="card"
-        ><text class="tap" @click="navTo('/pages/addresses/index')">管理各校区收货地址</text
-        ><button v-if="walletMore" class="secondary small-button" :loading="walletLoading" :disabled="walletLoading" @click="walletPage.load(false)">加载更多可用优惠券</button
-        ><picker
+          >
+        </picker>
+        <view class="muted" v-for="i in c.items" :key="i.id">{{ i.name }} × {{ i.quantity }}</view>
+      </view>
+      <view class="card">
+        <text class="tap" @click="navTo('/pages/addresses/index')">管理各校区收货地址</text>
+        <button
+          v-if="walletMore"
+          class="secondary small-button"
+          :loading="walletLoading"
+          :disabled="walletLoading"
+          @click="walletPage.load(false)"
+          >加载更多可用优惠券</button
+        >
+        <picker
           :range="['不使用平台券', ...coupons().map((c) => c.name)]"
           @change="
             platformCoupon = coupons()[Number($event.detail.value) - 1]?.id || null;
             invalidate();
           "
-          ><view class="field-label tap"
+        >
+          <view class="field-label tap"
             >平台优惠券：{{ wallet.find((w) => w.id === platformCoupon)?.name || '不使用' }} ▾</view
-          ></picker
-        ><textarea
-          v-model="remark"
-          maxlength="100"
-          placeholder="订单备注"
-          @input="invalidate"
-        /></view
-      ><button class="secondary" :disabled="!selections.length || busy" @click="preview">
+          >
+        </picker>
+        <textarea v-model="remark" maxlength="100" placeholder="订单备注" @input="invalidate" />
+      </view>
+      <button class="secondary" :disabled="!selections.length || busy" @click="preview">
         计算报价</button
-      ><view class="card" v-if="quote"
-        ><view v-for="p in quote.stores" :key="p.storeId" style="margin-bottom: 28rpx"
-          ><text style="font-weight: bold">{{ p.storeName }}</text
-          ><view class="muted"
+      >
+      <view class="card" v-if="quote">
+        <view v-for="p in quote.stores" :key="p.storeId" style="margin-bottom: 28rpx">
+          <text style="font-weight: bold">{{ p.storeName }}</text>
+          <view class="muted"
             >商品 ¥{{ cents(p.subtotalCents) }} · 店券 −¥{{ cents(p.shopDiscountCents) }} · 平台券
             −¥{{ cents(p.platformDiscountCents) }}</view
-          ><view class="muted"
+          >
+          <view class="muted"
             >配送 ¥{{ cents(p.deliveryCents) }} · 包装 ¥{{ cents(p.packagingCents) }}</view
-          ><view>本店应付 ¥{{ cents(p.totalCents) }}</view></view
-        ><view class="row"
-          ><text>合计</text><text class="price">¥{{ cents(quote.totalCents) }}</text></view
-        ><button class="primary" :loading="busy" @click="submit">
-          提交订单，随后模拟支付
-        </button></view
-      ></template
-    ></view
-  >
+          >
+          <view>本店应付 ¥{{ cents(p.totalCents) }}</view>
+        </view>
+        <view class="row">
+          <text>合计</text>
+          <text class="price">¥{{ cents(quote.totalCents) }}</text>
+        </view>
+        <button class="primary" :loading="busy" @click="submit"> 提交订单，随后模拟支付 </button>
+      </view>
+    </template>
+  </view>
 </template>

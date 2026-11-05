@@ -8,7 +8,7 @@ export interface CursorPage<T> {
   hasMore: boolean;
 }
 export function mergeRecords<T>(existing: T[], incoming: T[], key: (row: T) => string): T[] {
-  const rows = new Map(existing.map(row => [key(row), row]));
+  const rows = new Map(existing.map((row) => [key(row), row]));
   for (const row of incoming) rows.set(key(row), row);
   return [...rows.values()];
 }
@@ -17,12 +17,34 @@ export interface Campus {
   name: string;
   enabled: boolean;
 }
-export type Store = Fields<components['schemas']['StoreResponse'],
-  'id' | 'campusId' | 'campusName' | 'name' | 'enabled' | 'open' | 'accepting' |
-  'hours' | 'deliveryFee' | 'packagingFee' | 'phone' | 'version'>;
-export type Product = Fields<components['schemas']['ProductResponse'],
-  'id' | 'storeId' | 'name' | 'itemType' | 'categoryId' | 'price' | 'status' |
-  'description' | 'image' | 'remaining'> & {
+export type Store = Fields<
+  components['schemas']['StoreResponse'],
+  | 'id'
+  | 'campusId'
+  | 'campusName'
+  | 'name'
+  | 'enabled'
+  | 'open'
+  | 'accepting'
+  | 'hours'
+  | 'deliveryFee'
+  | 'packagingFee'
+  | 'phone'
+  | 'version'
+>;
+export type Product = Fields<
+  components['schemas']['ProductResponse'],
+  | 'id'
+  | 'storeId'
+  | 'name'
+  | 'itemType'
+  | 'categoryId'
+  | 'price'
+  | 'status'
+  | 'description'
+  | 'image'
+  | 'remaining'
+> & {
   flavors?: Fields<components['schemas']['FlavorResponse'], 'name' | 'values'>[];
   components?: Fields<components['schemas']['ComponentResponse'], 'dishId' | 'copies'>[];
   promotion?: Fields<components['schemas']['PromotionResponse'], 'id' | 'priceCents' | 'endsAt'>;
@@ -93,18 +115,37 @@ export interface Checkout {
   version: Id;
   orders: Order[];
 }
-export type Order = Fields<components['schemas']['OrderResponse'],
-  'id' | 'number' | 'storeId' | 'storeName' | 'campusName' | 'version' | 'status' |
-  'payStatus' | 'fulfillment' | 'ready' | 'amount' | 'paidCents' | 'refundedCents' |
-  'address' | 'consignee'> & Pick<components['schemas']['OrderResponse'],
-  'reviewed' | 'pickupCode' | 'phone' | 'courierId'> & {
-  details: Detail[];
-  aftersales: components['schemas']['OrderAftersaleResponse'][];
-  refunds: Refund[];
-  delivery?: Fields<components['schemas']['DeliveryResponse'], 'state'>;
-};
-export type Detail = Fields<components['schemas']['OrderDetailResponse'],
-  'id' | 'name' | 'number' | 'lineTotalCents' | 'refundedQuantity' | 'reservedQuantity'>;
+export type Order = Fields<
+  components['schemas']['OrderResponse'],
+  | 'id'
+  | 'number'
+  | 'storeId'
+  | 'storeName'
+  | 'campusName'
+  | 'version'
+  | 'status'
+  | 'payStatus'
+  | 'fulfillment'
+  | 'ready'
+  | 'amount'
+  | 'paidCents'
+  | 'refundedCents'
+  | 'address'
+  | 'consignee'
+> &
+  Pick<
+    components['schemas']['OrderResponse'],
+    'reviewed' | 'pickupCode' | 'phone' | 'courierId'
+  > & {
+    details: Detail[];
+    aftersales: components['schemas']['OrderAftersaleResponse'][];
+    refunds: Refund[];
+    delivery?: Fields<components['schemas']['DeliveryResponse'], 'state'>;
+  };
+export type Detail = Fields<
+  components['schemas']['OrderDetailResponse'],
+  'id' | 'name' | 'number' | 'lineTotalCents' | 'refundedQuantity' | 'reservedQuantity'
+>;
 export interface Aftersale {
   id: Id;
   orderId: Id;
@@ -127,8 +168,10 @@ export interface Task {
   attempts: number;
   lastError: string;
 }
-export type Refund = Fields<components['schemas']['RefundResponse'],
-  'id' | 'orderId' | 'amountCents' | 'state' | 'attempts' | 'lastError'>;
+export type Refund = Fields<
+  components['schemas']['RefundResponse'],
+  'id' | 'orderId' | 'amountCents' | 'state' | 'attempts' | 'lastError'
+>;
 export interface OutboxEvent extends Task {
   aggregateId: Id;
   eventType: string;
@@ -141,20 +184,40 @@ export interface HistoryFilters {
   end: string;
   taskId?: string;
 }
-export const aftersaleStates = ['PENDING', 'ESCALATED', 'APPROVED', 'REJECTED', 'WITHDRAWN', 'REFUNDED'];
+export const aftersaleStates = [
+  'PENDING',
+  'ESCALATED',
+  'APPROVED',
+  'REJECTED',
+  'WITHDRAWN',
+  'REFUNDED',
+];
 export const taskStates = ['REQUESTED', 'PROCESSING', 'FAILED', 'SUCCEEDED'];
 export function historyQuery(filters: HistoryFilters, beforeId?: string, limit?: number) {
-  const entries = Object.entries({ ...filters, beforeId, ...(limit === undefined ? {} : { limit: String(limit) }) }).filter(([, value]) => value?.trim());
-  return entries.length ? '?' + entries.map(([key, value]) =>
-    encodeURIComponent(key) + '=' + encodeURIComponent(value!.trim())).join('&') : '';
+  const entries = Object.entries({
+    ...filters,
+    beforeId,
+    ...(limit === undefined ? {} : { limit: String(limit) }),
+  }).filter(([, value]) => value?.trim());
+  return entries.length
+    ? '?' +
+        entries
+          .map(([key, value]) => encodeURIComponent(key) + '=' + encodeURIComponent(value!.trim()))
+          .join('&')
+    : '';
 }
 export function validateHistoryFilters(filters: HistoryFilters) {
   if (!!filters.begin !== !!filters.end) throw new Error('请同时选择开始和结束日期');
   if (filters.begin && filters.end) {
-    const days = (Date.parse(filters.end + 'T00:00:00+08:00') - Date.parse(filters.begin + 'T00:00:00+08:00')) / 86400000;
-    if (!Number.isFinite(days) || days < 0 || days >= 366) throw new Error('日期须按先后选择，最多366天（含首尾）');
+    const days =
+      (Date.parse(filters.end + 'T00:00:00+08:00') -
+        Date.parse(filters.begin + 'T00:00:00+08:00')) /
+      86400000;
+    if (!Number.isFinite(days) || days < 0 || days >= 366)
+      throw new Error('日期须按先后选择，最多366天（含首尾）');
   }
-  if (filters.taskId && !/^[1-9]\d*$/.test(filters.taskId.trim())) throw new Error('任务编号须为正整数');
+  if (filters.taskId && !/^[1-9]\d*$/.test(filters.taskId.trim()))
+    throw new Error('任务编号须为正整数');
 }
 export interface Coupon {
   id: Id;

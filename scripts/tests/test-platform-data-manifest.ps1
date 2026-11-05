@@ -25,9 +25,13 @@ try {
  $record=Get-Content -LiteralPath $after -Raw | ConvertFrom-Json
  if($record.tables.example.rows -ne 2 -or $record.tables.example.newRows -ne 1){throw 'Added rows were not separated from original data.'}
  foreach($case in @('changed','missing')){
-  $global:manifestFixtureCase=$case;$rejected=$false
+  $global:manifestFixtureCase = $case
+  $rejected = $false
   try {& (Join-Path $scriptsDir 'platform-data-manifest.ps1') -ProjectName 'campuseats-manifest-fixture' -OutputPath (Join-Path $fixture ($case+'.json')) -CompareManifest $before}catch{$rejected=$true}
   if(!$rejected){throw 'Historical mutation was accepted.'}
  }
  Write-Host 'Historical fingerprint: all original columns, additive rows, changed values and deleted rows passed.'
-}finally{Remove-Item Function:\docker -ErrorAction SilentlyContinue;Remove-Variable manifestFixtureCase -Scope Global -ErrorAction SilentlyContinue}
+} finally {
+  Remove-Item Function:\docker -ErrorAction SilentlyContinue
+  Remove-Variable manifestFixtureCase -Scope Global -ErrorAction SilentlyContinue
+}

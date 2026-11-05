@@ -44,7 +44,13 @@ function global:docker {
  if($a -contains 'start' -or $a -contains 'up'){
    if($a -contains '--no-build'){$global:fixtureRollbackCalls++}
   $specified=@('mysql','redis','server','web') | Where-Object {$a -contains $_}
-   if(!$specified){$global:fixtureFullUp=$true;$specified=@('mysql','redis','server','web');if($global:fixtureDeploymentFailure){$global:LASTEXITCODE=1}}
+   if (!$specified) {
+     $global:fixtureFullUp = $true
+     $specified = @('mysql','redis','server','web')
+     if ($global:fixtureDeploymentFailure) {
+       $global:LASTEXITCODE = 1
+     }
+   }
   foreach($service in $specified){$global:fixtureState[$service]=$true}
   return
  }
@@ -105,8 +111,11 @@ try {
   # successful migration or partial failed DDL must leave the failed deployment paused for inspection.
   foreach($case in @('unchanged','migrated','partial-ddl')){
    $global:fixtureState=@{mysql=$true;redis=$true;server=$true;web=$true}
-   $global:fixtureFullUp=$false;$global:fixtureDeploymentFailure=$true;$global:fixtureRollbackCalls=0
-   $global:fixtureChangedSchema=$case -eq 'migrated';$global:fixturePartialDdl=$case -eq 'partial-ddl'
+   $global:fixtureFullUp = $false
+   $global:fixtureDeploymentFailure = $true
+   $global:fixtureRollbackCalls = 0
+   $global:fixtureChangedSchema = $case -eq 'migrated'
+   $global:fixturePartialDdl = $case -eq 'partial-ddl'
    $failed=$false
    try {& (Join-Path $fixture 'scripts/start.ps1') -SkipVerify} catch {
     if($_.Exception.Message -notlike 'Deployment failed;*'){throw}

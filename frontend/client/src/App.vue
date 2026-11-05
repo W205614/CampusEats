@@ -1,11 +1,11 @@
 <script setup lang="ts">
-import { onLaunch } from "@dcloudio/uni-app";
+import { onLaunch } from '@dcloudio/uni-app';
 onLaunch(() => {});
 </script>
 <style>
 page {
   background: #f2f4f0;
-  font-family: "Microsoft YaHei", "DengXian", "PingFang SC", "Segoe UI", sans-serif;
+  font-family: 'Microsoft YaHei', 'DengXian', 'PingFang SC', 'Segoe UI', sans-serif;
   color: #20382d;
   font-size: 28rpx;
 }
@@ -249,10 +249,41 @@ button {
   text-decoration: underline;
   color: #22634e;
 }
-textarea{width:100%;box-sizing:border-box;background:#f2f4f0;padding:20rpx;border-radius:12rpx;margin:24rpx 0;min-height:150rpx}input{min-height:72rpx}picker{min-height:48rpx}.modal>.card{width:calc(100% - 48rpx);max-width:820rpx;max-height:88vh;overflow:auto}
+textarea {
+  width: 100%;
+  box-sizing: border-box;
+  background: #f2f4f0;
+  padding: 20rpx;
+  border-radius: 12rpx;
+  margin: 24rpx 0;
+  min-height: 150rpx;
+}
+input {
+  min-height: 72rpx;
+}
+picker {
+  min-height: 48rpx;
+}
+.modal > .card {
+  width: calc(100% - 48rpx);
+  max-width: 820rpx;
+  max-height: 88vh;
+  overflow: auto;
+}
 /* #ifdef H5 */
-body, uni-page-body { font-family: "Microsoft YaHei", "DengXian", "PingFang SC", "Segoe UI", sans-serif; color: #20382d; }
-a:focus-visible, button:focus-visible { outline: 3px solid #6b927c; outline-offset: 3px; }
+body,
+uni-page-body {
+  font-family: 'Microsoft YaHei', 'DengXian', 'PingFang SC', 'Segoe UI', sans-serif;
+  color: #20382d;
+}
+a:focus-visible,
+button:focus-visible {
+  outline: 3px solid #6b927c;
+  outline-offset: 3px;
+}
 /* #endif */
-.primary[disabled], .secondary[disabled] { opacity: .6; }
+.primary[disabled],
+.secondary[disabled] {
+  opacity: 0.6;
+}
 </style>

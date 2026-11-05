@@ -110,7 +110,8 @@ public class CheckoutService {
     db.one("SELECT id FROM user WHERE id=? FOR UPDATE", user);
     var parts = new ArrayList<Part>();
     var rules = new ArrayList<Map<String, Object>>();
-    Set<Long> stores = new HashSet<>(), coupons = new HashSet<>();
+    Set<Long> stores = new HashSet<>();
+    Set<Long> coupons = new HashSet<>();
     for (var selection : selections(input)) {
       long store = selection.storeId();
       require(stores.add(store), 400, "DUPLICATE_STORE", "同一店铺不能重复结算");

@@ -1,6 +1,7 @@
 import { createRouter, createWebHistory } from 'vue-router';
 import { useSession } from './stores/session';
-export const homeFor = (role: string) => role === 'DELIVERER' || role === 'OPERATOR' ? '/orders' : '/';
+export const homeFor = (role: string) =>
+  role === 'DELIVERER' || role === 'OPERATOR' ? '/orders' : '/';
 export const router = createRouter({
   history: createWebHistory('/admin/'),
   routes: [
@@ -22,8 +23,19 @@ router.beforeEach((to) => {
   if (!session) return true;
   if (session.mustChangePassword && to.path !== '/password') return '/password';
   if (to.path === '/password') return true;
-  if (session.role === 'DELIVERER' && !['/orders','/messages'].includes(to.path)) return '/orders';
-  if (session.role === 'OPERATOR' && !['/', '/orders', '/operations/aftersales', '/operations/reviews','/messages','/service-operations'].includes(to.path)) return '/orders';
+  if (session.role === 'DELIVERER' && !['/orders', '/messages'].includes(to.path)) return '/orders';
+  if (
+    session.role === 'OPERATOR' &&
+    ![
+      '/',
+      '/orders',
+      '/operations/aftersales',
+      '/operations/reviews',
+      '/messages',
+      '/service-operations',
+    ].includes(to.path)
+  )
+    return '/orders';
   if (to.path === '/users' && session.role !== 'PLATFORM_ADMIN') return '/';
   if (session.role === 'SHOP_MANAGER' && to.path === '/operations/buildings') return '/';
   return true;

@@ -58,7 +58,9 @@ class StaffPasswordIntegrationTest {
 
   @Test
   void unchangedInitialPasswordKeepsFirstChangeRequirementAndBothSessionsValid() {
-    String username = employee(), first = login(username, INITIAL), second = login(username, INITIAL);
+    String username = employee();
+    String first = login(username, INITIAL);
+    String second = login(username, INITIAL);
     Actor actor = auth.authenticate(first);
     var before = db.one("SELECT password,auth_version FROM employee WHERE id=?", actor.id());
 
@@ -78,7 +80,9 @@ class StaffPasswordIntegrationTest {
 
   @Test
   void differentPasswordClearsFirstChangeAndRevokesEveryPreviousSession() {
-    String username = employee(), first = login(username, INITIAL), second = login(username, INITIAL);
+    String username = employee();
+    String first = login(username, INITIAL);
+    String second = login(username, INITIAL);
     Actor actor = auth.authenticate(first);
     long version = db.count("SELECT auth_version FROM employee WHERE id=?", actor.id());
 

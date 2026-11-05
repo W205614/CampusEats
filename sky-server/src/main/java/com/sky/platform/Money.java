@@ -49,7 +49,8 @@ public final class Money {
   }
 
   public static long quantityAmount(long total, int quantity, int offset, int count) {
-    long base = total / quantity, extra = total % quantity;
+    long base = total / quantity;
+    long extra = total % quantity;
     return base * count + Math.max(0, Math.min(extra - offset, count));
   }
 }

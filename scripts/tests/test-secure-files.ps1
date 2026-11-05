@@ -16,7 +16,8 @@ if($IsWindows){
 # Inject at the protection boundary; no sensitive bytes may be written after failure.
 $script:originalProtection=${function:Set-SecurePathPermissions}
 function Set-SecurePathPermissions {param([string]$Path);throw 'Injected permission failure'}
-$failed=$false;$blocked=Join-Path $fixture 'blocked.txt'
+$failed = $false
+$blocked = Join-Path $fixture 'blocked.txt'
 try {Write-SecureTextFile -Path $blocked -Content 'must-not-be-written'} catch {$failed=$true}
 ${function:Set-SecurePathPermissions}=$script:originalProtection
 if(!$failed -or (Get-Item -LiteralPath $blocked).Length -ne 0){throw 'Permission failure did not fail before writing secret bytes.'}

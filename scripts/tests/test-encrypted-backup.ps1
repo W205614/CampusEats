@@ -15,7 +15,8 @@ $keygen=Join-Path (Split-Path $age -Parent) ('age-keygen'+$(if($IsWindows){'.exe
 $identity=Join-Path $fixture 'identity.txt'
 $private=(& $keygen 2>$null) -join "`n"
 if($LASTEXITCODE -ne 0){throw 'Fixture key generation failed.'}
-Write-SecureTextFile -Path $identity -Content $private;$private=$null
+Write-SecureTextFile -Path $identity -Content $private
+$private = $null
 Set-SecurePathPermissions -Path $identity
 $recipient=(& $keygen -y $identity) -join ''
 if($LASTEXITCODE -ne 0){throw 'Fixture public key extraction failed.'}
@@ -30,11 +31,15 @@ if([IO.File]::ReadAllText((Join-Path $restored '.env')) -cne 'isolated-.env'){th
 $badIdentity=Join-Path $fixture 'wrong-identity.txt'
 $private=(& $keygen 2>$null) -join "`n"
 if($LASTEXITCODE -ne 0){throw 'Wrong fixture key creation failed.'}
-Write-SecureTextFile -Path $badIdentity -Content $private;$private=$null
+Write-SecureTextFile -Path $badIdentity -Content $private
+$private = $null
 $rejected=$false
 try {Expand-EncryptedBackupReplica -ReplicaDirectory $replica -Destination (Join-Path $fixture 'wrong-key') -IdentityFile $badIdentity -AgeExecutable $age | Out-Null} catch {$rejected=$true}
 if(!$rejected -or (Test-Path -LiteralPath (Join-Path $fixture 'wrong-key/verified.json'))){throw 'Wrong key accepted.'}
-$cipher=Join-Path $replica 'backup.tar.gz.age';$bytes=[IO.File]::ReadAllBytes($cipher);$bytes[$bytes.Length-1]=$bytes[$bytes.Length-1] -bxor 1;[IO.File]::WriteAllBytes($cipher,$bytes)
+$cipher = Join-Path $replica 'backup.tar.gz.age'
+$bytes = [IO.File]::ReadAllBytes($cipher)
+$bytes[$bytes.Length-1] = $bytes[$bytes.Length-1] -bxor 1
+[IO.File]::WriteAllBytes($cipher,$bytes)
 $rejected=$false
 try {Expand-EncryptedBackupReplica -ReplicaDirectory $replica -Destination (Join-Path $fixture 'corrupt') -IdentityFile $identity -AgeExecutable $age | Out-Null} catch {$rejected=$true}
 if(!$rejected){throw 'Corrupt ciphertext accepted.'}

@@ -12,7 +12,8 @@ class MoneyTest {
     var random = new Random(42);
     for (int run = 0; run < 1000; run++) {
       long[] weights = random.longs(20, 0, 100000).toArray();
-      long total = Arrays.stream(weights).sum(), discount = random.nextLong(total + 1);
+      long total = Arrays.stream(weights).sum();
+      long discount = random.nextLong(total + 1);
       long[] result = Money.allocate(discount, weights);
       assertEquals(discount, Arrays.stream(result).sum());
       for (int i = 0; i < weights.length; i++)

@@ -8,17 +8,23 @@ const session = useSession(),
   carts = ref<Cart[]>([]),
   selected = ref<string[]>([]),
   busy = ref(false);
-let sessionVersion = 0, loadSequence = 0;
-watch(() => session.session?.token, () => {
-  sessionVersion++;
-  loadSequence++;
-  carts.value = [];
-  selected.value = [];
-  busy.value = false;
-}, { flush: 'sync' });
+let sessionVersion = 0,
+  loadSequence = 0;
+watch(
+  () => session.session?.token,
+  () => {
+    sessionVersion++;
+    loadSequence++;
+    carts.value = [];
+    selected.value = [];
+    busy.value = false;
+  },
+  { flush: 'sync' },
+);
 async function load() {
   if (!loggedIn()) return;
-  const owner = sessionVersion, sequence = ++loadSequence;
+  const owner = sessionVersion,
+    sequence = ++loadSequence;
   try {
     const result = await api<Cart[]>('/carts');
     if (owner !== sessionVersion || sequence !== loadSequence) return;
@@ -73,33 +79,37 @@ async function clearCart(c: Cart) {
 onShow(load);
 </script>
 <template>
-  <view class="screen"
-    ><view class="title">我的购物车</view
-    ><view class="subtitle">每店购物车独立保存，可勾选多个校区的店铺合并结算。</view
-    ><view class="card" v-for="c in carts" :key="c.storeId"
-      ><view class="row" @click="toggle(c.storeId)"
-        ><text style="font-weight: bold">{{ c.campusName }} · {{ c.storeName }}</text
-        ><text class="option" :class="{ selected: selected.includes(c.storeId) }">{{
+  <view class="screen">
+    <view class="title">我的购物车</view>
+    <view class="subtitle">每店购物车独立保存，可勾选多个校区的店铺合并结算。</view>
+    <view class="card" v-for="c in carts" :key="c.storeId">
+      <view class="row" @click="toggle(c.storeId)">
+        <text style="font-weight: bold">{{ c.campusName }} · {{ c.storeName }}</text>
+        <text class="option" :class="{ selected: selected.includes(c.storeId) }">{{
           selected.includes(c.storeId) ? '已选择' : '选择此店'
-        }}</text></view
-      ><text class="tap" @click="clearCart(c)">清空本店</text
-      ><view v-for="i in c.items" :key="i.id" class="row" style="margin-top: 30rpx"
-        ><view
-          ><view>{{ i.name }}</view
-          ><view class="muted">{{ Object.values(i.flavors || {}).join(' / ') }}</view
-          ><text>¥{{ i.price }}</text></view
-        ><view class="row"
-          ><button class="secondary small-button" :disabled="busy" @click="change(c, i, -1)">
+        }}</text>
+      </view>
+      <text class="tap" @click="clearCart(c)">清空本店</text>
+      <view v-for="i in c.items" :key="i.id" class="row" style="margin-top: 30rpx">
+        <view>
+          <view>{{ i.name }}</view>
+          <view class="muted">{{ Object.values(i.flavors || {}).join(' / ') }}</view>
+          <text>¥{{ i.price }}</text>
+        </view>
+        <view class="row">
+          <button class="secondary small-button" :disabled="busy" @click="change(c, i, -1)">
             −</button
-          ><text style="margin: 0 20rpx">{{ i.quantity }}</text
-          ><button class="secondary small-button" :disabled="busy" @click="change(c, i, 1)">
+          >
+          <text style="margin: 0 20rpx">{{ i.quantity }}</text>
+          <button class="secondary small-button" :disabled="busy" @click="change(c, i, 1)">
             ＋
-          </button></view
-        ></view
-      ></view
-    ><view v-if="!carts.length" class="empty">购物车还是空的，去挑一份喜欢的餐吧。</view
-    ><button v-if="carts.length" class="primary" :disabled="!selected.length" @click="checkout">
+          </button>
+        </view>
+      </view>
+    </view>
+    <view v-if="!carts.length" class="empty">购物车还是空的，去挑一份喜欢的餐吧。</view>
+    <button v-if="carts.length" class="primary" :disabled="!selected.length" @click="checkout">
       合并结算 {{ selected.length }} 家店
-    </button></view
-  >
+    </button>
+  </view>
 </template>

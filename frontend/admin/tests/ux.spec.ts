@@ -3,43 +3,59 @@ import { test, expect, call, asSession, password } from './helpers';
 import type { Session } from '../../contracts/models';
 import type { Cart, Checkout, Order, Product, Quote, Store } from '../../contracts/platform';
 
-test('root opens ordering and users can switch login entrances without editing the URL', async ({ page }) => {
+test('root opens ordering and users can switch login entrances without editing the URL', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/');
   await expect(page).toHaveURL(/\/app\//);
   await expect(page.getByText('登录点餐', { exact: true })).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBeTruthy();
+  expect(
+    await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth),
+  ).toBeTruthy();
   await page.getByRole('link', { name: '商家/配送工作台' }).click();
   await expect(page.getByLabel('账户', { exact: true })).toHaveValue('');
   await page.getByRole('link', { name: '用户点餐', exact: true }).click();
   await page.getByText('登录点餐', { exact: true }).click();
   await expect(page.getByText('进入演示用户 1', { exact: true })).toBeVisible();
   await expect(page.getByRole('link', { name: '进入工作台登录' })).toBeVisible();
-  const loggedIn = page.waitForResponse(r => r.url().endsWith('/user/auth/demo') && r.ok());
+  const loggedIn = page.waitForResponse((r) => r.url().endsWith('/user/auth/demo') && r.ok());
   await page.getByText('进入演示用户 1', { exact: true }).click();
   const login = await (await loggedIn).json();
   await expect(page.getByText(login.data.name, { exact: true })).toBeVisible();
   expect(await page.evaluate(() => sessionStorage.getItem('campus-admin'))).toBeNull();
-  expect(await page.evaluate(() => JSON.parse(sessionStorage.getItem('campus-user') || 'null')?.role)).toBe('USER');
+  expect(
+    await page.evaluate(() => JSON.parse(sessionStorage.getItem('campus-user') || 'null')?.role),
+  ).toBe('USER');
 });
 
-test('users can reach every login action with Tab and complete demo login using the keyboard', async ({ page }) => {
+test('users can reach every login action with Tab and complete demo login using the keyboard', async ({
+  page,
+}) => {
   await page.goto('/');
   await page.getByRole('link', { name: '登录点餐', exact: true }).click();
   await expect(page).toHaveURL(/\/app\/pages\/login\/index$/);
   await expect(page.getByText('进入演示用户 1', { exact: true })).toBeVisible();
-  const actions = [page.locator('uni-input[aria-label="独立账号"] input'),page.locator('uni-input[aria-label="账号密码"] input'),
-    page.getByText('登录独立账号',{exact:true}), ...['进入演示用户 1','进入演示用户 2','进入演示用户 3'].map(action=>page.getByText(action,{exact:true})),
-    page.getByRole('link',{name:'进入工作台登录'})];
+  const actions = [
+    page.locator('uni-input[aria-label="独立账号"] input'),
+    page.locator('uni-input[aria-label="账号密码"] input'),
+    page.getByText('登录独立账号', { exact: true }),
+    ...['进入演示用户 1', '进入演示用户 2', '进入演示用户 3'].map((action) =>
+      page.getByText(action, { exact: true }),
+    ),
+    page.getByRole('link', { name: '进入工作台登录' }),
+  ];
   for (const action of actions) {
     await page.keyboard.press('Tab');
     await expect(action).toBeFocused();
   }
-  await expect(page.getByText('当前未配置微信登录，请使用独立测试账号或演示账号。',{exact:true})).toBeVisible();
-  await expect(page.getByText('使用微信登录',{exact:true})).toHaveCount(0);
+  await expect(
+    page.getByText('当前未配置微信登录，请使用独立测试账号或演示账号。', { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText('使用微信登录', { exact: true })).toHaveCount(0);
   for (let i = 0; i < 3; i++) await page.keyboard.press('Shift+Tab');
   await expect(page.getByText('进入演示用户 1', { exact: true })).toBeFocused();
-  const loggedIn = page.waitForResponse(response => response.url().endsWith('/user/auth/demo'));
+  const loggedIn = page.waitForResponse((response) => response.url().endsWith('/user/auth/demo'));
   await page.keyboard.press('Enter');
   const response = await loggedIn;
   expect(response.ok()).toBeTruthy();
@@ -47,17 +63,31 @@ test('users can reach every login action with Tab and complete demo login using 
   const login = await response.json();
   await expect(page.getByRole('link', { name: login.data.name, exact: true })).toBeVisible();
   await expect(page.getByText('默认校区 ▾', { exact: true })).toBeVisible();
-  expect(await page.evaluate(() => JSON.parse(sessionStorage.getItem('campus-user') || 'null')?.role)).toBe('USER');
-  expect(await page.evaluate(id => JSON.parse(sessionStorage.getItem('campus-user') || 'null')?.id === id, login.data.id)).toBeTruthy();
+  expect(
+    await page.evaluate(() => JSON.parse(sessionStorage.getItem('campus-user') || 'null')?.role),
+  ).toBe('USER');
+  expect(
+    await page.evaluate(
+      (id) => JSON.parse(sessionStorage.getItem('campus-user') || 'null')?.id === id,
+      login.data.id,
+    ),
+  ).toBeTruthy();
   expect(await page.evaluate(() => sessionStorage.getItem('campus-admin'))).toBeNull();
 });
 
-test('switching between ordering and workbench preserves their independent sessions', async ({ page, adminSession, userSession }) => {
+test('switching between ordering and workbench preserves their independent sessions', async ({
+  page,
+  adminSession,
+  userSession,
+}) => {
   await page.goto('/');
-  await page.evaluate(({ admin, user }) => {
-    sessionStorage.setItem('campus-admin', JSON.stringify(admin));
-    sessionStorage.setItem('campus-user', JSON.stringify(user));
-  }, { admin: adminSession, user: userSession });
+  await page.evaluate(
+    ({ admin, user }) => {
+      sessionStorage.setItem('campus-admin', JSON.stringify(admin));
+      sessionStorage.setItem('campus-user', JSON.stringify(user));
+    },
+    { admin: adminSession, user: userSession },
+  );
   await page.reload();
   await expect(page).toHaveURL(/\/app\//);
   await expect(page.getByText(userSession.name, { exact: true })).toBeVisible();
@@ -65,18 +95,48 @@ test('switching between ordering and workbench preserves their independent sessi
   await expect(page.getByRole('button', { name: '退出', exact: true })).toBeVisible();
   await page.getByRole('link', { name: '去点餐' }).click();
   await expect(page.getByText(userSession.name, { exact: true })).toBeVisible();
-  expect(await page.evaluate(token => JSON.parse(sessionStorage.getItem('campus-admin')!).token === token, adminSession.token)).toBeTruthy();
-  expect(await page.evaluate(token => JSON.parse(sessionStorage.getItem('campus-user')!).token === token, userSession.token)).toBeTruthy();
+  expect(
+    await page.evaluate(
+      (token) => JSON.parse(sessionStorage.getItem('campus-admin')!).token === token,
+      adminSession.token,
+    ),
+  ).toBeTruthy();
+  expect(
+    await page.evaluate(
+      (token) => JSON.parse(sessionStorage.getItem('campus-user')!).token === token,
+      userSession.token,
+    ),
+  ).toBeTruthy();
 });
 
-test('courier login opens the delivery desk and protected routes return to it', async ({ page, request, adminSession }) => {
+test('courier login opens the delivery desk and protected routes return to it', async ({
+  page,
+  request,
+  adminSession,
+}) => {
   const username = 'uxcourier' + randomUUID().slice(0, 8);
-  const initial = password(), changed = 'Ux-' + randomUUID();
-  await call(request, '/platform/staff', adminSession.token, 'POST', { username, name: '页面配送验收', role: 'DELIVERER', campusId: '1', enabled: true, password: initial });
-  const first = await call<Session>(request, '/admin/auth/login', '', 'POST', { username, password: initial });
-  await call(request, '/admin/auth/password', first.token, 'POST', { oldPassword: initial, password: changed });
+  const initial = password(),
+    changed = 'Ux-' + randomUUID();
+  await call(request, '/platform/staff', adminSession.token, 'POST', {
+    username,
+    name: '页面配送验收',
+    role: 'DELIVERER',
+    campusId: '1',
+    enabled: true,
+    password: initial,
+  });
+  const first = await call<Session>(request, '/admin/auth/login', '', 'POST', {
+    username,
+    password: initial,
+  });
+  await call(request, '/admin/auth/password', first.token, 'POST', {
+    oldPassword: initial,
+    password: changed,
+  });
   const failures: string[] = [];
-  page.on('response', r => { if (r.status() >= 400 && r.url().includes('/api/v1/merchant')) failures.push(r.url()); });
+  page.on('response', (r) => {
+    if (r.status() >= 400 && r.url().includes('/api/v1/merchant')) failures.push(r.url());
+  });
   await page.goto('/admin/');
   await page.getByLabel('账户', { exact: true }).fill(username);
   await page.getByLabel('密码', { exact: true }).fill(changed);
@@ -88,13 +148,34 @@ test('courier login opens the delivery desk and protected routes return to it', 
   expect(failures).toEqual([]);
 });
 
-test('recovery retains unknown results but releases a rejected original checkout', async ({ page, userSession }) => {
+test('recovery retains unknown results but releases a rejected original checkout', async ({
+  page,
+  userSession,
+}) => {
   await asSession(page, userSession, true);
   const key = randomUUID();
-  await page.addInitScript(({ id, key }) => localStorage.setItem('checkout-pending-' + id, JSON.stringify({ type: 'object', data: { key, body: { stores: [] } } })), { id: userSession.id, key });
-  await page.route('**/api/v1/user/checkouts/by-request/*', route => route.fulfill({ status: 404, json: { code: 'NOT_FOUND', message: '尚未创建', data: null } }));
+  await page.addInitScript(
+    ({ id, key }) =>
+      localStorage.setItem(
+        'checkout-pending-' + id,
+        JSON.stringify({ type: 'object', data: { key, body: { stores: [] } } }),
+      ),
+    { id: userSession.id, key },
+  );
+  await page.route('**/api/v1/user/checkouts/by-request/*', (route) =>
+    route.fulfill({ status: 404, json: { code: 'NOT_FOUND', message: '尚未创建', data: null } }),
+  );
   let attempts = 0;
-  await page.route('**/api/v1/user/checkouts', route => route.fulfill({ status: ++attempts === 1 ? 503 : 409, json: { code: attempts === 1 ? 'UNAVAILABLE' : 'VERSION_CONFLICT', message: attempts === 1 ? '暂不可用' : '购物车已更新', data: null } }));
+  await page.route('**/api/v1/user/checkouts', (route) =>
+    route.fulfill({
+      status: ++attempts === 1 ? 503 : 409,
+      json: {
+        code: attempts === 1 ? 'UNAVAILABLE' : 'VERSION_CONFLICT',
+        message: attempts === 1 ? '暂不可用' : '购物车已更新',
+        data: null,
+      },
+    }),
+  );
   await page.goto('/app/pages/checkout/index');
   const recovery = page.getByText('查询并恢复原请求', { exact: true });
   await recovery.click();
@@ -103,52 +184,118 @@ test('recovery retains unknown results but releases a rejected original checkout
   await recovery.click();
   await expect(recovery).toHaveCount(0);
   await expect(page.getByText('计算报价', { exact: true })).toBeVisible();
-  expect(await page.evaluate(id => localStorage.getItem('checkout-pending-' + id), userSession.id)).toBeNull();
+  expect(
+    await page.evaluate((id) => localStorage.getItem('checkout-pending-' + id), userSession.id),
+  ).toBeNull();
 });
 
-test('order page exposes reminder and reorder actions with working requests', async ({ request, page, adminSession, userSession }) => {
-  const a = adminSession.token, u = userSession.token;
-  const store = (await call<Store[]>(request, '/merchant/stores', a)).find(s => s.id === '1')!;
-  await call(request, '/merchant/stores/1', a, 'PUT', { campusId: store.campusId, name: store.name, enabled: true, open: true, deliveryFeeCents: 600, packagingFeeCents: 100, hours: ['00:00-24:00'], phone: store.phone });
-  const product = (await call<Product[]>(request, '/user/stores/1/products', u)).find(p => p.itemType === 'DISH' && !p.flavors?.length && p.remaining > 0)!;
+test('order page exposes reminder and reorder actions with working requests', async ({
+  request,
+  page,
+  adminSession,
+  userSession,
+}) => {
+  const a = adminSession.token,
+    u = userSession.token;
+  const store = (await call<Store[]>(request, '/merchant/stores', a)).find((s) => s.id === '1')!;
+  await call(request, '/merchant/stores/1', a, 'PUT', {
+    campusId: store.campusId,
+    name: store.name,
+    enabled: true,
+    open: true,
+    deliveryFeeCents: 600,
+    packagingFeeCents: 100,
+    hours: ['00:00-24:00'],
+    phone: store.phone,
+  });
+  const product = (await call<Product[]>(request, '/user/stores/1/products', u)).find(
+    (p) => p.itemType === 'DISH' && !p.flavors?.length && p.remaining > 0,
+  )!;
   let cart = await call<Cart>(request, '/user/stores/1/cart', u);
   await call(request, '/user/stores/1/cart/clear', u, 'POST', { version: cart.cartVersion });
   cart = await call<Cart>(request, '/user/stores/1/cart', u);
-  cart = await call<Cart>(request, '/user/stores/1/cart/items', u, 'POST', { cartVersion: cart.cartVersion, itemType: product.itemType, itemId: product.id, flavors: {}, delta: 1 });
-  const input = { stores: [{ storeId: '1', cartVersion: cart.cartVersion, fulfillment: 'PICKUP', couponId: null, addressId: null }] };
+  cart = await call<Cart>(request, '/user/stores/1/cart/items', u, 'POST', {
+    cartVersion: cart.cartVersion,
+    itemType: product.itemType,
+    itemId: product.id,
+    flavors: {},
+    delta: 1,
+  });
+  const input = {
+    stores: [
+      {
+        storeId: '1',
+        cartVersion: cart.cartVersion,
+        fulfillment: 'PICKUP',
+        couponId: null,
+        addressId: null,
+      },
+    ],
+  };
   const quote = await call<Quote>(request, '/user/checkouts/preview', u, 'POST', input);
-  const checkout = await call<Checkout>(request, '/user/checkouts', u, 'POST', { ...input, quoteHash: quote.quoteHash }, { 'Idempotency-Key': randomUUID() });
-  const paid = await call<Checkout>(request, '/user/checkouts/' + checkout.id + '/pay', u, 'POST', { version: checkout.version });
+  const checkout = await call<Checkout>(
+    request,
+    '/user/checkouts',
+    u,
+    'POST',
+    { ...input, quoteHash: quote.quoteHash },
+    { 'Idempotency-Key': randomUUID() },
+  );
+  const paid = await call<Checkout>(request, '/user/checkouts/' + checkout.id + '/pay', u, 'POST', {
+    version: checkout.version,
+  });
   let order = paid.orders[0]!;
   await asSession(page, userSession, true);
   await page.goto('/app/pages/orders/index');
-  const card = page.locator('uni-view.card').filter({ has: page.getByText(order.number + ' · 自取', { exact: true }) });
-  const reminder = page.waitForResponse(r => r.url().endsWith('/orders/' + order.id + '/reminder'));
+  const card = page
+    .locator('uni-view.card')
+    .filter({ has: page.getByText(order.number + ' · 自取', { exact: true }) });
+  const reminder = page.waitForResponse((r) =>
+    r.url().endsWith('/orders/' + order.id + '/reminder'),
+  );
   await card.getByText('催单', { exact: true }).click();
   expect((await reminder).ok()).toBeTruthy();
   for (const action of ['accept', 'ready']) {
-    await call(request, '/merchant/orders/' + order.id + '/actions/' + action, a, 'POST', { version: order.version });
+    await call(request, '/merchant/orders/' + order.id + '/actions/' + action, a, 'POST', {
+      version: order.version,
+    });
     order = await call<Order>(request, '/user/orders/' + order.id, u);
   }
-  await call(request, '/merchant/orders/' + order.id + '/actions/verify', a, 'POST', { version: order.version, code: order.pickupCode });
+  await call(request, '/merchant/orders/' + order.id + '/actions/verify', a, 'POST', {
+    version: order.version,
+    code: order.pickupCode,
+  });
   await page.reload();
-  const response = page.waitForResponse(r => r.url().endsWith('/orders/' + order.id + '/reorder'));
+  const response = page.waitForResponse((r) =>
+    r.url().endsWith('/orders/' + order.id + '/reorder'),
+  );
   await card.getByText('再来一单', { exact: true }).click();
   expect((await response).ok()).toBeTruthy();
-  expect((await call<Cart>(request, '/user/stores/1/cart', u)).items.some(i => i.itemId === product.id)).toBeTruthy();
+  expect(
+    (await call<Cart>(request, '/user/stores/1/cart', u)).items.some(
+      (i) => i.itemId === product.id,
+    ),
+  ).toBeTruthy();
 });
 
-test('menu exposes category and campus opening filters and names search result stores', async ({ page }) => {
+test('menu exposes category and campus opening filters and names search result stores', async ({
+  page,
+}) => {
   await page.goto('/app/');
   await expect(page.getByText('分类：本店全部分类 ▾', { exact: true })).toBeVisible();
   await page.getByText('校区筛选：本校区全部店铺 ▾', { exact: true }).click();
-  const search = page.waitForResponse(r => r.url().includes('/user/search/page?') && r.url().includes('open=true'));
+  const search = page.waitForResponse(
+    (r) => r.url().includes('/user/search/page?') && r.url().includes('open=true'),
+  );
   await page.locator('.uni-picker-item:visible').filter({ hasText: '仅营业中' }).click();
   expect((await search).ok()).toBeTruthy();
   await expect(page.getByText('校区筛选：仅营业中 ▾', { exact: true })).toBeVisible();
 });
 
-test('quota and report default dates follow the browser local day near midnight', async ({ page, adminSession }) => {
+test('quota and report default dates follow the browser local day near midnight', async ({
+  page,
+  adminSession,
+}) => {
   await asSession(page, adminSession);
   await page.clock.install({ time: new Date('2026-10-15T17:30:00Z') });
   await page.goto('/admin/catalog');
@@ -159,27 +306,58 @@ test('quota and report default dates follow the browser local day near midnight'
 });
 
 for (const user of [true, false]) {
-  test(`${user ? 'user' : 'merchant'} can load older orders without polling dropping history`, async ({ page, adminSession, userSession }) => {
+  test(`${user ? 'user' : 'merchant'} can load older orders without polling dropping history`, async ({
+    page,
+    adminSession,
+    userSession,
+  }) => {
     await asSession(page, user ? userSession : adminSession, user);
     await page.clock.install();
-    const records = Array.from({ length: 101 }, (_, i) => ({ id: String(1001 - i), number: 'UX-HISTORY-' + i, storeId: '1', storeName: '分页验收店铺', campusName: '默认校区', version: '0', status: 5, payStatus: 1, fulfillment: 'PICKUP', ready: true, amount: '12.00', paidCents: '1200', refundedCents: '0', details: [], aftersales: [], refunds: [] }));
+    const records = Array.from({ length: 101 }, (_, i) => ({
+      id: String(1001 - i),
+      number: 'UX-HISTORY-' + i,
+      storeId: '1',
+      storeName: '分页验收店铺',
+      campusName: '默认校区',
+      version: '0',
+      status: 5,
+      payStatus: 1,
+      fulfillment: 'PICKUP',
+      ready: true,
+      amount: '12.00',
+      paidCents: '1200',
+      refundedCents: '0',
+      details: [],
+      aftersales: [],
+      refunds: [],
+    }));
     let olderReads = 0;
     const listPath = user ? '/user/orders' : '/merchant/stores/1/orders';
-    await page.route('**/api/v1' + listPath + '*', route => {
+    await page.route('**/api/v1' + listPath + '*', (route) => {
       const query = new URL(route.request().url()).searchParams;
       const before = Number(query.get('beforeId') || Number.MAX_SAFE_INTEGER);
       const limit = Number(query.get('limit') || 100);
       if (limit > 100) olderReads++;
-      const data = records.filter(row => Number(row.id) < before).slice(0, limit)
-        .map(row => row.id === records[100].id ? { ...row, storeName: '历史同步已更新-' + olderReads } : row);
+      const data = records
+        .filter((row) => Number(row.id) < before)
+        .slice(0, limit)
+        .map((row) =>
+          row.id === records[100].id ? { ...row, storeName: '历史同步已更新-' + olderReads } : row,
+        );
       return route.fulfill({ json: { code: 'OK', data } });
     });
     if (user) {
-      await page.route('**/api/v1/user/checkouts*', route => route.fulfill({ json: { code: 'OK', data: [] } }));
-      await page.route('**/api/v1/user/aftersales*', route => route.fulfill({ json: { code: 'OK', data: [] } }));
+      await page.route('**/api/v1/user/checkouts*', (route) =>
+        route.fulfill({ json: { code: 'OK', data: [] } }),
+      );
+      await page.route('**/api/v1/user/aftersales*', (route) =>
+        route.fulfill({ json: { code: 'OK', data: [] } }),
+      );
     }
     await page.goto(user ? '/app/pages/orders/index' : '/admin/orders');
-    const older = page.getByText(user ? 'UX-HISTORY-100 · 自取' : 'UX-HISTORY-100', { exact: true });
+    const older = page.getByText(user ? 'UX-HISTORY-100 · 自取' : 'UX-HISTORY-100', {
+      exact: true,
+    });
     await expect(older).toHaveCount(0);
     await page.getByText(user ? '加载更早订单与结算单' : '加载更早订单', { exact: true }).click();
     await expect(older).toBeVisible();
@@ -188,11 +366,17 @@ for (const user of [true, false]) {
     await expect.poll(() => olderReads).toBeGreaterThan(readsBeforePoll);
     // Receiving the route is not enough: the page waits for all related reads before
     // clearing loading. Wait for the refreshed oldest row to render before clicking.
-    await expect(page.getByText((user ? '默认校区 · ' : '') + '历史同步已更新-' + olderReads, { exact: true })).toBeVisible();
+    await expect(
+      page.getByText((user ? '默认校区 · ' : '') + '历史同步已更新-' + olderReads, { exact: true }),
+    ).toBeVisible();
     await expect(older).toBeVisible();
-    const refreshed = page.waitForResponse(response => {
+    const refreshed = page.waitForResponse((response) => {
       const url = new URL(response.url());
-      return url.pathname === '/api/v1' + listPath && url.searchParams.get('limit') === '100' && !url.searchParams.has('beforeId');
+      return (
+        url.pathname === '/api/v1' + listPath &&
+        url.searchParams.get('limit') === '100' &&
+        !url.searchParams.has('beforeId')
+      );
     });
     await page.getByText(user ? '重新加载' : '刷新', { exact: true }).click();
     expect((await refreshed).ok()).toBe(true);
@@ -200,14 +384,29 @@ for (const user of [true, false]) {
   });
 }
 
-test('campus search finds a matching store even before it has any products', async ({ page, request, adminSession }) => {
+test('campus search finds a matching store even before it has any products', async ({
+  page,
+  request,
+  adminSession,
+}) => {
   const name = '空店验收-' + randomUUID().slice(0, 8);
-  await call(request, '/platform/stores', adminSession.token, 'POST', { campusId: '1', name, enabled: true, open: true, deliveryFeeCents: 0, packagingFeeCents: 0, hours: ['00:00-24:00'], phone: '' });
+  await call(request, '/platform/stores', adminSession.token, 'POST', {
+    campusId: '1',
+    name,
+    enabled: true,
+    open: true,
+    deliveryFeeCents: 0,
+    packagingFeeCents: 0,
+    hours: ['00:00-24:00'],
+    phone: '',
+  });
   await page.goto('/app/');
   // Uni-app renders placeholder text beside the native input in H5.
   await page.getByRole('textbox').fill(name);
   await page.getByText('搜本校区', { exact: true }).click();
-  const store = page.locator('uni-view.card').filter({ hasText: name, has: page.getByText('进入店铺', { exact: true }) });
+  const store = page
+    .locator('uni-view.card')
+    .filter({ hasText: name, has: page.getByText('进入店铺', { exact: true }) });
   await expect(store).toHaveCount(1);
   await expect(store).toBeVisible();
   await store.getByText('进入店铺', { exact: true }).click();

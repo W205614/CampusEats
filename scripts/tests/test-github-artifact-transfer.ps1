@@ -53,11 +53,15 @@ function New-RangeSender {
   param($StorageClient,$RangeRequest,$CancellationToken)
   if($StorageClient.DefaultRequestHeaders.Authorization -or $RangeRequest.Headers.Authorization){throw 'Storage transport received an authorization header.'}
   [void]$State.Clients.Add($StorageClient)
-  $range=@($RangeRequest.Headers.Range.Ranges)[0];$start=[long]$range.From;$last=[long]$range.To
+  $range = @($RangeRequest.Headers.Range.Ranges)[0]
+  $start = [long]$range.From
+  $last = [long]$range.To
   [void]$State.Starts.Add($start)
-  $length=[int]($last-$start+1);$bytes=[byte[]]::new($length)
+  $length = [int]($last-$start+1)
+  $bytes = [byte[]]::new($length)
   [Array]::Copy($State.Bytes,[int]$start,$bytes,0,$length)
-  $failAfter=-1;$stall=$false
+  $failAfter = -1
+  $stall = $false
   if($State.Mode -eq 'interrupt' -and $start -eq 4 -and @($State.Starts | Where-Object {$_ -eq 4}).Count -eq 1){$failAfter=2}
   if($State.Mode -eq 'short'){$bytes=$bytes[0..($length-2)]}
   if($State.Mode -eq 'long'){$bytes=[byte[]](@($bytes)+@(255))}
@@ -92,34 +96,45 @@ function Assert-RangeBytes {
  if((Get-FileHash -LiteralPath $State.Output -Algorithm SHA256).Hash -cne [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($State.Bytes))){throw 'Range transport changed fixture bytes.'}
 }
 
-$normal=New-RangeFixture 'normal';Invoke-RangeFixture $normal;Assert-RangeBytes $normal
+$normal = New-RangeFixture 'normal'
+Invoke-RangeFixture $normal
+Assert-RangeBytes $normal
 if(($normal.Starts -join ',') -cne '0,4,8' -or $normal.Clients.Count -ne 3){throw 'Normal artifact was not requested in independent bounded ranges.'}
 
-$interrupt=New-RangeFixture 'interrupted' 'interrupt';Invoke-RangeFixture $interrupt;Assert-RangeBytes $interrupt
+$interrupt = New-RangeFixture 'interrupted' 'interrupt'
+Invoke-RangeFixture $interrupt
+Assert-RangeBytes $interrupt
 if(($interrupt.Starts -join ',') -cne '0,4,4,8' -or $interrupt.Clients.Count -ne 4){throw 'Interrupted chunk did not retry exactly its confirmed offset with a fresh client.'}
 
 foreach($mode in @('range','length','long','status')){
- $invalid=New-RangeFixture $mode $mode;Assert-RangeRejected $invalid
+ $invalid = New-RangeFixture $mode $mode
+ Assert-RangeRejected $invalid
  if($invalid.Starts.Count -ne 1 -or (Get-Item -LiteralPath $invalid.Output).Length -ne 0){throw ('Invalid range metadata/body was retained or retried: '+$mode)}
 }
-$short=New-RangeFixture 'short' 'short';Assert-RangeRejected $short
+$short = New-RangeFixture 'short' 'short'
+Assert-RangeRejected $short
 if(($short.Starts -join ',') -cne '0,0,0' -or (Get-Item -LiteralPath $short.Output).Length -ne 0){throw 'Incomplete range escaped the three-attempt bound or retained uncertain bytes.'}
 
-$digest=New-RangeFixture 'digest';Assert-RangeRejected -State $digest -Digest ('0'*64)
+$digest = New-RangeFixture 'digest'
+Assert-RangeRejected -State $digest -Digest ('0'*64)
 if($digest.Starts.Count -ne 3){throw 'Digest mismatch caused an unexpected whole-file retry.'}
 
-$budget=New-RangeFixture 'budget' 'budget';Assert-RangeRejected -State $budget -OverallTimeout ([TimeSpan]::FromMilliseconds(1000))
+$budget = New-RangeFixture 'budget' 'budget'
+Assert-RangeRejected -State $budget -OverallTimeout ([TimeSpan]::FromMilliseconds(1000))
 if(($budget.Starts -join ',') -cne '0,4' -or (Get-Item -LiteralPath $budget.Output).Length -ne 4){throw 'Overall budget did not preserve only the previously confirmed chunk.'}
 
-$timeout=New-RangeFixture 'timeout' 'timeout';$watch=[Diagnostics.Stopwatch]::StartNew()
+$timeout = New-RangeFixture 'timeout' 'timeout'
+$watch = [Diagnostics.Stopwatch]::StartNew()
 Assert-RangeRejected -State $timeout -OverallTimeout ([TimeSpan]::FromSeconds(3)) -RequestTimeout ([TimeSpan]::FromMilliseconds(40))
 $watch.Stop()
 if($timeout.Starts.Count -ne 3 -or $watch.Elapsed.TotalSeconds -ge 2 -or (Get-Item -LiteralPath $timeout.Output).Length -ne 0){throw 'The request cancellation token did not bound body reads and retries.'}
 
-$existing=New-RangeFixture 'existing';Write-SecureTextFile -Path $existing.Output -Content 'keep-this-file'
+$existing = New-RangeFixture 'existing'
+Write-SecureTextFile -Path $existing.Output -Content 'keep-this-file'
 Assert-RangeRejected $existing
 if($existing.Starts.Count -ne 0 -or [IO.File]::ReadAllText($existing.Output) -cne 'keep-this-file'){throw 'Transport reused or rewrote an unknown existing output.'}
-$badUrl=New-RangeFixture 'bad-url';$rejected=$false
+$badUrl = New-RangeFixture 'bad-url'
+$rejected = $false
 try{Receive-GitHubArtifactRanges -StorageUri 'http://artifact-fixture.invalid/local' -Path $badUrl.Output -ExpectedBytes 10 -ExpectedSha256 ('0'*64) -SendRange (New-RangeSender $badUrl)}catch{$rejected=$true}
 if(!$rejected -or $badUrl.Starts.Count -ne 0 -or (Test-Path -LiteralPath $badUrl.Output)){throw 'Invalid storage URL was accepted or attempted.'}
 

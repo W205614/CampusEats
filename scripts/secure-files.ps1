@@ -7,7 +7,10 @@ function Assert-NoSecurePathLinks {
    if(((Get-Item -LiteralPath $current -Force).Attributes -band [IO.FileAttributes]::ReparsePoint) -ne 0){throw 'Sensitive paths must not contain links.'}
   }
   $parent=[IO.Path]::GetDirectoryName($current)
-  if($parent -eq $current){break};$current=$parent
+  if ($parent -eq $current) {
+    break
+  }
+  $current = $parent
  }
 }
 
@@ -63,7 +66,8 @@ function Write-SecureTextFile {
  $absolute=[IO.Path]::GetFullPath($Path)
  Assert-NoSecurePathLinks -Path $absolute
  if(!(Test-Path -LiteralPath $absolute)){
-  $empty=[IO.File]::Open($absolute,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None);$empty.Dispose()
+  $empty = [IO.File]::Open($absolute,[IO.FileMode]::CreateNew,[IO.FileAccess]::Write,[IO.FileShare]::None)
+  $empty.Dispose()
  }
  Set-SecurePathPermissions -Path $absolute
  [IO.File]::WriteAllText($absolute,$Content,[Text.UTF8Encoding]::new($false))

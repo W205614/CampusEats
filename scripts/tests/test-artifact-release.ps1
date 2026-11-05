@@ -38,7 +38,10 @@ $bundle=New-SecureDirectory -Path (Join-Path $fixture '.local/bundle')
 New-SecureDirectory -Path (Join-Path $bundle 'security') | Out-Null
 $sha='a'*40
 $images=@(New-ReleaseOciFixture -Path (Join-Path $bundle 'application-images.tar') -SourceSha $sha)
-$global:artifactFixtureImages=@{};foreach($image in $images){$global:artifactFixtureImages[$image.service]=$image}
+$global:artifactFixtureImages = @{}
+foreach ($image in $images) {
+  $global:artifactFixtureImages[$image.service] = $image
+}
 @($images | ForEach-Object {@{service=$_.service;status='passed';imageId=$_.sourceRuntimeId}}) | ConvertTo-Json -AsArray | Set-Content -LiteralPath (Join-Path $bundle 'security/summary.json')
 '{}' | Set-Content -LiteralPath (Join-Path $bundle 'security/server-runtime-sbom.cdx.json')
 $files=@(Get-ChildItem -LiteralPath $bundle -Recurse -File | ForEach-Object {@{path=[IO.Path]::GetRelativePath($bundle,$_.FullName).Replace('\','/');bytes=$_.Length;sha256=(Get-FileHash -LiteralPath $_.FullName).Hash}})
@@ -47,10 +50,19 @@ $manifest=@{schemaVersion=2;imageIdentityFormat='oci-uncompressed-v1';repository
 $manifest | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath (Join-Path $bundle 'release-manifest.json')
 $hash=(Get-FileHash -LiteralPath (Join-Path $bundle 'release-manifest.json')).Hash
 function global:docker {
- $global:LASTEXITCODE=0;$a=@($args)
- if($a[0] -eq 'image' -and $a[1] -eq 'load'){$global:artifactFixtureLoads++;return}
+ $global:LASTEXITCODE = 0
+ $a = @($args)
+ if ($a[0] -eq 'image' -and $a[1] -eq 'load') {
+   $global:artifactFixtureLoads++
+   return
+ }
  if($a[0] -eq 'image' -and $a[1] -eq 'inspect'){
-  $kind=if($a[2] -like 'campuseats-server:*'){'server'}else{'web'};$image=$global:artifactFixtureImages[$kind]
+  $kind = if ($a[2] -like 'campuseats-server:*') {
+    'server'
+  } else {
+    'web'
+  }
+  $image = $global:artifactFixtureImages[$kind]
   $runtimeId=if($global:artifactFixtureCase -eq 'init-classic'){$image.configDigest}else{$image.platformManifestDigest}
   @{Id=$runtimeId;Os='linux';Architecture='amd64';Config=@{Labels=@{'org.opencontainers.image.revision'=('a'*40)}};RootFS=@{Type='layers';Layers=@($image.diffIds)}} | ConvertTo-Json -Depth 5 -AsArray
   return
@@ -63,13 +75,23 @@ function global:docker {
  if($a[0] -eq 'inspect'){
   $service=$a[-1] -replace '-container$',''
   if($a[2] -ceq '{{json .}}'){
-   $image=$global:artifactFixtureImages[$service];$runtimeId=if($global:artifactFixtureCase -eq 'init-classic'){$image.configDigest}else{$image.platformManifestDigest}
+   $image = $global:artifactFixtureImages[$service]
+   $runtimeId = if ($global:artifactFixtureCase -eq 'init-classic') {
+     $image.configDigest
+   } else {
+     $image.platformManifestDigest
+   }
    $containerId=if($global:artifactFixtureCase -eq 'container-substitution'){'sha256:'+('f'*64)}else{$runtimeId}
    $configuredId=if($global:artifactFixtureCase -eq 'container-tag'){$image.reference}else{$runtimeId}
    @{Image=$containerId;Config=@{Image=$configuredId}} | ConvertTo-Json -Depth 4
    return
   }
-  if($a[2] -like '*TASKS_ENABLED=false*'){if(!$global:artifactFixtureTasksEnabled){return 'disabled'};return ''}
+  if ($a[2] -like '*TASKS_ENABLED=false*') {
+    if (!$global:artifactFixtureTasksEnabled) {
+      return 'disabled'
+    }
+    return ''
+  }
   if($a[2] -like '*Mounts*'){
    $name=if($global:artifactFixtureCase -eq 'mount-changed' -and $global:artifactFixtureCandidateStarts -gt 0){'incorrect-uploads'}else{'original-uploads'}
    @(@{Type='volume';Name=$name;Source=('/var/lib/docker/volumes/'+$name+'/_data');Destination='/app/uploads'}) | ConvertTo-Json -AsArray
@@ -104,18 +126,27 @@ function global:docker {
     $global:artifactFixtureTasksEnabled=$false
    }else{$global:artifactFixtureTasksEnabled=$true}
    foreach($service in @('server','web')){if($a -contains $service){$global:artifactFixtureRunning[$service]=$true}}
-  }else{$global:artifactFixtureRunning.mysql=$true;$global:artifactFixtureRunning.redis=$true}
+  } else {
+    $global:artifactFixtureRunning.mysql = $true
+    $global:artifactFixtureRunning.redis = $true
+  }
   return
  }
  throw 'Unexpected Docker mutation in artifact release.'
 }
 try {
  foreach($case in @('init-success','init-classic','volume-exists','unlabeled-volume-exists','backup-failed','data-changed','upload-changed','mount-changed','container-substitution','container-tag','daily-success')){
-  $global:artifactFixtureCase=$case;$global:artifactFixtureLoads=0;$global:artifactFixtureCandidateStarts=0
+  $global:artifactFixtureCase = $case
+  $global:artifactFixtureLoads = 0
+  $global:artifactFixtureCandidateStarts = 0
   $global:artifactFixtureRunning=@{mysql=$true;redis=$true;server=$true;web=$true}
-  if($case.StartsWith('init')){$global:artifactFixtureRunning.server=$false;$global:artifactFixtureRunning.web=$false}
+  if ($case.StartsWith('init')) {
+    $global:artifactFixtureRunning.server = $false
+    $global:artifactFixtureRunning.web = $false
+  }
   $global:artifactFixtureTasksEnabled=$true
-  $envPath=Join-Path $fixture '.env';Write-SecureTextFile -Path $envPath -Content "MYSQL_PASSWORD=fixture-only`nWEB_PORT=28087`n"
+  $envPath = Join-Path $fixture '.env'
+  Write-SecureTextFile -Path $envPath -Content "MYSQL_PASSWORD=fixture-only`nWEB_PORT=28087`n"
   $failed=$false
   try {& (Join-Path $fixtureScripts 'release.ps1') -BundleDirectory $bundle -ExpectedSourceSha $sha -ExpectedRunId '12345' -ExpectedManifestSha256 $hash -ProjectName 'campuseats-improvement-artifactfixture' -EnvFile $envPath -Initialize:($case.StartsWith('init') -or $case -in @('volume-exists','unlabeled-volume-exists'))}catch{$failed=$true}
   if($failed -ne ($case -in @('volume-exists','unlabeled-volume-exists','backup-failed','data-changed','upload-changed','mount-changed','container-substitution','container-tag'))){throw "Unexpected artifact release result: $case"}

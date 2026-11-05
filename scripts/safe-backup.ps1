@@ -19,15 +19,28 @@ try {
  }
  try {
   $writers=@($running | Where-Object {$_ -in @('web','server')})
-  if($writers.Count){& docker @composeArgs stop @writers; if($LASTEXITCODE -ne 0){throw 'Cannot pause application writers.'}}
+  if ($writers.Count) {
+    & docker @composeArgs stop @writers
+    if ($LASTEXITCODE -ne 0) {
+      throw 'Cannot pause application writers.'
+    }
+  }
   # Start existing dependencies, without replacing their containers or changing their images.
   $mysql=& docker @composeArgs ps -a -q mysql
   if(!$mysql){throw 'No existing database container to back up.'}
-  if('mysql' -notin $running){& docker @composeArgs start mysql; if($LASTEXITCODE -ne 0){throw 'Cannot start backup database.'}}
+  if ('mysql' -notin $running) {
+    & docker @composeArgs start mysql
+    if ($LASTEXITCODE -ne 0) {
+      throw 'Cannot start backup database.'
+    }
+  }
   $ready=$false
   for($i=0;$i -lt 60;$i++){
    & docker @composeArgs exec -T mysql sh -c 'MYSQL_PWD="$MYSQL_PASSWORD" mysql -u campus sky_take_out -Nse "SELECT 1"' 2>$null | Out-Null
-   if($LASTEXITCODE -eq 0){$ready=$true;break}
+   if ($LASTEXITCODE -eq 0) {
+     $ready = $true
+     break
+   }
    Start-Sleep -Seconds 2
   }
   if(!$ready){throw 'Backup database not ready.'}
@@ -59,7 +72,10 @@ try {
    for($i=0;$i -lt 60;$i++){
     $id=& docker @composeArgs ps -a -q $service
     $state=if($id){docker inspect --format '{{.State.Status}} {{if .State.Health}}{{.State.Health.Status}}{{end}}' $id}else{'missing'}
-    if($state -eq 'running healthy'){$healthy=$true;break}
+    if ($state -eq 'running healthy') {
+      $healthy = $true
+      break
+    }
     Start-Sleep -Seconds 2
    }
    if(!$healthy){$restoreFailures+=$service}
@@ -68,4 +84,7 @@ try {
  }
  $marker | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $Destination 'verified.json') -Encoding utf8
  Write-Host "Backup independently restored and verified: $Destination"
-} finally {Pop-Location;Exit-OperationsLock $operationLease}
+} finally {
+  Pop-Location
+  Exit-OperationsLock $operationLease
+}

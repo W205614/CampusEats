@@ -134,8 +134,8 @@ public class ReportQueryService {
     metrics.putAll(paid);
     metrics.putAll(refunds);
     metrics.putAll(completed);
-    long p = ((Number) paid.get("paid_cents")).longValue(),
-        r = ((Number) refunds.get("refunded_cents")).longValue();
+    long p = ((Number) paid.get("paid_cents")).longValue();
+    long r = ((Number) refunds.get("refunded_cents")).longValue();
     metrics.put("net_cents", p - r);
     var daily =
         db.rows(

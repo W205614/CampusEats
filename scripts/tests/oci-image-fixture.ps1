@@ -1,26 +1,40 @@
 # Tiny, real OCI save archives for delivery checks; no Docker daemon is involved.
 function New-ReleaseOciFixture {
  param([Parameter(Mandatory)][string]$Path,[string]$SourceSha=('a'*40),[string]$Fault='',[string[]]$Services=@('server','web'))
- $utf8=[Text.UTF8Encoding]::new($false);$members=[ordered]@{};$images=@();$descriptors=@();$compat=@();$repositories=@{}
+ $utf8 = [Text.UTF8Encoding]::new($false)
+ $members = [ordered]@{}
+ $images = @()
+ $descriptors = @()
+ $compat = @()
+ $repositories = @{}
  foreach($service in $Services){
   $reference='campuseats-'+$service+':sha-'+$SourceSha
-  $layerStream=[IO.MemoryStream]::new();$layerWriter=[System.Formats.Tar.TarWriter]::new($layerStream,$true)
+  $layerStream = [IO.MemoryStream]::new()
+  $layerWriter = [System.Formats.Tar.TarWriter]::new($layerStream,$true)
   try{
    foreach($position in @(1,2)){
     $entry=[System.Formats.Tar.PaxTarEntry]::new([System.Formats.Tar.TarEntryType]::RegularFile,($service+$position+'.txt'))
-    $entry.DataStream=[IO.MemoryStream]::new($utf8.GetBytes($service+'-'+$position));try{$layerWriter.WriteEntry($entry)}finally{$entry.DataStream.Dispose()}
+    $entry.DataStream = [IO.MemoryStream]::new($utf8.GetBytes($service+'-'+$position))
+    try {
+      $layerWriter.WriteEntry($entry)
+    } finally {
+      $entry.DataStream.Dispose()
+    }
    }
   }finally{$layerWriter.Dispose()}
-  $layerBytes=$layerStream.ToArray();$layerStream.Dispose()
+  $layerBytes = $layerStream.ToArray()
+  $layerStream.Dispose()
   $layerDigest='sha256:'+([Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($layerBytes)).ToLowerInvariant())
   $members['blobs/sha256/'+$layerDigest.Substring(7)]=$layerBytes
   $config=@{os='linux';architecture='amd64';config=@{Labels=@{'org.opencontainers.image.revision'=$SourceSha}};rootfs=@{type='layers';diff_ids=@($layerDigest)}}
   if($Fault -eq 'diff-id' -and $service -eq 'server'){$config.rootfs.diff_ids=@('sha256:'+('d'*64))}
-  $configBytes=$utf8.GetBytes(($config | ConvertTo-Json -Depth 10 -Compress));$configDigest='sha256:'+([Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($configBytes)).ToLowerInvariant())
+  $configBytes = $utf8.GetBytes(($config | ConvertTo-Json -Depth 10 -Compress))
+  $configDigest = 'sha256:'+([Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($configBytes)).ToLowerInvariant())
   $members['blobs/sha256/'+$configDigest.Substring(7)]=$configBytes
   $platform=@{schemaVersion=2;mediaType='application/vnd.oci.image.manifest.v1+json';config=@{mediaType='application/vnd.oci.image.config.v1+json';digest=$configDigest;size=$configBytes.Length};layers=@(@{mediaType='application/vnd.oci.image.layer.v1.tar';digest=$layerDigest;size=$layerBytes.Length})}
   if($Fault -eq 'layer-size' -and $service -eq 'server'){$platform.layers[0].size++}
-  $platformBytes=$utf8.GetBytes(($platform | ConvertTo-Json -Depth 10 -Compress));$platformDigest='sha256:'+([Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($platformBytes)).ToLowerInvariant())
+  $platformBytes = $utf8.GetBytes(($platform | ConvertTo-Json -Depth 10 -Compress))
+  $platformDigest = 'sha256:'+([Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($platformBytes)).ToLowerInvariant())
   $members['blobs/sha256/'+$platformDigest.Substring(7)]=$platformBytes
   $descriptors+=@{mediaType='application/vnd.oci.image.manifest.v1+json';digest=$platformDigest;size=$platformBytes.Length;annotations=@{'io.containerd.image.name'=('docker.io/library/'+$reference);'org.opencontainers.image.ref.name'=('sha-'+$SourceSha)}}
   $compat+=@{Config=('blobs/sha256/'+$configDigest.Substring(7));RepoTags=@($reference);Layers=@('blobs/sha256/'+$layerDigest.Substring(7))}
@@ -37,12 +51,29 @@ function New-ReleaseOciFixture {
  $legacyDigest=[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($legacyBytes)).ToLowerInvariant()
  $members['blobs/sha256/'+$legacyDigest]=$legacyBytes
  if($Fault -eq 'auxiliary-bytes'){$members['blobs/sha256/'+$legacyDigest]=$utf8.GetBytes('{}')}
- if($Fault -eq 'mapping'){$descriptors[0].annotations.'io.containerd.image.name'='docker.io/library/'+$images[1].reference;$descriptors[1].annotations.'io.containerd.image.name'='docker.io/library/'+$images[0].reference}
+ if ($Fault -eq 'mapping') {
+   $descriptors[0].annotations.'io.containerd.image.name' = 'docker.io/library/'+$images[1].reference
+   $descriptors[1].annotations.'io.containerd.image.name' = 'docker.io/library/'+$images[0].reference
+ }
  $members['oci-layout']=$utf8.GetBytes('{"imageLayoutVersion":"1.0.0"}')
  $members['index.json']=$utf8.GetBytes((@{schemaVersion=2;mediaType='application/vnd.oci.image.index.v1+json';manifests=$descriptors} | ConvertTo-Json -Depth 10 -Compress))
  $members['manifest.json']=$utf8.GetBytes(($compat | ConvertTo-Json -Depth 10 -Compress -AsArray))
  $members['repositories']=$utf8.GetBytes(($repositories | ConvertTo-Json -Depth 10 -Compress))
- $stream=[IO.File]::Create($Path);$writer=[System.Formats.Tar.TarWriter]::new($stream,$true)
- try{foreach($name in $members.Keys){$entry=[System.Formats.Tar.PaxTarEntry]::new([System.Formats.Tar.TarEntryType]::RegularFile,$name);$entry.DataStream=[IO.MemoryStream]::new([byte[]]$members[$name]);try{$writer.WriteEntry($entry)}finally{$entry.DataStream.Dispose()}}}finally{$writer.Dispose();$stream.Dispose()}
+ $stream = [IO.File]::Create($Path)
+ $writer = [System.Formats.Tar.TarWriter]::new($stream,$true)
+ try {
+   foreach ($name in $members.Keys) {
+     $entry = [System.Formats.Tar.PaxTarEntry]::new([System.Formats.Tar.TarEntryType]::RegularFile,$name)
+     $entry.DataStream = [IO.MemoryStream]::new([byte[]]$members[$name])
+     try {
+       $writer.WriteEntry($entry)
+     } finally {
+       $entry.DataStream.Dispose()
+     }
+   }
+ } finally {
+   $writer.Dispose()
+   $stream.Dispose()
+ }
  return $images
 }

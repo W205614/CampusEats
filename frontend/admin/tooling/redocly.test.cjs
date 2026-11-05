@@ -23,7 +23,11 @@ test('Redocly reads a real HTTP document and selects headers through patched min
       const document = await readFileFromUrl(`http://${authority}/schemas/order.json`, {
         headers: [
           { matches, name: 'X-Matching-Fixture', value: 'selected' },
-          { matches: 'https://not-this-server.invalid/**', name: 'X-Other-Fixture', value: 'excluded' },
+          {
+            matches: 'https://not-this-server.invalid/**',
+            name: 'X-Other-Fixture',
+            value: 'excluded',
+          },
         ],
       });
       assert.deepEqual(JSON.parse(document.body), { openapi: '3.0.3' });
@@ -34,7 +38,9 @@ test('Redocly reads a real HTTP document and selects headers through patched min
       assert.equal(headers['x-other-fixture'], undefined);
     }
   } finally {
-    await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+    await new Promise((resolve, reject) =>
+      server.close((error) => (error ? reject(error) : resolve())),
+    );
   }
 });
 

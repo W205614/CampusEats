@@ -550,8 +550,10 @@ class OperationsIntegrationTest {
   @Test
   void newOperationsRoutesEnforceRolesOwnershipAndMethodsThroughRealSecurityChain()
       throws Exception {
-    long shopManager = person("SHOP_MANAGER"), operator = person("OPERATOR");
-    long foreignManager = person("SHOP_MANAGER"), legacyAdmin = person("ADMIN");
+    long shopManager = person("SHOP_MANAGER");
+    long operator = person("OPERATOR");
+    long foreignManager = person("SHOP_MANAGER");
+    long legacyAdmin = person("ADMIN");
     long otherStore = db.insert("INSERT INTO store(campus_id,name) VALUES(?,'其他店铺')", campus);
     db.update("UPDATE employee SET store_id=? WHERE id IN(?,?)", store, shopManager, operator);
     db.update("UPDATE employee SET store_id=? WHERE id=?", otherStore, foreignManager);
