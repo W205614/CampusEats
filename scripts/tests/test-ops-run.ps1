@@ -1,13 +1,14 @@
 # Real scripts, real exclusive file handles, real loopback HTTP. No daily Docker/project is used.
 $ErrorActionPreference='Stop'
-$root=Split-Path $PSScriptRoot -Parent
+$scriptsDir = Split-Path $PSScriptRoot -Parent
+$root=Split-Path $scriptsDir -Parent
 & (Join-Path $PSScriptRoot 'test-backup-replica.ps1')
 $fixture=Join-Path $root ('.local/ops-run-test-'+[guid]::NewGuid().ToString('N'))
 $fixtureScripts=Join-Path $fixture 'scripts'
 [void][IO.Directory]::CreateDirectory($fixtureScripts)
-foreach($script in @('ops-run.ps1','operations-support.ps1','secure-files.ps1','encrypted-backups.ps1','operations-lock.ps1','ops-check.ps1','docker-read.ps1')){Copy-Item -LiteralPath (Join-Path $PSScriptRoot $script) -Destination $fixtureScripts}
+foreach($script in @('ops-run.ps1','operations-support.ps1','secure-files.ps1','encrypted-backups.ps1','operations-lock.ps1','ops-check.ps1','docker-read.ps1')){Copy-Item -LiteralPath (Join-Path $scriptsDir $script) -Destination $fixtureScripts}
 $pwsh=(Get-Process -Id $PID).Path
-$dockerFixture=Join-Path $PSScriptRoot 'tests/ops-docker-fixture.ps1'
+$dockerFixture=Join-Path $PSScriptRoot 'ops-docker-fixture.ps1'
 $dockerConfig=Join-Path $fixture 'docker.json'
 '{}' | Set-Content -LiteralPath $dockerConfig
 $replicaRoot=Join-Path $fixture 'replicas'
@@ -19,11 +20,11 @@ $capture=Join-Path $fixture 'http-payloads.jsonl'
 $httpProcess=[Diagnostics.Process]::new()
 $httpProcess.StartInfo=[Diagnostics.ProcessStartInfo]::new($pwsh)
 $httpProcess.StartInfo.UseShellExecute=$false;$httpProcess.StartInfo.CreateNoWindow=$true
-foreach($argument in @('-NoProfile','-File',(Join-Path $PSScriptRoot 'tests/alert-http-fixture.ps1'),'-ConfigFile',$httpConfig,'-ReadyFile',$ready,'-CaptureFile',$capture)){$httpProcess.StartInfo.ArgumentList.Add($argument)}
-. (Join-Path $PSScriptRoot 'operations-lock.ps1')
-. (Join-Path $PSScriptRoot 'operations-support.ps1')
-. (Join-Path $PSScriptRoot 'encrypted-backups.ps1')
-. (Join-Path $PSScriptRoot 'docker-read.ps1')
+foreach($argument in @('-NoProfile','-File',(Join-Path $PSScriptRoot 'alert-http-fixture.ps1'),'-ConfigFile',$httpConfig,'-ReadyFile',$ready,'-CaptureFile',$capture)){$httpProcess.StartInfo.ArgumentList.Add($argument)}
+. (Join-Path $scriptsDir 'operations-lock.ps1')
+. (Join-Path $scriptsDir 'operations-support.ps1')
+. (Join-Path $scriptsDir 'encrypted-backups.ps1')
+. (Join-Path $scriptsDir 'docker-read.ps1')
 function New-FixtureBackup([string]$Destination){
  [void][IO.Directory]::CreateDirectory((Join-Path $Destination 'uploads/.private'))
  foreach($name in @('database.sql','source-counts.txt','all-table-counts.txt','tables.txt','table-checksums.txt','images.json','mounts.txt','.env','uploads/.private/evidence.png')){[IO.File]::WriteAllText((Join-Path $Destination $name),'fixture-private-'+$name)}
@@ -52,7 +53,7 @@ param($Helper,$Root)
 . $Helper
 try {$lease=Enter-OperationsLock -Root $Root -ProjectName 'campuseats-v1';Exit-OperationsLock $lease;exit 2} catch {exit 0}
 '@ | Set-Content -LiteralPath $child
-  & $pwsh -NoProfile -File $child (Join-Path $PSScriptRoot 'operations-lock.ps1') $fixture
+  & $pwsh -NoProfile -File $child (Join-Path $scriptsDir 'operations-lock.ps1') $fixture
   if($LASTEXITCODE -ne 0){throw 'A second process entered an active operation.'}
   $invalid=$false
   try {Enter-OperationsLock -Root $fixture -ProjectName 'campuseats-v1' -Token 'incorrect' | Out-Null} catch {$invalid=$true}

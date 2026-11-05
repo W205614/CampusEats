@@ -1,12 +1,13 @@
 # Targeted read-only operations tests use real subprocesses and disposable backups.
 $ErrorActionPreference='Stop'
-$root=Split-Path $PSScriptRoot -Parent
+$scriptsDir = Split-Path $PSScriptRoot -Parent
+$root=Split-Path $scriptsDir -Parent
 $fixture=Join-Path $root ('.local/ops-script-test-'+[guid]::NewGuid().ToString('N'))
 $fixtureScripts=Join-Path $fixture 'scripts'
 New-Item -ItemType Directory -Path $fixtureScripts -Force | Out-Null
-Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'ops-check.ps1'),(Join-Path $PSScriptRoot 'docker-read.ps1') -Destination $fixtureScripts
+Copy-Item -LiteralPath (Join-Path $scriptsDir 'ops-check.ps1'),(Join-Path $scriptsDir 'docker-read.ps1') -Destination $fixtureScripts
 $configFile=Join-Path $fixture 'docker.json'
-$fakeDocker=Join-Path $PSScriptRoot 'tests/ops-docker-fixture.ps1'
+$fakeDocker=Join-Path $PSScriptRoot 'ops-docker-fixture.ps1'
 $pwsh=(Get-Process -Id $PID).Path
 $backup=Join-Path $fixture '.local/backups/checked'
 New-Item -ItemType Directory -Path $backup -Force | Out-Null
@@ -22,7 +23,7 @@ function Check-Fixture([hashtable]$Config,[switch]$AllowTasksDisabled) {
  if(($report.issues.Count -gt 0 -and $exitCode -ne 1) -or ($report.issues.Count -eq 0 -and $exitCode -ne 0)){throw 'Operational exit code did not match report.'}
  return @{report=$report;exitCode=$exitCode}
 }
-. (Join-Path $PSScriptRoot 'docker-read.ps1')
+. (Join-Path $scriptsDir 'docker-read.ps1')
 $deadline=[Diagnostics.Stopwatch]::StartNew()
 $failed=$false
 try {Invoke-BoundedDocker -Executable $pwsh -Arguments @('-NoProfile','-Command','Start-Sleep -Seconds 10') -TimeoutMilliseconds 250 | Out-Null} catch {$failed=$true}
@@ -34,7 +35,7 @@ try {Invoke-BoundedDocker -Executable $pwsh -Arguments @('-NoProfile','-Command'
 }
 if(!$failed){throw 'Nonzero process exit accepted.'}
 # Exercise the actual POSIX scan, rather than only emulating find output.
-$scanner=[regex]::Match((Get-Content (Join-Path $PSScriptRoot 'ops-check.ps1') -Raw),'(?s)\$scan=@''\r?\n(.*?)\r?\n''@').Groups[1].Value
+$scanner=[regex]::Match((Get-Content (Join-Path $scriptsDir 'ops-check.ps1') -Raw),'(?s)\$scan=@''\r?\n(.*?)\r?\n''@').Groups[1].Value
 if(!$scanner){throw 'Cannot locate image inventory command.'}
 $scanner=$scanner.Replace('/app/uploads','$base/uploads')
 $bash=if($IsWindows){Join-Path $env:ProgramFiles 'Git/bin/bash.exe'}else{(Get-Command bash).Source}

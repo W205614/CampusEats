@@ -1,12 +1,13 @@
 # Real release orchestration, permission checks and environment writes; external services are isolated fixtures.
 $ErrorActionPreference='Stop'
-$root=Split-Path $PSScriptRoot -Parent
-. (Join-Path $PSScriptRoot 'secure-files.ps1')
-. (Join-Path $PSScriptRoot 'release-bundle.ps1')
+$scriptsDir = Split-Path $PSScriptRoot -Parent
+$root=Split-Path $scriptsDir -Parent
+. (Join-Path $scriptsDir 'secure-files.ps1')
+. (Join-Path $scriptsDir 'release-bundle.ps1')
 . (Join-Path $PSScriptRoot 'oci-image-fixture.ps1')
 $fixture=New-SecureDirectory -Path (Join-Path $root ('.local/artifact-release-test-'+[guid]::NewGuid().ToString('N')))
 $fixtureScripts=New-SecureDirectory -Path (Join-Path $fixture 'scripts')
-foreach($name in @('release.ps1','release-bundle.ps1','image-identity.ps1','secure-files.ps1','operations-lock.ps1')){Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination $fixtureScripts}
+foreach($name in @('release.ps1','release-bundle.ps1','image-identity.ps1','secure-files.ps1','operations-lock.ps1')){Copy-Item -LiteralPath (Join-Path $scriptsDir $name) -Destination $fixtureScripts}
 # Only the GitHub network boundary is replaced; actual source/run/file hashes stay enforced.
 Add-Content -LiteralPath (Join-Path $fixtureScripts 'release-bundle.ps1') -Value @'
 function Confirm-ReleaseWorkflow {param($SourceSha,$RunId,$RunAttempt);if($SourceSha -cne ('a'*40) -or $RunId -cne '12345' -or $RunAttempt -ne 1){throw 'Unexpected workflow request.'}}

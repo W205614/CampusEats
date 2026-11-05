@@ -1,8 +1,9 @@
 $ErrorActionPreference='Stop'
-. (Join-Path $PSScriptRoot 'secure-files.ps1')
-. (Join-Path $PSScriptRoot 'image-identity.ps1')
+$scriptsDir = Split-Path $PSScriptRoot -Parent
+. (Join-Path $scriptsDir 'secure-files.ps1')
+. (Join-Path $scriptsDir 'image-identity.ps1')
 . (Join-Path $PSScriptRoot 'oci-image-fixture.ps1')
-$root=Split-Path $PSScriptRoot -Parent
+$root=Split-Path $scriptsDir -Parent
 $fixture=New-SecureDirectory -Path (Join-Path $root ('.local/image-identity-test-'+[guid]::NewGuid().ToString('N')))
 $archive=Join-Path $fixture 'images.tar';$sha='a'*40
 $expected=@(New-ReleaseOciFixture -Path $archive -SourceSha $sha)

@@ -1,7 +1,8 @@
 # Two overlapping recovery contexts share the same wall-clock second. Docker itself is a fixture.
 $ErrorActionPreference='Stop'
-. (Join-Path $PSScriptRoot 'secure-files.ps1')
-$root=Split-Path $PSScriptRoot -Parent
+$scriptsDir = Split-Path $PSScriptRoot -Parent
+. (Join-Path $scriptsDir 'secure-files.ps1')
+$root=Split-Path $scriptsDir -Parent
 $fixture=New-SecureDirectory -Path (Join-Path $root ('.local/restore-ownership-test-'+[guid]::NewGuid().ToString('N')))
 foreach($name in @('first','second')){
  $directory=New-SecureDirectory -Path (Join-Path $fixture $name)
@@ -20,7 +21,7 @@ $global:restoreOwnershipNames=[Collections.Generic.List[string]]::new()
 $global:restoreOwnershipRemoved=[Collections.Generic.List[string]]::new()
 $global:restoreOwnershipNested=$false
 $global:restoreOwnershipSecondFailed=$false
-$global:restoreOwnershipScript=Join-Path $PSScriptRoot 'restore-check.ps1'
+$global:restoreOwnershipScript=Join-Path $scriptsDir 'restore-check.ps1'
 $global:restoreOwnershipSecond=Join-Path $fixture 'second'
 function global:Get-Date {param([string]$Format);$date=[datetime]::new(2026,10,26,3,0,0);if($Format){return $date.ToString($Format)};return $date}
 function global:docker {
@@ -59,7 +60,7 @@ function global:docker {
  throw 'Unexpected recovery Docker request.'
 }
 try {
- & (Join-Path $PSScriptRoot 'restore-check.ps1') -BackupDirectory (Join-Path $fixture 'first')
+ & (Join-Path $scriptsDir 'restore-check.ps1') -BackupDirectory (Join-Path $fixture 'first')
  if($global:restoreOwnershipNames.Count -ne 2 -or $global:restoreOwnershipNames[0] -ceq $global:restoreOwnershipNames[1] -or !$global:restoreOwnershipSecondFailed -or $global:restoreOwnershipRemoved.Count -ne 1){throw 'Recovery context isolation was not proven.'}
  Write-Host 'Restore ownership: same-second overlapping contexts, failed create isolation, token binding and exact-ID cleanup passed.'
 }finally{

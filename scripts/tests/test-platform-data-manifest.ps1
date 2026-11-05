@@ -1,6 +1,7 @@
 $ErrorActionPreference='Stop'
-. (Join-Path $PSScriptRoot 'secure-files.ps1')
-$root=Split-Path $PSScriptRoot -Parent
+$scriptsDir = Split-Path $PSScriptRoot -Parent
+. (Join-Path $scriptsDir 'secure-files.ps1')
+$root=Split-Path $scriptsDir -Parent
 $fixture=New-SecureDirectory -Path (Join-Path $root ('.local/data-manifest-test-'+[guid]::NewGuid().ToString('N')))
 $global:manifestFixtureCase='baseline'
 function global:docker {
@@ -17,15 +18,15 @@ function global:docker {
 }
 try {
  $before=Join-Path $fixture 'before.json'
- & (Join-Path $PSScriptRoot 'platform-data-manifest.ps1') -ProjectName 'campuseats-manifest-fixture' -OutputPath $before
+ & (Join-Path $scriptsDir 'platform-data-manifest.ps1') -ProjectName 'campuseats-manifest-fixture' -OutputPath $before
  $global:manifestFixtureCase='additive'
  $after=Join-Path $fixture 'after.json'
- & (Join-Path $PSScriptRoot 'platform-data-manifest.ps1') -ProjectName 'campuseats-manifest-fixture' -OutputPath $after -CompareManifest $before
+ & (Join-Path $scriptsDir 'platform-data-manifest.ps1') -ProjectName 'campuseats-manifest-fixture' -OutputPath $after -CompareManifest $before
  $record=Get-Content -LiteralPath $after -Raw | ConvertFrom-Json
  if($record.tables.example.rows -ne 2 -or $record.tables.example.newRows -ne 1){throw 'Added rows were not separated from original data.'}
  foreach($case in @('changed','missing')){
   $global:manifestFixtureCase=$case;$rejected=$false
-  try {& (Join-Path $PSScriptRoot 'platform-data-manifest.ps1') -ProjectName 'campuseats-manifest-fixture' -OutputPath (Join-Path $fixture ($case+'.json')) -CompareManifest $before}catch{$rejected=$true}
+  try {& (Join-Path $scriptsDir 'platform-data-manifest.ps1') -ProjectName 'campuseats-manifest-fixture' -OutputPath (Join-Path $fixture ($case+'.json')) -CompareManifest $before}catch{$rejected=$true}
   if(!$rejected){throw 'Historical mutation was accepted.'}
  }
  Write-Host 'Historical fingerprint: all original columns, additive rows, changed values and deleted rows passed.'

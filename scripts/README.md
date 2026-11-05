@@ -30,9 +30,9 @@
 | 性能身份与历史夹具 | `prepare-performance.mjs` | 核验隔离项目、端口及卷；`--lunch` 增加3名热店员工会话，`--grow-history --history-orders` 将同一夹具递增至最多20万笔合成历史；不测登录容量 |
 | 有限性能测量 | `measure-performance.mjs` | 默认测量1／5／10／30客户端读取及30客户端混合交易；`PERF_SCENARIO=lunch` 测量30用户三波集中交易与历史／对账读取，操作说明见运维指南 |
 
-`docker-read.ps1` 是运维读取的超时辅助文件；`test-ops-check.ps1`、`test-release-safety.ps1`、`check-client-audit.test.mjs` 及 `tests/ops-docker-fixture.ps1` 是脚本回归与夹具，不是日常启动入口。
+`docker-read.ps1` 为运维命令提供带超时的 Docker 读取。制品下载入口调用 `github-artifact-transfer.ps1` 分段传输，并校验完整制品。
 
-`test-image-identity.ps1` 和 `test-github-artifact-transfer.ps1` 验证镜像身份及分段传输的拒绝边界，CI在Windows及Linux执行。`github-artifact-transfer.ps1` 由正式下载入口调用，不能将单段传输成功当作整个制品校验成功。
+PowerShell 回归测试与夹具集中在 [tests/](tests/)。例如，从项目根目录运行 `pwsh -NoProfile -File ./scripts/tests/test-release-safety.ps1` 验证发布时的写入隔离。镜像身份与制品分段传输分别由 `tests/test-image-identity.ps1` 和 `tests/test-github-artifact-transfer.ps1` 在 Windows、Linux 两端验证。Node.js 脚本的测试以 `.test.mjs` 结尾，与被测脚本同目录。
 
 涉及写入的业务、迁移和浏览器验收应使用独立项目、端口与数据卷。[日常维护](../docs/operations.md)列出备份与检查命令；完整自动验证入口是 [GitHub Actions](../.github/workflows/verify.yml)。
 

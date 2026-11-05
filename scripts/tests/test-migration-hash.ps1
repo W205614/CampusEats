@@ -1,6 +1,7 @@
 $ErrorActionPreference='Stop'
-. (Join-Path $PSScriptRoot 'release-bundle.ps1')
-$root=Split-Path $PSScriptRoot -Parent
+$scriptsDir = Split-Path $PSScriptRoot -Parent
+. (Join-Path $scriptsDir 'release-bundle.ps1')
+$root=Split-Path $scriptsDir -Parent
 $fixture=New-SecureDirectory -Path (Join-Path $root ('.local/migration-hash-test-'+[guid]::NewGuid().ToString('N')))
 $utf8=[Text.UTF8Encoding]::new($false,$true)
 $sql="-- 校园迁移夹具`nSELECT '中文',1;`n"

@@ -1,6 +1,7 @@
 $ErrorActionPreference='Stop'
-. (Join-Path $PSScriptRoot 'secure-files.ps1')
-$root=Split-Path $PSScriptRoot -Parent
+$scriptsDir = Split-Path $PSScriptRoot -Parent
+. (Join-Path $scriptsDir 'secure-files.ps1')
+$root=Split-Path $scriptsDir -Parent
 $fixture=New-SecureDirectory -Path (Join-Path $root ('.local/secure-files-test-'+[guid]::NewGuid().ToString('N')))
 $file=Join-Path $fixture 'credentials.txt'
 Write-SecureTextFile -Path $file -Content 'isolated-permission-fixture'

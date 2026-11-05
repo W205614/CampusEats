@@ -13,7 +13,7 @@ interface DeliveryRead {
 interface Policy { deliveryMinutes: number; version: string }
 interface HttpSummary { role: string; method: string; path: string; status: number; code: string }
 
-test('three boundary fixes: real staff password rotation, delivery policy and expired wallet', async ({ browser, request, adminSession }, testInfo) => {
+test('staff rotate passwords, active deliveries keep their policy and expired coupons leave the available wallet', async ({ browser, request, adminSession }, testInfo) => {
   test.setTimeout(360000);
   expect(process.env.CI === 'true' || new URL(String(testInfo.project.use.baseURL)).port !== '18083').toBe(true);
   const suffix = randomUUID().slice(0, 8), admin = adminSession.token;
@@ -263,12 +263,12 @@ test('three boundary fixes: real staff password rotation, delivery policy and ex
     throw error;
   } finally {
     await Promise.all(responseChecks);
-    const output = testInfo.outputPath('three-boundary-fixes-evidence.json');
+    const output = testInfo.outputPath('staff-password-delivery-policy-coupon-expiry-evidence.json');
     await fs.writeFile(output, JSON.stringify({ sourceRevision: process.env.CANDIDATE_SHA || process.env.GITHUB_SHA || 'local',
       fixtureBoundary: 'Only campus/store/building/product/quota/coupon/staff use setup APIs. Accounts, password changes, coupon claim/filter, cart/checkout/mock payment, policy changes and delivery transitions use pages. Other APIs are read-only checks. Stage deadlines are tested with a fixed Clock separately and may be inspected by read-only SQL.',
       browserContexts: contexts.length, browserRoles: [...roles.values()], pageErrors, unexpectedHttp, expectedDenials, uiRequests, checkpoints,
     }, null, 2));
-    await testInfo.attach('three-boundary-fixes-evidence', { path: output, contentType: 'application/json' });
+    await testInfo.attach('staff-password-delivery-policy-coupon-expiry-evidence', { path: output, contentType: 'application/json' });
     for (const context of contexts) await context.close();
   }
 });

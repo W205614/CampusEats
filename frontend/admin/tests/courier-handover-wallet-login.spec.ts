@@ -1,13 +1,13 @@
 import { test, expect, type Page } from '@playwright/test';
 
-// Changed interaction boundaries only. These mocked transports are not real-role acceptance.
+// The UI scenarios below use intercepted API responses.
 const store = { id:'1',campusId:'1',campusName:'测试校区',name:'测试店铺',enabled:true,open:true,accepting:true,hours:['00:00-24:00'],deliveryFee:'0.00',packagingFee:'0.00',version:'0' };
 const courier = { id:'12',username:'courier-ui',name:'配送员甲',role:'DELIVERER',campusId:'1',storeId:null,status:1,mustChangePassword:false,acceptingTasks:true };
 const delivery = { id:'123',number:'HANDOVER-123',status:4,version:'3',storeId:'1',campusId:'1' };
 async function fixture(page: Page, user = false, anonymous = false) {
   await page.addInitScript(({ user, anonymous }) => {
     if (anonymous) { sessionStorage.removeItem('campus-user'); return; }
-    sessionStorage.setItem(user?'campus-user':'campus-admin',JSON.stringify({id:'90',token:'local-upgrade-ui',name:'交互测试',role:user?'USER':'PLATFORM_ADMIN',mustChangePassword:false}));
+    sessionStorage.setItem(user?'campus-user':'campus-admin',JSON.stringify({id:'90',token:'ui-test-session',name:'交互测试',role:user?'USER':'PLATFORM_ADMIN',mustChangePassword:false}));
     localStorage.setItem('campus-store','1');
   },{user,anonymous});
   await page.route('**/api/v1/**',route => {

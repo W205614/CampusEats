@@ -1,6 +1,7 @@
 $ErrorActionPreference='Stop'
-. (Join-Path $PSScriptRoot 'github-artifact-transfer.ps1')
-$root=Split-Path $PSScriptRoot -Parent
+$scriptsDir = Split-Path $PSScriptRoot -Parent
+. (Join-Path $scriptsDir 'github-artifact-transfer.ps1')
+$root=Split-Path $scriptsDir -Parent
 $fixture=New-SecureDirectory -Path (Join-Path $root ('.local/artifact-range-test-'+[guid]::NewGuid().ToString('N')))
 
 # In-memory HttpResponseMessage fixtures: no listener, socket, Docker or real URL is used.

@@ -1,6 +1,7 @@
 # Check fail-closed orchestration without downloading a scanner or reading Docker.
 $ErrorActionPreference='Stop'
-$root=Split-Path $PSScriptRoot -Parent
+$scriptsDir = Split-Path $PSScriptRoot -Parent
+$root=Split-Path $scriptsDir -Parent
 $fixture=Join-Path $root ('.local/image-scan-test-'+[guid]::NewGuid().ToString('N'))
 [void][IO.Directory]::CreateDirectory($fixture)
 $fake=Join-Path $fixture 'trivy-fixture.ps1'
@@ -71,7 +72,7 @@ try {
   $env:CAMPUS_TRIVY_FIXTURE_MODE=$mode
   $out=Join-Path $fixture $mode
   $failed=$false
-  try {& (Join-Path $PSScriptRoot 'scan-images.ps1') -ServerImage 'fixture:server' -WebImage 'fixture:web' -MySqlImage 'fixture:mysql' -RedisImage 'fixture:redis' -OutputDirectory $out -TrivyExecutable $fake 6>$null} catch {$failed=$true}
+  try {& (Join-Path $scriptsDir 'scan-images.ps1') -ServerImage 'fixture:server' -WebImage 'fixture:web' -MySqlImage 'fixture:mysql' -RedisImage 'fixture:redis' -OutputDirectory $out -TrivyExecutable $fake 6>$null} catch {$failed=$true}
   if($failed -ne ($mode -ne 'clean')){throw ('Scanner accepted a vulnerability/failure or rejected a clean report: '+$mode)}
   $summary=@(Get-Content -LiteralPath (Join-Path $out 'summary.json') -Raw | ConvertFrom-Json)
   if(($summary.service -join ',') -cne 'server,web,mysql,redis'){throw 'Scanner did not report all four service images.'}

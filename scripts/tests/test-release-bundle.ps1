@@ -1,8 +1,9 @@
 $ErrorActionPreference='Stop'
-. (Join-Path $PSScriptRoot 'operations-support.ps1')
-. (Join-Path $PSScriptRoot 'release-bundle.ps1')
+$scriptsDir = Split-Path $PSScriptRoot -Parent
+. (Join-Path $scriptsDir 'operations-support.ps1')
+. (Join-Path $scriptsDir 'release-bundle.ps1')
 . (Join-Path $PSScriptRoot 'oci-image-fixture.ps1')
-$root=Split-Path $PSScriptRoot -Parent
+$root=Split-Path $scriptsDir -Parent
 $fixture=New-SecureDirectory -Path (Join-Path $root ('.local/release-bundle-test-'+[guid]::NewGuid().ToString('N')))
 New-SecureDirectory -Path (Join-Path $fixture 'security') | Out-Null
 $sha='a'*40;$run='12345';$images=@(New-ReleaseOciFixture -Path (Join-Path $fixture 'application-images.tar') -SourceSha $sha)

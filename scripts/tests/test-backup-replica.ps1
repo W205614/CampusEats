@@ -1,11 +1,12 @@
 # Fault injection at the actual Copy-Item boundary, with real source/destination hashing.
 $ErrorActionPreference='Stop'
-$root=Split-Path $PSScriptRoot -Parent
+$scriptsDir = Split-Path $PSScriptRoot -Parent
+$root=Split-Path $scriptsDir -Parent
 $fixture=Join-Path $root ('.local/replica-race-test-'+[guid]::NewGuid().ToString('N'))
 $source=Join-Path $fixture 'source'
 $replicas=Join-Path $fixture 'replicas'
 [void][IO.Directory]::CreateDirectory((Join-Path $source 'uploads'))
-. (Join-Path $PSScriptRoot 'operations-support.ps1')
+. (Join-Path $scriptsDir 'operations-support.ps1')
 foreach($name in @('database.sql','source-counts.txt','all-table-counts.txt','tables.txt','table-checksums.txt','images.json','mounts.txt','.env')){[IO.File]::WriteAllText((Join-Path $source $name),'fixture-original')}
 $entries=@(Get-ChildItem -LiteralPath $source -File -Recurse -Force | ForEach-Object {[ordered]@{path=$_.Name;bytes=$_.Length;sha256=(Get-FileHash -LiteralPath $_.FullName).Hash}})
 Write-OperationsJson -Path (Join-Path $source 'sha256.json') -Value $entries

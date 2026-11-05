@@ -6,7 +6,7 @@ import type { Page, BrowserContext, Locator } from '@playwright/test';
 import type { Session } from '../../contracts/models';
 import type { Checkout, Order, CursorPage, Aftersale } from '../../contracts/platform';
 
-test('complete upgrade: four real roles use independent identity, delivery safeguards, messages and simulated ledger', async ({ browser, request, adminSession }, testInfo) => {
+test('four roles complete a delivery handover, track a refund through messages and reconcile the simulated ledger', async ({ browser, request, adminSession }, testInfo) => {
   test.setTimeout(360000);
   expect(process.env.CI === 'true' || new URL(String(testInfo.project.use.baseURL)).port !== '18083').toBe(true);
   const suffix = randomUUID().slice(0,8), a = adminSession.token;
@@ -332,11 +332,11 @@ test('complete upgrade: four real roles use independent identity, delivery safeg
     for(let index=0;index<contexts.length;index++) {const page=contexts[index].pages()[0];if(page) await capture(page,'failure-role-'+index).catch(()=>{});}throw error;
   } finally {
     await Promise.all(networkChecks);
-    const evidence=testInfo.outputPath('complete-upgrade-evidence.json');
+    const evidence=testInfo.outputPath('delivery-handover-refund-reconciliation-evidence.json');
     await fs.writeFile(evidence,JSON.stringify({sourceRevision:process.env.CANDIDATE_SHA||process.env.GITHUB_SHA||'local',
       fixtureBoundary:'Only campus/store/building/product/quota/coupon/staff use setup APIs. User creation/login/passwords/coupon claim, cart/checkout/mock payment, service policy, building rename, delivery availability/claim/transitions, platform emergency disable/exception acknowledgement/physical handover and reassignment, refund and message reads use real pages. APIs otherwise verify read-only snapshots.',
       browserContexts:contexts.length,maxConcurrentBrowserContexts:maxConcurrentContexts,browserRoles,pageErrors,unexpectedHttp,expectedDenials,checkpoints},null,2));
-    await testInfo.attach('complete-upgrade-evidence',{path:evidence,contentType:'application/json'});
+    await testInfo.attach('delivery-handover-refund-reconciliation-evidence',{path:evidence,contentType:'application/json'});
     for(const context of contexts) await context.close();
   }
 });

@@ -1,7 +1,8 @@
 $ErrorActionPreference='Stop'
-. (Join-Path $PSScriptRoot 'operations-support.ps1')
-. (Join-Path $PSScriptRoot 'encrypted-backups.ps1')
-$root=Split-Path $PSScriptRoot -Parent
+$scriptsDir = Split-Path $PSScriptRoot -Parent
+. (Join-Path $scriptsDir 'operations-support.ps1')
+. (Join-Path $scriptsDir 'encrypted-backups.ps1')
+$root=Split-Path $scriptsDir -Parent
 $fixture=New-SecureDirectory -Path (Join-Path $root ('.local/encrypted-backup-test-'+[guid]::NewGuid().ToString('N')))
 $source=New-SecureDirectory -Path (Join-Path $fixture 'source')
 New-SecureDirectory -Path (Join-Path $source 'uploads/.private') | Out-Null
@@ -43,7 +44,7 @@ Write-OperationsJson -Path (Join-Path $replica 'encrypted-replica.json') -Value 
 $rejected=$false
 try {Expand-EncryptedBackupReplica -ReplicaDirectory $replica -Destination (Join-Path $fixture 'bad-authentication') -IdentityFile $identity -AgeExecutable $age | Out-Null} catch {$rejected=$true}
 if(!$rejected -or (Test-Path -LiteralPath (Join-Path $fixture 'bad-authentication/verified.json'))){throw 'age authenticated corrupted ciphertext.'}
-& (Join-Path $PSScriptRoot 'ops-schedule.ps1') -OutputDirectory (Join-Path $fixture 'schedules')
+& (Join-Path $scriptsDir 'ops-schedule.ps1') -OutputDirectory (Join-Path $fixture 'schedules')
 $xml=[xml](Get-Content -LiteralPath (Join-Path $fixture 'schedules/campuseats-v1-Backup.xml') -Raw)
 if($xml.Task.Triggers.CalendarTrigger.StartBoundary -notmatch '^\d{4}-\d{2}-\d{2}T03:00:00\+08:00$' -or $xml.Task.Settings.StartWhenAvailable -cne 'false'){throw 'Shanghai schedule or maintenance-window policy mismatch.'}
 Write-Host 'Encrypted backups: pinned real age roundtrip, public-only export, missing/wrong key, corruption rejection and schedule preview passed.'
