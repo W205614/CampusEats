@@ -4,7 +4,6 @@ type Complete<T> = T extends (infer U)[]
   : T extends object
     ? { [P in keyof T]-?: Complete<T[P]> }
     : T;
-export type Id = string;
 export type Session = Omit<Complete<components['schemas']['SessionView']>, 'role'> & {
   role: 'PLATFORM_ADMIN' | 'SHOP_MANAGER' | 'OPERATOR' | 'DELIVERER' | 'USER' | 'ADMIN';
   storeId?: string | null;
@@ -24,6 +23,3 @@ export const roles: Record<string, string> = {
   USER: '用户',
   ADMIN: '旧版管理员',
 };
-export const money = (v: string | number) => Number(v || 0).toFixed(2);
-export const when = (v: string) =>
-  v ? new Date(v).toLocaleString('zh-CN', { hour12: false }) : '—';
