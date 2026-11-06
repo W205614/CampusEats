@@ -1,0 +1,6 @@
+apiVersion: 1
+providers:
+  - name: CampusEats
+    folder: CampusEats
+    type: file
+    options: { path: /etc/grafana/provisioning/dashboards }

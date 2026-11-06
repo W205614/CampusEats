@@ -22,6 +22,9 @@ const capabilities = ref({
 });
 const capabilitiesLoaded = ref(false),
   capabilitiesError = ref(false);
+const identity = ref({phoneLoginEnabled:false,oauthEnabled:false,policyVersion:'',privacyUrl:'',termsUrl:''});
+const phone=ref(''), phoneCode=ref(''), consent=ref(false), retryAt=ref(0);
+function openPolicy(){uni.navigateTo({url:'/pages/privacy/index'});}
 let loadSequence = 0;
 async function load() {
   const current = ++loadSequence,
@@ -31,6 +34,7 @@ async function load() {
     const result = await api<typeof capabilities.value>('/auth/capabilities');
     if (current !== loadSequence) return;
     capabilities.value = result;
+    identity.value = await api<typeof identity.value>('/auth/identity-capabilities');
     capabilitiesLoaded.value = true;
     if (token && store.session?.token === token) {
       const profile = await api<{ localAccount: boolean; username: string | null }>(
@@ -70,6 +74,26 @@ async function localLogin() {
   } finally {
     busy.value = false;
   }
+}
+async function sendPhoneCode() {
+  if(busy.value || Date.now()<retryAt.value) return;
+  busy.value=true;
+  try {
+    await api('/auth/otp/send','POST',{phone:phone.value,purpose:'LOGIN'});
+    retryAt.value=Date.now()+60000;
+    uni.showToast({title:'验证码已申请，请查看短信',icon:'none'});
+  } catch(e) { toast(e); } finally { busy.value=false; }
+}
+async function phoneLogin() {
+  if(busy.value) return;
+  if(!consent.value) { toast(new Error('请先阅读并同意隐私政策和用户协议')); return; }
+  busy.value=true;
+  try {
+    store.set(await api<Session>('/auth/otp/login','POST',{phone:phone.value,code:phoneCode.value,policyVersion:identity.value.policyVersion}));
+    phoneCode.value='';
+    uni.removeStorageSync('campus-pending-submit');
+    uni.switchTab({url:'/pages/menu/index'});
+  } catch(e) { toast(e); } finally { busy.value=false; }
 }
 async function changePassword() {
   if (busy.value) return;
@@ -117,7 +141,7 @@ async function demo(account: number) {
 async function wechat() {
   // #ifdef H5
   uni.showToast({
-    title: '微信登录请使用已配置微信应用的小程序；浏览器可选择演示账户。',
+    title: capabilities.value.mode==='PRODUCTION'?'浏览器请使用手机验证码登录；微信内付款时可绑定公众号身份。':'微信登录请使用已配置微信应用的小程序；浏览器可选择演示账户。',
     icon: 'none',
     duration: 4000,
   });
@@ -125,12 +149,13 @@ async function wechat() {
   // #endif
   // #ifndef H5
   if (busy.value) return;
+  if(capabilities.value.mode==='PRODUCTION' && !consent.value){toast(new Error('请先阅读并同意隐私政策和用户协议'));return;}
   busy.value = true;
   try {
     const login = await new Promise<UniApp.LoginRes>((resolve, reject) =>
       uni.login({ provider: 'weixin', success: resolve, fail: reject }),
     );
-    store.set(await api<Session>('/auth/wechat', 'POST', { code: login.code }));
+    store.set(await api<Session>('/auth/wechat', 'POST', { code: login.code,policyVersion:consent.value?identity.value.policyVersion:null }));
     uni.switchTab({ url: '/pages/menu/index' });
   } catch (e) {
     toast(e);
@@ -158,7 +183,7 @@ async function logout() {
     <view class="entry-sheet">
       <view class="entry-intro">
         <view class="entry-title">校园里的每一餐，<br />从这里开始。</view>
-        <view class="entry-description">使用平台创建的独立测试账号，体验点餐到配送。</view>
+        <view class="entry-description">登录后选择校区和店铺，查看点餐与履约进度。</view>
         <view class="entry-footnote">校区选店 · 配送或自取 · 跨店合单</view>
       </view>
       <view class="entry-content">
@@ -229,6 +254,14 @@ async function logout() {
           <!-- #endif -->
           <view class="entry-description">改密后旧会话失效，请使用新密码重新登录。</view>
         </view>
+        <view v-if="identity.phoneLoginEnabled && !store.session" class="entry-local-form">
+          <view class="section-title">手机验证码登录</view>
+          <input v-model="phone" type="number" maxlength="11" placeholder="手机号" aria-label="手机号" />
+          <input v-model="phoneCode" type="number" maxlength="6" placeholder="短信验证码" aria-label="短信验证码" />
+          <button class="secondary entry-action" :disabled="busy" @click="sendPhoneCode">获取验证码（间隔60秒）</button>
+          <button class="primary entry-action" :disabled="busy" @click="phoneLogin">登录 / 首次使用自动建号</button>
+        </view>
+        <view v-if="!store.session && (identity.phoneLoginEnabled || capabilities.wechatLoginEnabled)" class="row"><checkbox :checked="consent" @click="consent=!consent" /><text>我已阅读并同意</text><text class="tap" @click="openPolicy">隐私政策与用户协议</text></view>
         <view v-if="capabilities.localLoginEnabled && !store.session" class="entry-local-form">
           <view class="section-title">独立账号登录</view>
           <view class="entry-description">账号由平台创建；忘记密码请联系平台重置。</view>
@@ -295,16 +328,17 @@ async function logout() {
             <!-- #endif -->
           </view>
         </view>
-        <view class="entry-simulation"
+        <view v-if="capabilities.paymentMode==='MOCK'" class="entry-simulation"
           >支付与退款均为模拟，无真实资金交易。演示登录仅在演示环境启用。</view
         >
         <view v-if="capabilities.wechatLoginEnabled" class="entry-wechat">
           <view class="section-title">微信登录</view>
           <!-- #ifdef H5 -->
           <view class="entry-description"
-            >微信登录需在已配置微信应用的小程序中使用。浏览器可选择上方演示账户。</view
+            >{{capabilities.mode==='PRODUCTION'?'浏览器使用手机验证码登录；微信内付款时可绑定公众号身份。':'微信登录需在已配置微信应用的小程序中使用。浏览器可选择上方演示账户。'}}</view
           >
           <component
+            v-if="capabilities.mode!=='PRODUCTION'"
             :is="'button'"
             type="button"
             class="secondary entry-action"

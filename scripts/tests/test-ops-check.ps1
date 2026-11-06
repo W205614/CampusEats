@@ -75,6 +75,8 @@ if ($disabled.report.issues -notcontains 'Background tasks are disabled') {
 }
 $allowed = Check-Fixture @{disabled = $true } -AllowTasksDisabled
 if ($allowed.report.issues.Count) { throw 'Explicit disabled-task fixture was rejected.' }
+$optional = Check-Fixture @{notificationsDisabled = $true }
+if ($optional.report.issues.Count) { throw 'Unconfigured external notifications were treated as failed mandatory jobs.' }
 $failed = Check-Fixture @{failedJob = 'maintenance'; staleJob = 'outbox' }
 if ($failed.report.issues -notcontains 'maintenance task check failed' -or $failed.report.issues -notcontains 'outbox task check failed') {
   throw 'Job failure or staleness hidden.'

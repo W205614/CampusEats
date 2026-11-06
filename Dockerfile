@@ -20,9 +20,14 @@ FROM eclipse-temurin:21.0.13_9-jre-alpine-3.24@sha256:82cf3d9ccbe1ed46252008d51b
 ARG RUNTIME_REFRESH=initial
 ARG SOURCE_REVISION=unknown
 LABEL org.opencontainers.image.revision=$SOURCE_REVISION
+ENV APP_REVISION=$SOURCE_REVISION
 # ImageIO/fixed-width XLSX and the bundled JDK truststore need neither fontconfig nor build-time GPG tools.
 RUN test -n "$RUNTIME_REFRESH" && apk del --no-cache fontconfig ttf-dejavu gnupg p11-kit-trust && \
-    apk upgrade --no-cache && apk add --no-cache curl findutils
+    for attempt in 1 2 3; do \
+      apk upgrade --no-cache && apk add --no-cache curl findutils && exit 0; \
+      [ "$attempt" = 3 ] && exit 1; \
+      sleep 2; \
+    done
 WORKDIR /app
 RUN mkdir -p /app/uploads && chown -R 10001:10001 /app
 COPY --from=build --chown=10001:10001 /workspace/sky-server/target/sky-server-1.0-SNAPSHOT.jar /app/app.jar

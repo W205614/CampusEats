@@ -108,7 +108,7 @@ SELECT COUNT(*) FROM orders o LEFT JOIN order_stage s ON s.order_id=o.id WHERE o
         $issues.Add('Background tasks are disabled')
       }
       $checks.backgroundJobs = [ordered]@{}
-      $knownJobs = @('checkoutExpiry', 'platformRefunds', 'legacyRefunds', 'outbox', 'legacyExpiry', 'deliveryOverdue', 'fulfillmentExceptions', 'maintenance', 'metrics')
+      $knownJobs = @('checkoutExpiry', 'channelPayments', 'platformRefunds', 'legacyRefunds', 'outbox', 'legacyExpiry', 'deliveryOverdue', 'fulfillmentExceptions', 'externalNotifications', 'smsReceipts', 'maintenance', 'metrics')
       if ((@($details.jobs.PSObject.Properties.Name | Sort-Object) -join ',') -cne (@($knownJobs | Sort-Object) -join ',')) {
         throw 'Missing or unknown operations job.'
       }
@@ -117,7 +117,7 @@ SELECT COUNT(*) FROM orders o LEFT JOIN order_stage s ON s.order_id=o.id WHERE o
         if ($null -eq $job -or $job.enabled -isnot [bool] -or $job.status -notin @('STARTING', 'OK', 'FAILED', 'STALE', 'DISABLED')) {
           throw 'Invalid job status.'
         }
-        if ($job.enabled -and $job.status -eq 'DISABLED' -or !$job.enabled -and $job.status -ne 'DISABLED' -or (!$job.enabled -and ($name -eq 'metrics' -or $details.tasksEnabled))) {
+        if ($job.enabled -and $job.status -eq 'DISABLED' -or !$job.enabled -and $job.status -ne 'DISABLED' -or (!$job.enabled -and ($name -eq 'metrics' -or ($details.tasksEnabled -and $name -notin @('externalNotifications', 'smsReceipts'))))) {
           throw 'Inconsistent job status.'
         }
         $checks.backgroundJobs[$name] = $job.status

@@ -5,7 +5,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const contract = path.join(root, 'frontend/contracts/openapi.json');
 if (process.argv.includes('--fetch')) {
   const env = Object.fromEntries(
-    (await fs.readFile(path.join(root, '.env'), 'utf8'))
+    (await fs.readFile(path.resolve(root, process.env.CAMPUS_ENV_FILE || '.env'), 'utf8'))
       .split(/\r?\n/)
       .filter((l) => l.includes('=') && !l.startsWith('#'))
       .map((l) => [l.slice(0, l.indexOf('=')), l.slice(l.indexOf('=') + 1)]),

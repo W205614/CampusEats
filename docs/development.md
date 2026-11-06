@@ -12,7 +12,9 @@
 | `sky-pojo/src/main/java/com/sky/api/` | 请求 `Commands` 和响应 `Views` |
 | `sky-server/src/main/java/com/sky/web/` | HTTP 入口；按目录、结算、履约、售后和管理控制器阅读，再看认证与统一异常处理 |
 | `sky-server/src/main/java/com/sky/platform/` | 多校区主业务：`PlatformScope` 权限、`StoreCart` 购物车、`CheckoutService` 合单、`FulfillmentService` 履约、`AftersaleService` 售后 |
-| `sky-server/src/main/java/com/sky/finance/` | `LedgerService` 事务内流水、`FinanceService` 期初、日结预览、冻结账单及对账；均为模拟资金 |
+| `sky-server/src/main/java/com/sky/finance/` | `LedgerService` 事务内业务流水、`FinanceService` 期初、日结预览、冻结账单及对账；平台账单不代表向商家打款 |
+| `sky-server/src/main/java/com/sky/payment/` | 持久支付意图、微信验签解密、查单关单、异步退款、商户快照与渠道账单；模拟与真实交易按渠道区分 |
+| `sky-server/src/main/java/com/sky/storage/`、`integration/` | LOCAL/COS 文件和元数据、身份与短信/订阅适配器及接入状态 |
 | `sky-server/src/main/java/com/sky/business/` | 商品、地址、配额、缓存、支付接口等复用服务，也保留旧接口使用的交易服务 |
 | `sky-server/src/main/java/com/sky/security/` | 员工／演示／微信登录、`LocalUserService` 独立测试账号、会话、角色校验与限流 |
 | `sky-server/src/main/java/com/sky/infra/`、`mapper/` | 数据访问、配置、种子数据、后台维护与批量查询 |
@@ -20,7 +22,7 @@
 | `sky-server/src/main/resources/` | 应用配置和 `db/migration/` 中的 Flyway 迁移 |
 | `sky-server/src/test/` | 集成测试、并发及边界测试，与生产代码分开 |
 
-平台五类原控制器默认启用：`PlatformController`（目录发现）、`PlatformCheckoutController`、`PlatformFulfillmentController`、`PlatformAftersaleController`、`PlatformManagementController`；另有 `LocalUserController`、`OperationsController` 和 `FinanceController`。旧交易控制器由 `campus.legacy-api=true` 条件启用，部分集成测试仍覆盖旧交易路径；模拟账务HTTP入口与当前平台模式配套启用。`business/` 与 `platform/` 并非可以整目录删除的重复实现。不要修改已执行的Flyway迁移；V13—V17为业务能力追加，V18—V19只补充对账流水与订单覆盖索引。
+平台五类原控制器默认启用：`PlatformController`（目录发现）、`PlatformCheckoutController`、`PlatformFulfillmentController`、`PlatformAftersaleController`、`PlatformManagementController`；另有身份、支付、通知、存储及运维入口。旧交易控制器由 `campus.legacy-api=true` 条件启用，部分集成测试仍覆盖旧交易路径；账务 HTTP 入口与当前平台模式配套启用。`business/` 与 `platform/` 并非可以整目录删除的重复实现。不要修改已执行的 Flyway 迁移；V13—V17为业务能力追加，V18—V19补充余额对账索引，V20—V23增加生产接入及多实例数据，V24补充期间流水汇总覆盖索引。
 
 控制器只协调 HTTP 与服务。`ArchitectureBoundaryTest` 检查控制器不持有 `Db`，并检查指定核心服务不依赖 `web` 视图；这是一组明确的边界约束，不是完整 DDD 或所有包无环的证明。不要为了移动目录复制配额、金额或退款算法。
 
@@ -101,11 +103,11 @@ npm run dev:h5 --prefix frontend/client
 ## 微信小程序
 
 1. 构建后将 `frontend/client/dist/build/mp-weixin/` 导入微信开发者工具。
-2. 按账号权限配置自己的 AppID；本机工具预览与正式发布的要求不同。
-3. 设备访问需在 `frontend/client/.env.local` 设置 `VITE_API_BASE` 为可访问的 HTTPS API 地址，并重新构建。按需同步配置 `src/manifest.json` 的 AppID 与微信合法 request 域名。
+2. 本机工具预览与正式发布的要求不同。生产构建按[小程序接入步骤](production-readiness.md#小程序生产构建)设置进程环境中的 `WECHAT_APPID` / `PUBLIC_BASE_URL`，运行 `build:mp-weixin:production`，不手改生成目录或源 manifest。
+3. 在微信后台配置 request、uploadFile、downloadFile 合法域名，导入与该次 AppID/API 源匹配的构建产物；开发联调仍可使用被忽略的 `frontend/client/.env.local`。
 4. 微信登录所需 `WECHAT_APPID`、`WECHAT_SECRET` 仅配置在后端本机环境，Secret 不进入前端或 Git。
 
-H5 默认使用同源 API。H5 和小程序构建成功不代表微信登录、真机或真实资金交易已经通过验收；当前支付和退款仍为模拟实现。
+H5 默认使用同源 API。默认演示使用模拟支付；生产使用独立微信支付流程，前端只展示服务端确认的结果。H5 和小程序构建成功不代表微信登录、真机或真实资金交易已经通过验收。
 
 ## 本机文件与验证范围
 

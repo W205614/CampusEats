@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import { test, expect, call, password } from './helpers';
+import { candidateSource } from './candidate-source';
 import type { BrowserContext, Locator, Page } from '@playwright/test';
 import type { Session } from '../../contracts/models';
 import type { Checkout, CursorPage, Order } from '../../contracts/platform';
@@ -36,6 +37,7 @@ test('staff rotate passwords, active deliveries keep their policy and expired co
   adminSession,
 }, testInfo) => {
   test.setTimeout(360000);
+  const source = await candidateSource();
   expect(
     process.env.CI === 'true' || new URL(String(testInfo.project.use.baseURL)).port !== '18083',
   ).toBe(true);
@@ -398,7 +400,7 @@ test('staff rotate passwords, active deliveries keep their policy and expired co
       customer.getByText('计算报价', { exact: true }).click(),
     );
     const checkout = await ui<Checkout>(customer, '/user/checkouts', 'POST', () =>
-      customer.getByText('提交订单，随后模拟支付', { exact: true }).click(),
+      customer.getByText('提交订单，随后付款', { exact: true }).click(),
     );
     const checkoutCard = customer
       .locator('uni-view.card')
@@ -550,7 +552,7 @@ test('staff rotate passwords, active deliveries keep their policy and expired co
       output,
       JSON.stringify(
         {
-          sourceRevision: process.env.CANDIDATE_SHA || process.env.GITHUB_SHA || 'local',
+          ...source,
           fixtureBoundary:
             'Only campus/store/building/product/quota/coupon/staff use setup APIs. Accounts, password changes, coupon claim/filter, cart/checkout/mock payment, policy changes and delivery transitions use pages. Other APIs are read-only checks. Stage deadlines are tested with a fixed Clock separately and may be inspected by read-only SQL.',
           browserContexts: contexts.length,

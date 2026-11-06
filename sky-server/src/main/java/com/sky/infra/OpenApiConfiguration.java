@@ -16,7 +16,7 @@ public class OpenApiConfiguration {
             new Info()
                 .title("CampusEats Platform")
                 .version("2.0")
-                .description("多校区独立店铺平台，单体单实例；支付与退款均为模拟"))
+                .description("多校区独立店铺平台；支持本机演示与生产多实例，支付渠道由部署配置决定"))
         .components(
             new Components()
                 .addSecuritySchemes(
@@ -87,6 +87,13 @@ public class OpenApiConfiguration {
                                 || path.endsWith("/auth/demo")
                                 || path.endsWith("/auth/wechat")
                                 || path.endsWith("/auth/capabilities")
+                                || path.endsWith("/auth/identity-capabilities")
+                                || path.endsWith("/auth/privacy-policy")
+                                || path.endsWith("/auth/otp/send")
+                                || path.endsWith("/auth/otp/login")
+                                || path.endsWith("/auth/wechat/oauth/callback")
+                                || path.equals("/api/v1/user/payment-capabilities")
+                                || path.startsWith("/api/v1/payments/wechat/")
                                 || path.startsWith("/api/v1/user/menu")
                                 || path.equals("/api/v1/user/shop")
                                 || path.equals("/api/v1/user/buildings")

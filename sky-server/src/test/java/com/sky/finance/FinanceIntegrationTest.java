@@ -248,6 +248,38 @@ class FinanceIntegrationTest {
   }
 
   @Test
+  void reconciliationKeepsStoreAndDateBoundariesWithAllTimeBalances() {
+    var day = LocalDate.of(2026, 10, 28);
+    var before = finance.reconcile(null, day, day);
+    clock.day(27);
+    long earlier = order(1000);
+    payment(earlier);
+    long missing = order(400);
+    clock.day(28);
+    long today = order(2000);
+    payment(today);
+    refund(earlier, 200, "SUCCEEDED");
+    long otherStore = order(3000);
+    db.update("UPDATE orders SET store_id=? WHERE id=?", other, otherStore);
+    payment(otherStore);
+
+    var result = finance.reconcile(store, day, day);
+    assertEquals(2000, result.periodPaidCents());
+    assertEquals(200, result.periodRefundedCents());
+    assertEquals(3200, result.currentOrderNetCents());
+    assertEquals(2800, result.ledgerNetCents());
+    assertEquals(1, result.differenceCount());
+    assertEquals(missing, result.differences().getFirst().orderId());
+
+    var global = finance.reconcile(null, day, day);
+    assertEquals(before.periodPaidCents() + 5000, global.periodPaidCents());
+    assertEquals(before.periodRefundedCents() + 200, global.periodRefundedCents());
+    assertEquals(before.currentOrderNetCents() + 6200, global.currentOrderNetCents());
+    assertEquals(before.ledgerNetCents() + 5800, global.ledgerNetCents());
+    assertEquals(before.differenceCount() + 1, global.differenceCount());
+  }
+
+  @Test
   void reconciliationRestoresTheConnectionTemporaryTableBudget() {
     var transaction = new TransactionTemplate(manager);
     transaction.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);

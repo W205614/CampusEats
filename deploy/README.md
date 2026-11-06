@@ -10,6 +10,7 @@
 | `maven-settings.xml` | 后端源码镜像的Maven镜像源配置 |
 | `dish.svg` | 默认演示餐品图片 |
 | `ops-config.example.json` | 运维接入模板；复制到 `.local/ops-config.json` 后配置副本目录和告警地址 |
+| [`production/`](production/) | 生产环境变量与云接入模板、可信代理配置，以及 Prometheus/Grafana/Alertmanager 模板；使用根目录 `compose.production.yaml`，见[生产部署](../docs/production-deployment.md) |
 
 根目录的 `compose.yaml`、`Dockerfile`、`pom.xml`、`.env.example` 与 Git／编辑器配置保留默认入口位置。前端 `package.json`、锁文件、Vite／TypeScript配置以及后端应用配置继续留在所属模块，便于工具默认发现和独立构建。
 

@@ -21,6 +21,11 @@ public class UploadService {
   }
 
   public String uploadProduct(MultipartFile file) {
+    // The legacy upload route has no store path; retain its authenticated owner's store.
+    return uploadProduct(file, null);
+  }
+
+  public String uploadProduct(MultipartFile file, Long store) {
     var actor = Actor.employee();
     require(
         java.util.Set.of("ADMIN", "PLATFORM_ADMIN", "SHOP_MANAGER").contains(actor.role()),
@@ -28,7 +33,7 @@ public class UploadService {
         "FORBIDDEN",
         "需要店长或平台权限");
     try (var image = storage.stage(file)) {
-      String id = image.publish(false);
+      String id = image.publish(false, store);
       image.accept();
       return "/uploads/" + id + ".png";
     } catch (java.io.IOException ex) {

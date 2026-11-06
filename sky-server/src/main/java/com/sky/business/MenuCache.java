@@ -27,6 +27,9 @@ public class MenuCache {
   private final AtomicLongArray generations = new AtomicLongArray(256);
   private final String epoch = UUID.randomUUID().toString();
 
+  @org.springframework.beans.factory.annotation.Value("${campus.cache.shared-versions:true}")
+  private boolean sharedVersions;
+
   public MenuCache(
       StringRedisTemplate redis,
       Json json,
@@ -38,12 +41,14 @@ public class MenuCache {
 
   @org.springframework.beans.factory.annotation.Autowired
   public MenuCache(
-      StringRedisTemplate redis,
+      @org.springframework.beans.factory.annotation.Qualifier("cacheRedisTemplate")
+          StringRedisTemplate redis,
       Json json,
       Db db,
       Clock clock,
       org.springframework.transaction.PlatformTransactionManager manager,
-      RedisAccess access) {
+      @org.springframework.beans.factory.annotation.Qualifier("cacheRedisAccess")
+          RedisAccess access) {
     this.retryTx = new TransactionTemplate(manager);
     this.retryTx.setPropagationBehavior(
         org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
@@ -55,7 +60,7 @@ public class MenuCache {
   }
 
   public List<Map<String, Object>> load(String key, Supplier<List<Map<String, Object>>> loader) {
-    long generation = generations.get(stripe(key));
+    long generation = generation(key);
     long deadline = System.nanoTime() + WAIT_NANOS;
     var hit = cached(key, generation);
     if (hit != null) return hit;
@@ -94,9 +99,15 @@ public class MenuCache {
                 redis
                     .opsForValue()
                     .set(
-                        "campus:" + key,
+                        cacheKey(key, generation),
                         json.write(
-                            Map.of("epoch", epoch, "generation", generation, "items", snapshot)),
+                            Map.of(
+                                "epoch",
+                                sharedVersions ? "shared-v1" : epoch,
+                                "generation",
+                                generation,
+                                "items",
+                                snapshot)),
                         Duration.ofSeconds(
                             snapshot.isEmpty()
                                 ? 30
@@ -125,10 +136,10 @@ public class MenuCache {
   @SuppressWarnings("unchecked")
   private List<Map<String, Object>> cached(String key, long generation) {
     try {
-      String hit = access.call(() -> redis.opsForValue().get("campus:" + key));
+      String hit = access.call(() -> redis.opsForValue().get(cacheKey(key, generation)));
       if (hit != null) {
         var envelope = json.map(hit);
-        if (!epoch.equals(envelope.get("epoch"))
+        if (!(sharedVersions ? "shared-v1" : epoch).equals(envelope.get("epoch"))
             || !(envelope.get("generation") instanceof Number value)
             || value.longValue() != generation) return null;
         if (!(envelope.get("items") instanceof List<?> items)) return null;
@@ -170,9 +181,10 @@ public class MenuCache {
     return value;
   }
 
-  /** Commit invalidation durably; the local generation changes without waiting on reads or Redis. */
+  /** The shared generation changes in the same transaction as the catalog write. */
   public void afterCommit(String key) {
     if (TransactionSynchronizationManager.isSynchronizationActive()) {
+      if (sharedVersions) advanceShared(key);
       LocalDateTime now = LocalDateTime.now(clock);
       Long storeId = key.matches("store:[0-9]+:catalog") ? Long.parseLong(key.split(":")[1]) : null;
       db.update(
@@ -191,13 +203,14 @@ public class MenuCache {
               // No Redis I/O or reader lock on the committed write's response path.
               // The durable event removes the entry later; generations make old fills unreadable
               // now.
-              advance(key);
+              if (!sharedVersions) advance(key);
             }
           });
     } else invalidate(key);
   }
 
   public void invalidate(String key) {
+    if (sharedVersions) retryTx.executeWithoutResult(status -> advanceShared(key));
     try {
       retry(key);
     } catch (Exception ex) {
@@ -215,8 +228,25 @@ public class MenuCache {
   }
 
   public void retry(String key) {
-    advance(key);
+    if (!sharedVersions) advance(key);
     access.call(() -> redis.delete("campus:" + key));
+  }
+
+  private long generation(String key) {
+    if (!sharedVersions) return generations.get(stripe(key));
+    var version = db.one("SELECT generation FROM catalog_cache_version WHERE cache_key=?", key);
+    return version == null ? 0 : Db.id(version, "generation");
+  }
+
+  private String cacheKey(String key, long generation) {
+    return sharedVersions ? "campus:catalog:v1:" + key + ":" + generation : "campus:" + key;
+  }
+
+  private void advanceShared(String key) {
+    db.update(
+        "INSERT INTO catalog_cache_version(cache_key,generation) VALUES(?,1)"
+            + " ON DUPLICATE KEY UPDATE generation=generation+1",
+        key);
   }
 
   private void advance(String key) {

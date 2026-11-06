@@ -17,6 +17,7 @@
 application-dev.yml
 application-*.yml
 !application-docker.yml
+!application-prod.yml
 .env
 .env.*
 !.env.example

@@ -68,13 +68,15 @@ public class AuthService {
 
   public Capabilities capabilities() {
     return new Capabilities(
-        environment.matchesProfiles("demo") && !environment.matchesProfiles("trial"),
-        true,
+        environment.matchesProfiles("demo") && !environment.matchesProfiles("trial", "prod"),
+        !environment.matchesProfiles("prod"),
         !appid.isBlank() && !wxsecret.isBlank(),
-        "MOCK",
-        environment.matchesProfiles("trial")
-            ? "TRIAL"
-            : environment.matchesProfiles("demo") ? "DEMO" : "LOCAL");
+        environment.matchesProfiles("prod") ? "WECHAT" : "MOCK",
+        environment.matchesProfiles("prod")
+            ? "PRODUCTION"
+            : environment.matchesProfiles("trial")
+                ? "TRIAL"
+                : environment.matchesProfiles("demo") ? "DEMO" : "LOCAL");
   }
 
   @Transactional

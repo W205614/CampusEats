@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import { test, expect, call, password } from './helpers';
 import { selectAuthorizedStore } from './journey-selectors';
+import { candidateSource } from './candidate-source';
 import type { Page, BrowserContext, Locator } from '@playwright/test';
 import type { Session } from '../../contracts/models';
 import type { Checkout, Order, CursorPage, Aftersale } from '../../contracts/platform';
@@ -12,6 +13,7 @@ test('four roles complete a delivery handover, track a refund through messages a
   adminSession,
 }, testInfo) => {
   test.setTimeout(360000);
+  const source = await candidateSource();
   expect(
     process.env.CI === 'true' || new URL(String(testInfo.project.use.baseURL)).port !== '18083',
   ).toBe(true);
@@ -362,7 +364,7 @@ test('four roles complete a delivery handover, track a refund through messages a
         customer.getByText('计算报价', { exact: true }).click(),
       );
       const checkout = await ui<Checkout>(customer, '/user/checkouts', 'POST', () =>
-        customer.getByText('提交订单，随后模拟支付', { exact: true }).click(),
+        customer.getByText('提交订单，随后付款', { exact: true }).click(),
       );
       const card = customer
         .locator('uni-view.card')
@@ -631,7 +633,7 @@ test('four roles complete a delivery handover, track a refund through messages a
       .locator('.el-table__body tr')
       .filter({ has: manager.getByRole('cell', { name: id, exact: true }) })
       .first();
-    await expect(merchantMessage).toContainText('模拟退款已完成');
+    await expect(merchantMessage).toContainText('退款已完成');
     await capture(manager, '04a-manager-authorized-workbench-messages');
     await courier.goto('/admin/messages');
     const courierRows = courier.locator('.el-table__body-wrapper');
@@ -807,7 +809,7 @@ test('four roles complete a delivery handover, track a refund through messages a
       evidence,
       JSON.stringify(
         {
-          sourceRevision: process.env.CANDIDATE_SHA || process.env.GITHUB_SHA || 'local',
+          ...source,
           fixtureBoundary:
             'Only campus/store/building/product/quota/coupon/staff use setup APIs. User creation/login/passwords/coupon claim, cart/checkout/mock payment, service policy, building rename, delivery availability/claim/transitions, platform emergency disable/exception acknowledgement/physical handover and reassignment, refund and message reads use real pages. APIs otherwise verify read-only snapshots.',
           browserContexts: contexts.length,

@@ -9,7 +9,7 @@ import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.HealthIndicator;
 import org.springframework.stereotype.Component;
 
-/** Process-local evidence of task progress; reading health never queries the database. */
+/** Health reads cached progress. Cluster peers refresh that progress while attempting a job. */
 @Component("runtimeOperations")
 public class RuntimeOperations implements HealthIndicator {
   private final Clock clock;
@@ -18,9 +18,21 @@ public class RuntimeOperations implements HealthIndicator {
   private final Instant started;
   private final Map<String, State> states = new LinkedHashMap<>();
 
-  @Autowired
+  @Autowired(required = false)
+  private ClusterJobs cluster;
+
   public RuntimeOperations(Clock clock, @Value("${campus.tasks-enabled:true}") boolean enabled) {
     this(clock, enabled, System::nanoTime);
+  }
+
+  @Autowired
+  public RuntimeOperations(
+      Clock clock,
+      @Value("${campus.tasks-enabled:true}") boolean enabled,
+      @Value("${campus.notifications.enabled:false}") boolean notificationsEnabled) {
+    this(clock, enabled, System::nanoTime);
+    states.put("externalNotifications", new State(enabled && notificationsEnabled, 120));
+    states.put("smsReceipts", new State(enabled && notificationsEnabled, 180));
   }
 
   RuntimeOperations(Clock clock, boolean enabled, LongSupplier ticker) {
@@ -31,12 +43,15 @@ public class RuntimeOperations implements HealthIndicator {
     for (String name :
         List.of(
             "checkoutExpiry",
+            "channelPayments",
             "platformRefunds",
             "legacyRefunds",
             "outbox",
             "legacyExpiry",
             "deliveryOverdue")) states.put(name, new State(enabled, 120));
     states.put("fulfillmentExceptions", new State(enabled, 120));
+    states.put("externalNotifications", new State(enabled, 120));
+    states.put("smsReceipts", new State(enabled, 180));
     states.put("maintenance", new State(enabled, 720));
     states.put("metrics", new State(true, 60));
   }
@@ -45,13 +60,14 @@ public class RuntimeOperations implements HealthIndicator {
     private final String name;
     private final long start = ticker.getAsLong();
     private String error;
+    private ClusterJobs.Lease lease;
 
     private Round(String name) {
       this.name = name;
     }
 
     public boolean withinBudget() {
-      return ticker.getAsLong() - start < 5_000_000_000L;
+      return ticker.getAsLong() - start < 5_000_000_000L && (lease == null || cluster.owned(lease));
     }
 
     public void failed(Exception ex, Object id) {
@@ -75,16 +91,45 @@ public class RuntimeOperations implements HealthIndicator {
     Round round = new Round(name);
     boolean completed = false;
     try {
+      if (cluster != null && !name.equals("metrics")) {
+        round.lease = cluster.claim(name);
+        if (round.lease == null) {
+          var peer = cluster.latest(name);
+          synchronized (state) {
+            if (peer != null) {
+              state.lastCompleted = ClusterJobs.utc(peer.get("last_completed_at"));
+              state.lastSuccess = ClusterJobs.utc(peer.get("last_success_at"));
+              state.error = (String) peer.get("last_error");
+            }
+            state.running = false;
+          }
+          return;
+        }
+      }
       action.accept(round);
       completed = true;
     } catch (Exception ex) {
       round.failed(ex, "batch");
     } finally {
-      synchronized (state) {
-        state.running = false;
-        state.lastCompleted = clock.instant();
-        state.error = completed ? round.error : Objects.requireNonNullElse(round.error, "ABORTED");
-        if (state.error == null) state.lastSuccess = state.lastCompleted;
+      if (cluster != null && !name.equals("metrics") && round.lease == null) {
+        synchronized (state) {
+          state.running = false;
+        }
+      } else {
+        if (round.lease != null) {
+          try {
+            if (!cluster.complete(round.lease, round.error)) round.error = "LEASE_LOST";
+          } catch (Exception ex) {
+            round.failed(ex, "cluster-completion");
+          }
+        }
+        synchronized (state) {
+          state.running = false;
+          state.lastCompleted = clock.instant();
+          state.error =
+              completed ? round.error : Objects.requireNonNullElse(round.error, "ABORTED");
+          if (state.error == null) state.lastSuccess = state.lastCompleted;
+        }
       }
     }
   }

@@ -1,4 +1,20 @@
 export interface paths {
+    "/api/v1/user/profile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["profile"];
+        put: operations["profile_1"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/user/addresses/{id}": {
         parameters: {
             query?: never;
@@ -24,6 +40,22 @@ export interface paths {
         };
         get?: never;
         put: operations["update"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/stores/{store}/payment-config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put: operations["merchant"];
         post?: never;
         delete?: never;
         options?: never;
@@ -72,6 +104,22 @@ export interface paths {
         };
         get?: never;
         put: operations["platformCouponUpdate"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/coupons/{id}/participants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["participants"];
+        put: operations["participants_1"];
         post?: never;
         delete?: never;
         options?: never;
@@ -303,6 +351,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/user/privacy-consents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["consent"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/user/orders/{id}/review": {
         parameters: {
             query?: never;
@@ -399,6 +463,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/user/notifications/subscriptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["subscribe"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/user/messages/{id}/read": {
         parameters: {
             query?: never;
@@ -457,6 +537,22 @@ export interface paths {
         get: operations["checkouts"];
         put?: never;
         post: operations["submit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/user/checkouts/{id}/payment-intents": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["create"];
         delete?: never;
         options?: never;
         head?: never;
@@ -527,6 +623,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/user/auth/wechat/oauth/start": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["start"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/user/auth/wechat/bind": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["bindWechat"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/user/auth/phone/bind": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["bindPhone"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/user/auth/password": {
         parameters: {
             query?: never;
@@ -543,7 +687,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/user/auth/login": {
+    "/api/v1/user/auth/otp/send": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["send"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/user/auth/otp/login": {
         parameters: {
             query?: never;
             header?: never;
@@ -553,6 +713,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/user/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["login_1"];
         delete?: never;
         options?: never;
         head?: never;
@@ -639,6 +815,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/user/account-closure": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["close"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/platform/users": {
         parameters: {
             query?: never;
@@ -648,7 +840,7 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["create"];
+        post: operations["create_1"];
         delete?: never;
         options?: never;
         head?: never;
@@ -681,6 +873,38 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["store"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/stores/{store}/channel-differences/{id}/review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["review_1"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/storage/images/{id}/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["verify"];
         delete?: never;
         options?: never;
         head?: never;
@@ -752,6 +976,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/platform/payment-exceptions/{id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["retry"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/platform/orders/{id}/unassign": {
         parameters: {
             query?: never;
@@ -810,6 +1050,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["exceptionCancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/integrations/{provider}/acceptance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["accept"];
         delete?: never;
         options?: never;
         head?: never;
@@ -897,6 +1153,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/payments/wechat/refund-notify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["refund"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/payments/wechat/notify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["payment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/order-exceptions/{id}/acknowledge": {
         parameters: {
             query?: never;
@@ -907,6 +1195,22 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["acknowledge"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/merchant/stores/{store}/channel-reconciliations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["statements"];
+        put?: never;
+        post: operations["reconcile"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1212,7 +1516,23 @@ export interface paths {
         };
         get?: never;
         put?: never;
-        post: operations["login_1"];
+        post: operations["login_2"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/uploads/{id}.png": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["image"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1429,6 +1749,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/user/payment-capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["capabilities"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/user/orders": {
         parameters: {
             query?: never;
@@ -1453,6 +1789,38 @@ export interface paths {
             cookie?: never;
         };
         get: operations["order_2"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/user/notifications/templates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["templates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/user/notifications/deliveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["user"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1607,6 +1975,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/user/checkouts/{id}/payment": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["status"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/user/checkouts/by-request/{key}": {
         parameters: {
             query?: never;
@@ -1671,6 +2055,54 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/user/auth/wechat/oauth/callback": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["callback"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/user/auth/privacy-policy": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["policy_2"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/user/auth/identity-capabilities": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["capabilities_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/user/auth/capabilities": {
         parameters: {
             query?: never;
@@ -1678,7 +2110,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["capabilities"];
+        get: operations["capabilities_2"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1727,6 +2159,22 @@ export interface paths {
             cookie?: never;
         };
         get: operations["page"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/storage/images": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["review_2"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1822,7 +2270,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["statements"];
+        get: operations["statements_1"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1879,7 +2327,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/platform/order-exceptions/page": {
+    "/api/v1/platform/payment-exceptions": {
         parameters: {
             query?: never;
             header?: never;
@@ -1887,6 +2335,38 @@ export interface paths {
             cookie?: never;
         };
         get: operations["exceptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/order-exceptions/page": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["exceptions_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/platform/notifications/deliveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["platform"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1911,6 +2391,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/platform/integrations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["states"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/platform/finance/reconciliation": {
         parameters: {
             query?: never;
@@ -1918,7 +2414,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["reconcile"];
+        get: operations["reconcile_1"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1999,6 +2495,38 @@ export interface paths {
             cookie?: never;
         };
         get: operations["adminStores"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/merchant/stores/{store}/payment-config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["merchant_1"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/merchant/stores/{store}/channel-differences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["differences"];
         put?: never;
         post?: never;
         delete?: never;
@@ -2460,6 +2988,9 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        Name: {
+            name: string;
+        };
         Address: {
             buildingId: string;
             room: string;
@@ -2478,6 +3009,11 @@ export interface components {
             mustChangePassword?: boolean;
             /** Format: date-time */
             createdAt?: string;
+        };
+        Merchant: {
+            subMchid: string;
+            enabled?: boolean;
+            version?: string;
         };
         Staff: {
             username: string;
@@ -2506,6 +3042,9 @@ export interface components {
             /** Format: date-time */
             endsAt: string;
             enabled?: boolean;
+        };
+        Joint: {
+            stores: number[];
         };
         Campus: {
             name: string;
@@ -2597,6 +3136,9 @@ export interface components {
         Version: {
             version: string;
         };
+        Consent: {
+            version: string;
+        };
         Review: {
             /** Format: int32 */
             rating?: number;
@@ -2619,6 +3161,10 @@ export interface components {
             courierId?: string;
             code?: string;
         };
+        Subscription: {
+            templateId: string;
+            accepted?: boolean;
+        };
         Checkout: {
             stores: components["schemas"]["Selection"][];
             platformCouponId?: string;
@@ -2631,6 +3177,23 @@ export interface components {
             fulfillment: string;
             addressId?: string;
             couponId?: string;
+        };
+        Create: {
+            channel: string;
+            version?: string;
+        };
+        PaymentIntent: {
+            id?: string;
+            checkoutId?: string;
+            channel?: string;
+            state?: string;
+            /** Format: date-time */
+            expiresAt?: string;
+            action?: {
+                [key: string]: unknown;
+            };
+            lastError?: string;
+            closeRequested?: boolean;
         };
         Line: {
             cartId?: string;
@@ -2676,8 +3239,9 @@ export interface components {
                 [key: string]: unknown;
             }[];
         };
-        WxLogin: {
+        WechatLogin: {
             code: string;
+            policyVersion?: string;
         };
         SessionView: {
             token?: string;
@@ -2690,9 +3254,25 @@ export interface components {
             storeId?: string;
             campusId?: string;
         };
+        WechatCode: {
+            code: string;
+        };
+        PhoneCode: {
+            phone: string;
+            code: string;
+        };
         Password: {
             oldPassword: string;
             password: string;
+        };
+        SendCode: {
+            phone: string;
+            purpose: string;
+        };
+        PhoneLogin: {
+            phone: string;
+            code: string;
+            policyVersion: string;
         };
         LocalUserLogin: {
             username: string;
@@ -2709,6 +3289,9 @@ export interface components {
         };
         LocalUserResetPassword: {
             password: string;
+        };
+        Resolution: {
+            reason: string;
         };
         Reason: {
             reason: string;
@@ -2748,6 +3331,9 @@ export interface components {
             version?: string;
             reason: string;
         };
+        Acceptance: {
+            evidenceReference: string;
+        };
         Decision: {
             version?: string;
             approve?: boolean;
@@ -2756,6 +3342,10 @@ export interface components {
         Acknowledge: {
             version?: string;
             reason: string;
+        };
+        Day: {
+            /** Format: date */
+            businessDate: string;
         };
         Login: {
             username: string;
@@ -2908,6 +3498,14 @@ export interface components {
             nextCursor?: string;
             hasMore?: boolean;
         };
+        Profile: {
+            id?: string;
+            name?: string;
+            phone?: string;
+            miniProgramBound?: boolean;
+            officialAccountBound?: boolean;
+            closureState?: string;
+        };
         DeliveryResponse: {
             id?: string;
             orderId?: string;
@@ -3032,6 +3630,14 @@ export interface components {
             succeededAt?: string;
             successTimeSource?: string;
         };
+        SubscriptionTemplates: {
+            enabled?: boolean;
+            templates?: components["schemas"]["Template"][];
+        };
+        Template: {
+            event?: string;
+            templateId?: string;
+        };
         Message: {
             id?: string;
             orderId?: string;
@@ -3059,6 +3665,13 @@ export interface components {
             records: components["schemas"]["CollectionFavorite"][];
             nextCursor?: string;
             hasMore: boolean;
+        };
+        Capabilities: {
+            phoneLoginEnabled?: boolean;
+            oauthEnabled?: boolean;
+            policyVersion?: string;
+            privacyUrl?: string;
+            termsUrl?: string;
         };
         AuthenticationCapabilities: {
             demoLoginEnabled?: boolean;
@@ -3194,6 +3807,15 @@ export interface components {
             records: components["schemas"]["ExceptionView"][];
             nextCursor?: string;
             hasMore: boolean;
+        };
+        State: {
+            provider?: string;
+            status?: string;
+            connectivityEvidence?: string;
+            sourceRevision?: string;
+            acceptanceEvidence?: string;
+            /** Format: date-time */
+            acceptedAt?: string;
         };
         FinanceDifference: {
             orderId: string;
@@ -3384,6 +4006,55 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    profile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["Profile"];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    profile_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Name"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     addressUpdate: {
         parameters: {
             query?: never;
@@ -3470,6 +4141,30 @@ export interface operations {
             };
         };
     };
+    merchant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                store: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Merchant"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     staffUpdate: {
         parameters: {
             query?: never;
@@ -3530,6 +4225,59 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": components["schemas"]["Coupon"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    participants: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: Record<string, never>;
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    participants_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Joint"];
             };
         };
         responses: {
@@ -4002,6 +4750,28 @@ export interface operations {
             };
         };
     };
+    consent: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Consent"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     review: {
         parameters: {
             query?: never;
@@ -4191,6 +4961,28 @@ export interface operations {
             };
         };
     };
+    subscribe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Subscription"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     read: {
         parameters: {
             query?: never;
@@ -4323,6 +5115,41 @@ export interface operations {
             };
         };
     };
+    create: {
+        parameters: {
+            query?: never;
+            header: {
+                "Idempotency-Key": string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Create"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["PaymentIntent"];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
     pay: {
         parameters: {
             query?: never;
@@ -4376,7 +5203,16 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content?: never;
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: Record<string, never>;
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
             };
         };
     };
@@ -4420,7 +5256,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["WxLogin"];
+                "application/json": components["schemas"]["WechatLogin"];
             };
         };
         responses: {
@@ -4439,6 +5275,79 @@ export interface operations {
                         requestId: string;
                     };
                 };
+            };
+        };
+    };
+    start: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: {
+                            [key: string]: string;
+                        };
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    bindWechat: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WechatCode"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    bindPhone: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PhoneCode"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -4464,7 +5373,71 @@ export interface operations {
             };
         };
     };
+    send: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendCode"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: {
+                            [key: string]: number;
+                        };
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
     login: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PhoneLogin"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["SessionView"];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    login_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -4652,7 +5625,29 @@ export interface operations {
             };
         };
     };
-    create: {
+    close: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PhoneCode"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    create_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -4744,6 +5739,51 @@ export interface operations {
                         requestId: string;
                     };
                 };
+            };
+        };
+    };
+    review_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                store: string;
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Resolution"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    verify: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -4884,6 +5924,26 @@ export interface operations {
             };
         };
     };
+    retry: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     unassign: {
         parameters: {
             query?: never;
@@ -5000,6 +6060,30 @@ export interface operations {
                         requestId: string;
                     };
                 };
+            };
+        };
+    };
+    accept: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                provider: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Acceptance"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -5225,6 +6309,50 @@ export interface operations {
             };
         };
     };
+    refund: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": string;
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    payment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": string;
+            };
+        };
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     acknowledge: {
         parameters: {
             query?: never;
@@ -5246,6 +6374,68 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    statements: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                store: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: Record<string, never>;
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    reconcile: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                store: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["Day"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: Record<string, never>;
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
             };
         };
     };
@@ -5824,7 +7014,7 @@ export interface operations {
             };
         };
     };
-    login_1: {
+    login_2: {
         parameters: {
             query?: never;
             header?: never;
@@ -5852,6 +7042,26 @@ export interface operations {
                         requestId: string;
                     };
                 };
+            };
+        };
+    };
+    image: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -6251,6 +7461,35 @@ export interface operations {
             };
         };
     };
+    capabilities: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: {
+                            [key: string]: unknown;
+                        };
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
     userOrders: {
         parameters: {
             query?: {
@@ -6303,6 +7542,66 @@ export interface operations {
                         code: string;
                         message: string;
                         data: components["schemas"]["OrderResponse"];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    templates: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["SubscriptionTemplates"];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    user: {
+        parameters: {
+            query?: {
+                beforeId?: string;
+                limit?: number;
+                state?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: {
+                            [key: string]: unknown;
+                        }[];
                         /** Format: uuid */
                         requestId: string;
                     };
@@ -6571,6 +7870,35 @@ export interface operations {
             };
         };
     };
+    status: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["PaymentIntent"];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
     checkoutKey: {
         parameters: {
             query?: never;
@@ -6683,7 +8011,82 @@ export interface operations {
             };
         };
     };
-    capabilities: {
+    callback: {
+        parameters: {
+            query: {
+                state: string;
+                code: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    policy_2: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["Policy"];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    capabilities_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["Capabilities"];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    capabilities_2: {
         parameters: {
             query?: never;
             header?: never;
@@ -6797,6 +8200,37 @@ export interface operations {
                         code: string;
                         message: string;
                         data: components["schemas"]["LocalUsersPage"];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    review_2: {
+        parameters: {
+            query?: {
+                state?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: {
+                            [key: string]: unknown;
+                        }[];
                         /** Format: uuid */
                         requestId: string;
                     };
@@ -6956,7 +8390,7 @@ export interface operations {
             };
         };
     };
-    statements: {
+    statements_1: {
         parameters: {
             query?: {
                 storeId?: string;
@@ -7083,6 +8517,33 @@ export interface operations {
     };
     exceptions: {
         parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: Record<string, never>;
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    exceptions_1: {
+        parameters: {
             query?: {
                 storeId?: string;
                 cursor?: string;
@@ -7106,6 +8567,39 @@ export interface operations {
                         code: string;
                         message: string;
                         data: components["schemas"]["PageExceptionView"];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    platform: {
+        parameters: {
+            query?: {
+                beforeId?: string;
+                limit?: number;
+                state?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: {
+                            [key: string]: unknown;
+                        }[];
                         /** Format: uuid */
                         requestId: string;
                     };
@@ -7147,7 +8641,34 @@ export interface operations {
             };
         };
     };
-    reconcile: {
+    states: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["State"][];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    reconcile_1: {
         parameters: {
             query: {
                 storeId?: string;
@@ -7316,6 +8837,64 @@ export interface operations {
             query?: never;
             header?: never;
             path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: Record<string, never>;
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    merchant_1: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                store: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        /** @example OK */
+                        code: string;
+                        message: string;
+                        data: components["schemas"]["Merchant"];
+                        /** Format: uuid */
+                        requestId: string;
+                    };
+                };
+            };
+        };
+    };
+    differences: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                store: string;
+            };
             cookie?: never;
         };
         requestBody?: never;

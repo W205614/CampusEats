@@ -1,7 +1,7 @@
 package com.sky.web;
 
-import com.sky.business.UploadService;
 import com.sky.api.Commands;
+import com.sky.business.UploadService;
 import com.sky.platform.*;
 import jakarta.validation.Valid;
 import java.time.LocalDate;
@@ -167,7 +167,7 @@ public class PlatformController {
   @PostMapping("/merchant/stores/{storeId}/uploads")
   public Object productUpload(@PathVariable long storeId, @RequestParam MultipartFile file) {
     scope.merchant(storeId, true);
-    return Map.of("url", uploads.uploadProduct(file));
+    return Map.of("url", uploads.uploadProduct(file, storeId));
   }
 
   @GetMapping("/user/search")

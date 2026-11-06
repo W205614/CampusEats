@@ -9,6 +9,7 @@ import org.springframework.stereotype.Component;
 
 /** Single-instance, bounded Redis admission with one recovery probe after a failed command. */
 @Component
+@org.springframework.context.annotation.Primary
 public class RedisAccess {
   private static final long RETRY_NANOS = TimeUnit.SECONDS.toNanos(5);
   private final LongSupplier ticker;

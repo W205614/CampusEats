@@ -13,10 +13,12 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
   private final AuthService service;
   private final RateLimits limits;
+  private final UserIdentityService identities;
 
-  public AuthController(AuthService service, RateLimits limits) {
+  public AuthController(AuthService service, RateLimits limits, UserIdentityService identities) {
     this.service = service;
     this.limits = limits;
+    this.identities = identities;
   }
 
   @PostMapping("/api/v1/admin/auth/login")
@@ -34,8 +36,8 @@ public class AuthController {
   }
 
   @PostMapping("/api/v1/user/auth/wechat")
-  public Views.SessionView wx(@Valid @RequestBody WxLogin input) {
-    return ViewFactory.session(service.wx(input));
+  public Views.SessionView wx(@Valid @RequestBody UserIdentityController.WechatLogin input) {
+    return ViewFactory.session(identities.miniLogin(input.code(), input.policyVersion()));
   }
 
   @GetMapping({"/api/v1/admin/auth/me", "/api/v1/user/auth/me"})

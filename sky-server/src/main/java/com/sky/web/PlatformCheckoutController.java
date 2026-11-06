@@ -1,7 +1,7 @@
 package com.sky.web;
 
-import com.sky.business.AddressService;
 import com.sky.api.Commands;
+import com.sky.business.AddressService;
 import com.sky.platform.*;
 import com.sky.security.Actor;
 import jakarta.validation.Valid;
@@ -18,12 +18,17 @@ public class PlatformCheckoutController {
   private final StoreCart cart;
   private final CheckoutService checkout;
   private final AddressService addresses;
+  private final com.sky.payment.PaymentService payments;
 
   public PlatformCheckoutController(
-      StoreCart cart, CheckoutService checkout, AddressService addresses) {
+      StoreCart cart,
+      CheckoutService checkout,
+      AddressService addresses,
+      com.sky.payment.PaymentService payments) {
     this.cart = cart;
     this.checkout = checkout;
     this.addresses = addresses;
+    this.payments = payments;
   }
 
   @PostMapping("/user/stores/{storeId}/cart/clear")
@@ -112,7 +117,7 @@ public class PlatformCheckoutController {
   }
 
   @PostMapping("/user/checkouts/{id}/cancel")
-  public void checkoutCancel(@PathVariable long id, @Valid @RequestBody Commands.Version input) {
-    checkout.cancel(id, input.version());
+  public Object checkoutCancel(@PathVariable long id, @Valid @RequestBody Commands.Version input) {
+    return payments.cancel(id, input.version());
   }
 }

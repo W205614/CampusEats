@@ -22,10 +22,13 @@ public class BusinessMessages {
           "ORDER_EXCEPTION");
   private final Db db;
   private final Clock clock;
+  private final com.sky.integration.ExternalNotifications notifications;
 
-  public BusinessMessages(Db db, Clock clock) {
+  public BusinessMessages(
+      Db db, Clock clock, com.sky.integration.ExternalNotifications notifications) {
     this.db = db;
     this.clock = clock;
+    this.notifications = notifications;
   }
 
   public void publish(long event, long order, String type) {
@@ -33,7 +36,7 @@ public class BusinessMessages {
     if (o == null) return;
     String summary =
         switch (type) {
-          case "ORDER_PAID" -> "订单模拟支付成功";
+          case "ORDER_PAID" -> "订单支付成功";
           case "ORDER_READY" -> "餐品已备好，请关注取餐或配送";
           case "DELIVERY_ASSIGNED", "ORDER_ASSIGN", "ORDER_REASSIGNED" -> "配送任务分配已更新";
           case "ORDER_PICKUP" -> "配送员已取餐";
@@ -41,7 +44,7 @@ public class BusinessMessages {
           case "ORDER_CANCELLED", "ORDER_EXCEPTION_CANCELLED" -> "订单已取消";
           case "AFTERSALE_APPLY" -> "售后申请已提交";
           case "AFTERSALE_DECIDED" -> "售后申请已有处理结果";
-          case "ORDER_REFUNDED" -> "模拟退款已完成";
+          case "ORDER_REFUNDED" -> "退款已完成";
           case "ORDER_EXCEPTION" -> "订单需要人工关注";
           default -> "订单处理进度已更新";
         };
@@ -73,5 +76,6 @@ public class BusinessMessages {
         at,
         o.get("store_id"),
         COURIER_EVENTS.contains(type) ? o.get("courier_id") : null);
+    notifications.enqueue(event, order, type, summary);
   }
 }

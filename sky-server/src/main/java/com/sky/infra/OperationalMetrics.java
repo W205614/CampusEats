@@ -14,6 +14,15 @@ public class OperationalMetrics {
       refundFailures = new AtomicLong(),
       outboxBacklog = new AtomicLong();
   private final AtomicLong valid = new AtomicLong();
+  private final AtomicLong notificationFailed = new AtomicLong(-1),
+      notificationUnknown = new AtomicLong(-1),
+      notificationBacklog = new AtomicLong(-1),
+      notificationOldest = new AtomicLong(-1);
+  private final AtomicLong unknownImages = new AtomicLong(-1);
+
+  @org.springframework.beans.factory.annotation.Value("${campus.storage.backend:local}")
+  private String storageBackend = "local";
+
   private final AtomicLong evictedKeys = new AtomicLong(-1);
   private final AtomicLong openExceptions = new AtomicLong(-1),
       oldestRefund = new AtomicLong(-1),
@@ -45,11 +54,16 @@ public class OperationalMetrics {
     registry.gauge("campus.refund.failed", refundFailures);
     registry.gauge("campus.outbox.backlog", outboxBacklog);
     registry.gauge("campus.metrics.valid", valid);
+    registry.gauge("campus.notification.failed", notificationFailed);
+    registry.gauge("campus.notification.unknown", notificationUnknown);
+    registry.gauge("campus.notification.backlog", notificationBacklog);
+    registry.gauge("campus.notification.oldest.wait.seconds", notificationOldest);
     registry.gauge("campus.redis.evicted.keys", evictedKeys);
     registry.gauge("campus.order.exceptions.open", openExceptions);
     registry.gauge("campus.refund.oldest.wait.seconds", oldestRefund);
     registry.gauge("campus.outbox.oldest.wait.seconds", oldestOutbox);
     registry.gauge("campus.upload.bytes", uploadBytes);
+    registry.gauge("campus.upload.unknown", unknownImages);
   }
 
   @Scheduled(fixedDelay = 10000)
@@ -80,9 +94,24 @@ public class OperationalMetrics {
       openExceptions.set(db.count("SELECT COUNT(*) FROM order_exception WHERE state<>'RESOLVED'"));
       oldestRefund.set(age("refund_request"));
       oldestOutbox.set(age("outbox_event"));
+      notificationFailed.set(
+          db.count("SELECT COUNT(*) FROM notification_delivery WHERE state='FAILED'"));
+      notificationUnknown.set(
+          db.count("SELECT COUNT(*) FROM notification_delivery WHERE state='UNKNOWN'"));
+      notificationBacklog.set(
+          db.count(
+              "SELECT COUNT(*) FROM notification_delivery WHERE state"
+                  + " IN('REQUESTED','PROCESSING')"));
+      notificationOldest.set(age("notification_delivery"));
+      unknownImages.set(
+          db.count(
+              "SELECT COUNT(*) FROM stored_image WHERE state"
+                  + " IN('UPLOADING','UNKNOWN','UNREFERENCED')"));
       if (System.nanoTime() >= nextDiskSample) {
         nextDiskSample = System.nanoTime() + java.time.Duration.ofMinutes(5).toNanos();
-        if (java.nio.file.Files.exists(uploads))
+        if (storageBackend.equals("cos")) {
+          uploadBytes.set(db.count("SELECT used_bytes FROM blob_storage_budget WHERE id=1"));
+        } else if (java.nio.file.Files.exists(uploads))
           try (var paths = java.nio.file.Files.walk(uploads)) {
             uploadBytes.set(
                 paths
@@ -105,6 +134,10 @@ public class OperationalMetrics {
       valid.set(0);
       refundFailures.set(-1);
       outboxBacklog.set(-1);
+      notificationFailed.set(-1);
+      notificationUnknown.set(-1);
+      notificationBacklog.set(-1);
+      notificationOldest.set(-1);
       registry.counter("campus.metrics.failures").increment();
       round.failed(ex, "metrics");
     }

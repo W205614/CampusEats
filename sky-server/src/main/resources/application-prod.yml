@@ -1,0 +1,65 @@
+server:
+  forward-headers-strategy: framework
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USER}
+    password: ${MYSQL_PASSWORD}
+    hikari:
+      connection-init-sql: "SET SESSION innodb_lock_wait_timeout=3, time_zone='+08:00'"
+  flyway:
+    enabled: ${MIGRATIONS_ENABLED:false}
+campus:
+  instance-id: ${INSTANCE_ID}
+  cluster:
+    enabled: true
+  cache:
+    shared-versions: true
+  mock-payment-enabled: false
+  payment:
+    provider: wechat
+  storage:
+    backend: cos
+  allowed-origins: ${ALLOWED_ORIGINS}
+  jwt-secret: ${JWT_ADMIN_SECRET}
+  demo-admin-password: ${BOOTSTRAP_ADMIN_PASSWORD:}
+  rate:
+    fail-closed: true
+  redis:
+    control:
+      host: ${REDIS_CONTROL_HOST}
+      port: ${REDIS_CONTROL_PORT:6379}
+      password: ${REDIS_CONTROL_PASSWORD}
+      database: ${REDIS_CONTROL_DATABASE:0}
+      ssl: ${REDIS_CONTROL_SSL:true}
+    cache:
+      host: ${REDIS_CACHE_HOST}
+      port: ${REDIS_CACHE_PORT:6379}
+      password: ${REDIS_CACHE_PASSWORD}
+      database: ${REDIS_CACHE_DATABASE:0}
+      ssl: ${REDIS_CACHE_SSL:true}
+management:
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true
+  server:
+    port: 9090
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      show-details: never
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+logging:
+  level:
+    com.qcloud.cos.http.DefaultCosHttpClient: 'OFF'
+  structured:
+    format:
+      console: logstash

@@ -1,8 +1,40 @@
 # CampusEats · 校园多校区点餐平台
 
+[![CI](https://github.com/W205614/CampusEats/actions/workflows/verify.yml/badge.svg?branch=master)](https://github.com/W205614/CampusEats/actions/workflows/verify.yml)
+
 CampusEats 让学生在多个校区、多个店铺选餐后合并付款，各店分别备餐，支持配送和到店自取。员工工作台按角色处理店铺营业、订单履约、售后和经营报表。
 
-项目面向本机演示，默认监听 `127.0.0.1`。付款与退款均为模拟操作，演示账号由体验者共享，请使用虚构的个人信息。后端使用 Java 21、Spring Boot 4.1、MySQL 8.4 和 Redis 7.4，员工工作台使用 Vue 3，用户端使用 uni-app。下列步骤体验浏览器 H5 版，微信小程序登录需另行配置，真机验收仍待完成。
+默认启动的是本机演示环境，监听 `127.0.0.1`，付款与退款使用模拟渠道，共享演示账号仅使用虚构资料。另提供微信服务商合单支付、腾讯云短信与 COS、微信订阅消息、多实例和腾讯云生产部署实现；**真实云凭据、商户权限及真机业务验收尚未完成，不能把本地验证当作已经上线。**后端使用 Java 21、Spring Boot 4.1、MySQL 8.4 和 Redis 7.4，员工工作台使用 Vue 3，用户端使用 uni-app。
+
+## 生产接入
+
+生产模式为单体多实例：CLB HTTPS → 两台 CVM 的 Web/Java → 托管 MySQL、控制 Redis、缓存 Redis、COS。商家绑定自己的微信子商户，平台不抽佣；跨店联合优惠由参与商家承担。平台配置店铺与子商户，微信外部进件和产品授权在微信后台完成。
+
+| 能力 | 实现与后续接入 |
+|---|---|
+| 微信收款/退款 | 已实现四种支付场景、验签解密、查单关单、退款结果确认；填写服务商、公钥、私钥、AppID、回调域名并为店铺绑定已授权子商户 |
+| 手机与微信身份 | 已实现验证码登录、应用身份绑定、授权、资料与注销；填写腾讯云短信模板、小程序与公众号配置、运营方隐私政策 |
+| 站外通知 | 已实现短信投递与回执、微信订阅授权与投递；填写事件模板与字段映射，启用选定事件 |
+| COS 文件 | 已实现私有桶读写适配、固定商品入口、鉴权举证、元数据与上传结果未知核验；创建两个开启版本控制的私有桶并配置最小权限凭据 |
+| 多实例与运维 | 已实现共享目录版本、实时广播、数据库任务租约；提供生产配置检查、滚动发布说明、监控告警与恢复流程 |
+
+按[生产接入总览](docs/production-readiness.md)准备参数，再按[腾讯云部署与运维](docs/production-deployment.md)部署。详细步骤、模板、接口和故障处理见[身份与通知](docs/identity-notifications.md)、[文件存储](docs/storage-integration.md)。后续对这些已实现服务的接入以配置和外部授权为主；新增支付产品、其他服务商或新业务规则仍需相应开发。
+
+源码、CI 与实际部署的核对入口见[当前版本记录](docs/verification/current.md)，首轮本地验证保留为[候选留档](docs/verification/production-upgrade.md)。历史 CI 或候选镜像不能代替当前提交与运行实例的核对。
+
+```mermaid
+flowchart LR
+    Client[H5 / 微信小程序] --> CLB[CLB HTTPS]
+    CLB --> App1[CVM 1 · Web / Java]
+    CLB --> App2[CVM 2 · Web / Java]
+    App1 & App2 --> DB[托管 MySQL]
+    App1 & App2 --> Control[控制 Redis]
+    App1 & App2 --> Cache[缓存 Redis]
+    App1 & App2 --> COS[COS 私有桶]
+    App1 & App2 --> Channel[微信支付 / 短信 / 订阅消息]
+```
+
+本地验证环境为 Windows、PowerShell 7、Docker Desktop/WSL2，镜像面向 `linux/amd64`；生产模板面向 Linux CVM。小程序编译与真机验收分别记录。其他宿主平台与架构需要另行验证，构建条件见[开发指南](docs/development.md)。
 
 ## 首次启动
 
@@ -65,4 +97,13 @@ docker compose ps
 | 日常启停、排障和维护 | [日常维护](docs/operations.md) |
 | 维护已有环境、升级和回滚 | [部署与恢复](docs/platform-deployment.md) |
 | 源码、CI、容量测量与部署版本 | [当前版本验证记录](docs/verification/current.md) |
+| 版本变化与升级影响 | [变更记录](CHANGELOG.md) |
+| 开发协作、验证与提交规则 | [贡献指南](CONTRIBUTING.md) |
+| 安全支持与漏洞私报 | [安全政策](SECURITY.md) |
 | 其他指南 | [文档目录](docs/README.md) |
+
+## 支持与许可
+
+使用问题和经过脱敏的缺陷通过 [GitHub Issues](https://github.com/W205614/CampusEats/issues)反馈，附上版本、复现步骤和预期结果。漏洞使用[私有报告渠道](SECURITY.md)，不要在公开问题中粘贴凭据、个人资料或可利用细节。
+
+仓库尚未设置项目级开源许可证，不声明整套源码采用 MIT 或 Apache-2.0。源码来源、第三方依赖与授权状态见[许可说明](docs/licensing.md)。

@@ -89,7 +89,7 @@ public class LedgerService {
               public void afterCommit() {
                 org.slf4j.LoggerFactory.getLogger(LedgerService.class)
                     .info(
-                        "Simulated ledger committed; type={} sourceId={} orderId={} storeId={}",
+                        "Ledger committed; type={} sourceId={} orderId={} storeId={}",
                         type,
                         source,
                         order,

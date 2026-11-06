@@ -14,6 +14,10 @@ public class RateLimits {
   private final Clock clock;
   private final RedisAccess access;
   private static final int LOCAL_CAPACITY = 10000;
+
+  @org.springframework.beans.factory.annotation.Value("${campus.rate.fail-closed:false}")
+  private boolean failClosed;
+
   private final Map<String, Window> local = new HashMap<>();
 
   private record Window(long expiresAt, long count) {}
@@ -47,6 +51,8 @@ public class RateLimits {
                       redis.execute(INCR, List.of("campus:rate:" + key), String.valueOf(seconds))));
     } catch (Exception ex) {
       // Already counted above; a timeout/short-circuit must never count the same request twice.
+      if (failClosed && !key.startsWith("search-ip:") && !key.startsWith("catalog-ip:"))
+        throw new BusinessException(503, "CONTROL_REDIS_UNAVAILABLE", "安全校验暂不可用，请稍后重试");
       return;
     }
     BusinessException.require(count <= max, 429, "RATE_LIMITED", "操作过于频繁，请稍后重试");

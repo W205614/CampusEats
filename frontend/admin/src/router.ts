@@ -13,6 +13,8 @@ export const router = createRouter({
     { path: '/reports', component: () => import('./pages/Reports.vue') },
     { path: '/users', component: () => import('./pages/Users.vue') },
     { path: '/finance', component: () => import('./pages/Finance.vue') },
+    { path: '/channel-payments', component: () => import('./pages/ChannelPayments.vue') },
+    { path: '/notification-deliveries', component: () => import('./pages/NotificationDeliveries.vue') },
     { path: '/service-operations', component: () => import('./pages/ServiceOperations.vue') },
     { path: '/messages', component: () => import('./pages/Inbox.vue') },
     { path: '/password', component: () => import('./pages/Password.vue') },
@@ -37,6 +39,7 @@ router.beforeEach((to) => {
   )
     return '/orders';
   if (to.path === '/users' && session.role !== 'PLATFORM_ADMIN') return '/';
+  if (to.path === '/notification-deliveries' && session.role !== 'PLATFORM_ADMIN') return '/';
   if (session.role === 'SHOP_MANAGER' && to.path === '/operations/buildings') return '/';
   return true;
 });

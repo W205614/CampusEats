@@ -1,0 +1,11 @@
+route:
+  receiver: unconfigured
+  group_by: [alertname, deployment]
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+receivers:
+  - name: unconfigured
+# This default intentionally has no outbound receiver. Before real launch replace
+# this receiver with your webhook/email configuration and verify a test alert.
+# Do not consider the stack externally monitored until that verification passes.

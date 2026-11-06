@@ -95,7 +95,7 @@ test('checkout discards a delayed quote when the user changes their remark', asy
   state.release!();
   await received;
   await expect(page.getByText('计算报价', { exact: true })).not.toHaveAttribute('disabled');
-  await expect(page.getByText('提交订单，随后模拟支付', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('提交订单，随后付款', { exact: true })).toHaveCount(0);
 });
 
 test.describe('aftersale appeal eligibility', () => {
@@ -163,11 +163,11 @@ test('a failed checkout recalculation removes the previous payable quote', async
   const state = await fixture(page);
   await page.goto('/app/pages/checkout/index');
   await page.getByText('计算报价', { exact: true }).click();
-  await expect(page.getByText('提交订单，随后模拟支付', { exact: true })).toBeVisible();
+  await expect(page.getByText('提交订单，随后付款', { exact: true })).toBeVisible();
   state.previewFailure = true;
   await page.getByText('计算报价', { exact: true }).click();
   await expect(page.getByText('请重新计算报价', { exact: true })).toBeVisible();
-  await expect(page.getByText('提交订单，随后模拟支付', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('提交订单，随后付款', { exact: true })).toHaveCount(0);
 });
 
 for (const target of ['cart', 'orders'] as const) {

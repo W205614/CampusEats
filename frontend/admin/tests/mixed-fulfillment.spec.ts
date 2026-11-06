@@ -473,7 +473,7 @@ test('browser cross-campus mixed fulfillment preserves coupon cents, repeated pa
       quote,
     });
     const checkout = await postUI<Checkout>(customer, '/user/checkouts', () =>
-      customer.getByText('提交订单，随后模拟支付', { exact: true }).click(),
+      customer.getByText('提交订单，随后付款', { exact: true }).click(),
     );
     const payment = customer
       .locator('uni-view.card')

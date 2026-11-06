@@ -69,6 +69,7 @@ jobs:
         run: |
           ./scripts/tests/test-release-safety.ps1
           ./scripts/tests/test-ops-check.ps1
+          ./scripts/tests/test-production-preflight.ps1
           ./scripts/tests/test-ops-run.ps1
           ./scripts/tests/test-image-scan.ps1
           ./scripts/tests/test-secure-files.ps1
@@ -111,6 +112,9 @@ jobs:
       - run: npx --prefix frontend/admin playwright install --with-deps chromium
       - run: npm run test --prefix frontend/admin
       - run: node scripts/check-websocket.mjs
+      - name: Verify shared state across two backend instances
+        shell: pwsh
+        run: ./scripts/verify-cluster.ps1 -ServerImage campuseats-server:v1
       - name: Verify independent backup restore
         shell: pwsh
         run: |

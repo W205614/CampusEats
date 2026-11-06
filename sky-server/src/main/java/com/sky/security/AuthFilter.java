@@ -117,6 +117,8 @@ public class AuthFilter extends OncePerRequestFilter {
                       List.of(new SimpleGrantedAuthority("ROLE_PLATFORM_ADMIN"))));
       }
       if (path.endsWith("/auth/login")
+          || path.endsWith("/auth/otp/send")
+          || path.endsWith("/auth/otp/login")
           || path.endsWith("/auth/demo")
           || path.endsWith("/auth/wechat")) limits.check("login-ip:" + req.getRemoteAddr(), 20, 60);
       chain.doFilter(req, res);

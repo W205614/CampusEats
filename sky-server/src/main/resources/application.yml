@@ -92,5 +92,6 @@ logging:
   pattern:
     level: '%5p [requestId:%X{requestId:-}]'
   level:
+    com.qcloud.cos.http.DefaultCosHttpClient: 'OFF'
     com.sky: INFO
     org.springframework.security: WARN

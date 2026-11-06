@@ -24,6 +24,9 @@ public class PlatformJobs {
   private final com.sky.business.OrderCommandService orders;
   private final ExpirySweep checkoutExpiry = new ExpirySweep(), deliveryExpiry = new ExpirySweep();
 
+  @org.springframework.beans.factory.annotation.Autowired
+  private com.sky.payment.ChannelRefunds channelRefunds;
+
   public PlatformJobs(
       Db db,
       Clock clock,
@@ -84,8 +87,9 @@ public class PlatformJobs {
                 round,
                 cursor ->
                     db.rows(
-                        "SELECT id FROM orders WHERE checkout_id IS NULL AND status=4 AND delivery_overdue=false"
-                            + " AND delivery_started_at<? AND id>? ORDER BY id LIMIT 100",
+                        "SELECT id FROM orders WHERE checkout_id IS NULL AND status=4 AND"
+                            + " delivery_overdue=false AND delivery_started_at<? AND id>? ORDER BY"
+                            + " id LIMIT 100",
                         now().minusMinutes(60),
                         cursor),
                 orders::markOverdue));
@@ -120,12 +124,24 @@ public class PlatformJobs {
     if (task == null) return false;
     try {
       var payment = db.one("SELECT checkout_id FROM orders WHERE id=?", task.get("order_id"));
-      gateway.refund(
-          new PaymentGateway.Refund(
-              "refund-request:" + task.get("id"),
-              "checkout:" + payment.get("checkout_id"),
-              Db.id(task, "amount_cents"),
-              "CNY"));
+      if (channelRefunds.real(Db.id(task, "order_id"))) {
+        if (!channelRefunds.complete(task)) {
+          db.update(
+              "UPDATE refund_request SET"
+                  + " state='REQUESTED',next_attempt_at=?,lease_token=NULL,lease_until=NULL WHERE"
+                  + " id=? AND lease_token=? AND state='PROCESSING'",
+              now().plusSeconds(15),
+              task.get("id"),
+              task.get("lease_token"));
+          return true;
+        }
+      } else
+        gateway.refund(
+            new PaymentGateway.Refund(
+                "refund-request:" + task.get("id"),
+                "checkout:" + payment.get("checkout_id"),
+                Db.id(task, "amount_cents"),
+                "CNY"));
       tx.executeWithoutResult(
           s -> {
             var order = db.one("SELECT * FROM orders WHERE id=? FOR UPDATE", task.get("order_id"));
@@ -184,7 +200,7 @@ public class PlatformJobs {
             db.update(
                 "INSERT INTO"
                     + " audit_log(actor_type,actor_id,action,target_id,detail,created_at,store_id,campus_id)"
-                    + " VALUES('SYSTEM',0,'REFUND_SUCCESS',?,'模拟退款完成',?,?,?)",
+                    + " VALUES('SYSTEM',0,'REFUND_SUCCESS',?,'退款结果确认成功',?,?,?)",
                 current.get("id"),
                 now(),
                 order.get("store_id"),

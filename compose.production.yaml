@@ -1,0 +1,99 @@
+name: campuseats-production
+x-logging: &logging
+  driver: json-file
+  options: { max-size: '10m', max-file: '3' }
+services:
+  server:
+    image: ${SERVER_IMAGE:?Set the verified immutable release image}
+    restart: unless-stopped
+    logging: *logging
+    env_file: ${PRODUCTION_ENV_FILE:-.env.production}
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      MIGRATIONS_ENABLED: ${MIGRATIONS_ENABLED:-false}
+      INSTANCE_ID: ${INSTANCE_ID:?Use a different id on each CVM}
+      TASKS_ENABLED: ${TASKS_ENABLED:-true}
+      SPRING_CONFIG_ADDITIONAL_LOCATION: file:/run/config/integrations.yml
+      TZ: Asia/Shanghai
+    volumes:
+      - type: bind
+        source: ${PRODUCTION_SECRETS_DIRECTORY:-./.local/production-secrets}
+        target: /run/secrets
+        read_only: true
+        bind: { create_host_path: false }
+      - type: bind
+        source: ${PRODUCTION_INTEGRATIONS_FILE:-./.local/production/integrations.yml}
+        target: /run/config/integrations.yml
+        read_only: true
+        bind: { create_host_path: false }
+      - type: bind
+        source: ${PRODUCTION_CONFIG_DIRECTORY:-./.local/production}
+        target: /run/operations
+        read_only: true
+        bind: { create_host_path: false }
+    ports: ['${MONITOR_BIND_ADDRESS:-127.0.0.1}:${MONITOR_PORT:-19090}:9090']
+    healthcheck:
+      test: ['CMD', 'curl', '-fsS', 'http://127.0.0.1:9090/actuator/health/readiness']
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 60s
+    stop_grace_period: 30s
+    mem_limit: ${SERVER_MEMORY:-1024m}
+  web:
+    image: ${WEB_IMAGE:?Set the matching immutable web release image}
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      CLB_CIDR: ${CLB_CIDR:?Specify the actual trusted CLB source CIDR}
+      NGINX_ENVSUBST_FILTER: CLB_CIDR
+    volumes:
+      - ./deploy/production/nginx.conf.template:/etc/nginx/templates/default.conf.template:ro
+      - ./deploy/production/proxy-headers.conf:/etc/nginx/campus-proxy-headers.conf:ro
+    ports: ['${WEB_BIND_ADDRESS:-127.0.0.1}:${WEB_PORT:-18083}:80']
+    depends_on:
+      server: { condition: service_healthy }
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -q -O /dev/null http://127.0.0.1/healthz']
+      interval: 10s
+      timeout: 5s
+      retries: 6
+    stop_grace_period: 15s
+    mem_limit: 128m
+  prometheus:
+    profiles: [monitoring]
+    image: ${PROMETHEUS_IMAGE:-prom/prometheus:v3.13.5@sha256:aafa9d694e6a883c02db516d9f6e5b84e14195f49a2a6456a4cca815edda72b9}
+    restart: unless-stopped
+    logging: *logging
+    volumes:
+      - ./deploy/production/monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./deploy/production/monitoring/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+    ports: ['127.0.0.1:19091:9090']
+  alertmanager:
+    profiles: [monitoring]
+    image: ${ALERTMANAGER_IMAGE:-prom/alertmanager:v0.34.2@sha256:39d8bb3966c694a124428a3a88fbcffd40bd069129ecd47c059f8a3f17c55f3b}
+    restart: unless-stopped
+    logging: *logging
+    volumes: ['./deploy/production/monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro']
+    ports: ['127.0.0.1:19093:9093']
+  grafana:
+    profiles: [monitoring]
+    image: ${GRAFANA_IMAGE:-grafana/grafana:13.3.0@sha256:488984b716c0862639f91a698adbe2862677a5a07bad42da5f03f3030883b205}
+    restart: unless-stopped
+    logging: *logging
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD__FILE: /run/secrets/grafana-admin-password
+      GF_USERS_ALLOW_SIGN_UP: 'false'
+    volumes:
+      - ./deploy/production/monitoring/grafana:/etc/grafana/provisioning:ro
+      - type: bind
+        source: ${PRODUCTION_SECRETS_DIRECTORY:-./.local/production-secrets}
+        target: /run/secrets
+        read_only: true
+        bind: { create_host_path: false }
+      - grafana-data:/var/lib/grafana
+    ports: ['127.0.0.1:13000:3000']
+volumes:
+  prometheus-data:
+  grafana-data:

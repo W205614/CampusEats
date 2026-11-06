@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import fs from 'node:fs/promises';
 import { test, expect, call, password } from './helpers';
 import { selectAuthorizedStore, selectStaffOption } from './journey-selectors';
+import { candidateSource } from './candidate-source';
 import type { BrowserContext, Locator, Page } from '@playwright/test';
 import type { Session } from '../../contracts/models';
 import type { Checkout, CursorPage, Order } from '../../contracts/platform';
@@ -53,7 +54,8 @@ test('authorization and inbox context: real staff revocation and cross-campus me
 }, testInfo) => {
   test.setTimeout(420000);
   const target = new URL(String(testInfo.project.use.baseURL));
-  const sourceRevision = process.env.CANDIDATE_SHA || process.env.GITHUB_SHA || '';
+  const source = await candidateSource();
+  const sourceRevision = source.sourceRevision;
   // Do not request the shared helper's adminSession fixture: that fixture logs in before
   // the body. Validate the isolated target before performing even a login write.
   if (process.env.CI !== 'true') {
@@ -408,7 +410,7 @@ test('authorization and inbox context: real staff revocation and cross-campus me
       customer.getByText('计算报价', { exact: true }).click(),
     );
     const checkout = await ui<Checkout>(customer, '/user/checkouts', 'POST', () =>
-      customer.getByText('提交订单，随后模拟支付', { exact: true }).click(),
+      customer.getByText('提交订单，随后付款', { exact: true }).click(),
     );
     const checkoutCard = customer
       .locator('uni-view.card')
@@ -660,7 +662,7 @@ test('authorization and inbox context: real staff revocation and cross-campus me
       output,
       JSON.stringify(
         {
-          sourceRevision,
+          ...source,
           browserContexts: contexts.length,
           browserRoles: [...roleFor.values()],
           roleTypes: ['PLATFORM_ADMIN', 'SHOP_MANAGER', 'USER'],

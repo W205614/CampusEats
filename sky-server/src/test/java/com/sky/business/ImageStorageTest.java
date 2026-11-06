@@ -9,6 +9,7 @@ import java.io.*;
 import java.nio.file.*;
 import java.util.Random;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicLong;
 import javax.imageio.ImageIO;
 import org.junit.jupiter.api.Test;
@@ -52,6 +53,38 @@ class ImageStorageTest {
     var out = new ByteArrayOutputStream();
     ImageIO.write(new BufferedImage(2, 2, BufferedImage.TYPE_INT_RGB), "png", out);
     return new MockMultipartFile("file", "test.png", "image/png", out.toByteArray());
+  }
+
+  @Test
+  void multipartSourceClosesAfterSuccessfulAndRejectedDecoding() throws Exception {
+    var storage = storage(100000, 0);
+    byte[] valid = image().getBytes();
+    for (byte[] bytes : java.util.List.of(valid, new byte[] {1, 2, 3})) {
+      var closed = new AtomicBoolean();
+      var file =
+          new MockMultipartFile("file", "image.png", "image/png", bytes) {
+            @Override
+            public InputStream getInputStream() {
+              return new ByteArrayInputStream(bytes) {
+                @Override
+                public void close() throws IOException {
+                  closed.set(true);
+                  super.close();
+                }
+              };
+            }
+          };
+      if (bytes == valid) {
+        try (var staged = storage.stage(file)) {
+          assertNotNull(staged);
+        }
+      } else {
+        assertEquals(
+            "INVALID_IMAGE",
+            assertThrows(BusinessException.class, () -> storage.stage(file)).code());
+      }
+      assertTrue(closed.get(), "ImageIO's wrapper does not own the multipart input stream");
+    }
   }
 
   @Test

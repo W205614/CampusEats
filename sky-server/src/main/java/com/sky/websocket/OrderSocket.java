@@ -24,10 +24,21 @@ public class OrderSocket extends TextWebSocketHandler {
           new ThreadPoolExecutor.AbortPolicy());
   private final Db db;
   private final Clock clock;
+  private org.springframework.data.redis.core.StringRedisTemplate redis;
+  private boolean clusterEnabled;
 
   public OrderSocket(Db db, Clock clock) {
     this.db = db;
     this.clock = clock;
+  }
+
+  @org.springframework.beans.factory.annotation.Autowired
+  void clusterTransport(
+      org.springframework.data.redis.core.StringRedisTemplate redis,
+      @org.springframework.beans.factory.annotation.Value("${campus.cluster.enabled:false}")
+          boolean enabled) {
+    this.redis = redis;
+    this.clusterEnabled = enabled;
   }
 
   @Override
@@ -59,6 +70,12 @@ public class OrderSocket extends TextWebSocketHandler {
 
   /** Enqueue a best-effort hint; clients recover state by querying orders. */
   public void publish(String payload) {
+    if (clusterEnabled) redis.convertAndSend("campus:orders:v1", payload);
+    else localPublish(payload);
+  }
+
+  /** Pub/Sub is only a live hint; durable inbox queries recover messages after disconnects. */
+  public void localPublish(String payload) {
     Long storeId = eventStore(payload);
     sender.execute(
         () -> {

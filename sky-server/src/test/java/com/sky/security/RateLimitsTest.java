@@ -51,6 +51,15 @@ class RateLimitsTest {
     for (int i = 0; i < count; i++) limits.check("existing:" + i, 2, 60);
   }
 
+  @Test
+  void productionFailsClosedForSensitiveRequestsButKeepsBoundedPublicReads() {
+    org.springframework.test.util.ReflectionTestUtils.setField(limits, "failClosed", true);
+    rejects("CONTROL_REDIS_UNAVAILABLE", () -> limits.check("login-ip:127.0.0.1", 20, 60));
+    rejects("CONTROL_REDIS_UNAVAILABLE", () -> limits.check("order:USER:1", 30, 60));
+    limits.check("catalog-ip:127.0.0.1", 1, 60);
+    rejects("RATE_LIMITED", () -> limits.check("catalog-ip:127.0.0.1", 1, 60));
+  }
+
   void rejects(String code, Runnable call) {
     var error = assertThrows(BusinessException.class, call::run);
     assertEquals(code, error.code());

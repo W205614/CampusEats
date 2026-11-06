@@ -42,6 +42,8 @@ async function main() {
     );
   const metadataOutput = output.replace(/\.json$/, '') + '.metadata.json';
   const growHistory = args.includes('--grow-history');
+  if (growHistory && args.includes('--refresh-sessions'))
+    throw new FixtureError('History growth and session refresh are separate operations.');
   for (const target of growHistory ? [] : [output, metadataOutput]) {
     let exists = true;
     try {
@@ -219,45 +221,94 @@ async function main() {
   const userCount = args.includes('--users') ? Number(option('--users')) : 30;
   if (!Number.isInteger(userCount) || userCount < 1 || userCount > 30)
     throw new FixtureError('Fixture users must be in 1..30.');
-  const fixturePrefix = `perf-${randomUUID()}`;
-  const statements = [
-    `INSERT INTO campus(name) VALUES('${fixturePrefix}'); SET @perf_campus=LAST_INSERT_ID();`,
-  ];
-  for (let store = 0; store < 205; store++) {
+  let fixture;
+  let reusedSessions;
+  if (args.includes('--refresh-sessions')) {
+    const source = path.resolve(root, option('--source'));
+    if (
+      !source.startsWith(local) ||
+      !source.endsWith('.json') ||
+      userCount !== 30 ||
+      !args.includes('--lunch')
+    )
+      throw new FixtureError(
+        'Session refresh requires a private JSON source and the original 30-user lunch fixture.',
+      );
+    const metadata = JSON.parse(await fs.readFile(source.replace(/\.json$/, '.metadata.json'), 'utf8'));
+    reusedSessions = JSON.parse(await fs.readFile(source, 'utf8'));
+    if (!Array.isArray(reusedSessions) || reusedSessions.length !== 30)
+      throw new FixtureError('Session source must contain the original thirty identities.');
+    fixture = metadata.fixture;
+    const ids = reusedSessions.map((session) => session.id);
+    const staffIds = [...new Set(reusedSessions.map((session) => session.staffId))];
+    if (
+      metadata.project !== project ||
+      metadata.baseUrl !== base.origin ||
+      new Set(ids).size !== 30 ||
+      ids.some((id) => !/^[1-9]\d*$/.test(id)) ||
+      staffIds.length !== 3 ||
+      staffIds.some((id) => !/^[1-9]\d*$/.test(id)) ||
+      !Array.isArray(metadata.userIds) ||
+      metadata.userIds.length !== 30 ||
+      ids.some((id) => !metadata.userIds.includes(id)) ||
+      !fixture ||
+      ['campusId', 'storeId', 'productId'].some((key) => !/^[1-9]\d*$/.test(fixture[key])) ||
+      fixture.stores !== 205 ||
+      fixture.products !== 1025 ||
+      fixture.historyOrders !== 200000
+    )
+      throw new FixtureError('Session source does not match the original isolated lunch fixture.');
+    const { campusId, storeId, productId } = fixture;
+    if (
+      sql(`SELECT COUNT(*) FROM user WHERE id IN (${ids.join(',')});`) !== '30' ||
+      sql(`SELECT COUNT(*) FROM employee WHERE id IN (${staffIds.join(',')}) AND store_id=${storeId} AND role='SHOP_MANAGER';`) !== '3' ||
+      sql(`SELECT COUNT(*) FROM store WHERE campus_id=${campusId};`) !== '205' ||
+      sql(`SELECT COUNT(*) FROM dish d JOIN store s ON s.id=d.store_id WHERE s.campus_id=${campusId};`) !== '1025' ||
+      sql(`SELECT COUNT(*) FROM dish d JOIN store s ON s.id=d.store_id WHERE d.id=${productId} AND s.id=${storeId} AND s.campus_id=${campusId};`) !== '1' ||
+      sql(`SELECT COUNT(*) FROM orders WHERE campus_id=${campusId} AND number LIKE 'perf-history-${campusId}-%';`) !== '200000'
+    )
+      throw new FixtureError('The live isolated fixture no longer matches the original session evidence.');
+  } else {
+    const fixturePrefix = `perf-${randomUUID()}`;
+    const statements = [
+      `INSERT INTO campus(name) VALUES('${fixturePrefix}'); SET @perf_campus=LAST_INSERT_ID();`,
+    ];
+    for (let store = 0; store < 205; store++) {
+      statements.push(
+        `INSERT INTO store(campus_id,name,open,delivery_fee,packaging_fee,hours) VALUES(@perf_campus,'${fixturePrefix}-${store}',true,0,0,'["00:00-24:00"]'); SET @perf_store=LAST_INSERT_ID();`,
+      );
+      statements.push(
+        "INSERT INTO category(store_id,name,type,sort,status) VALUES(@perf_store,'Performance',1,0,1); SET @perf_category=LAST_INSERT_ID();",
+      );
+      statements.push(
+        'INSERT INTO dish(store_id,name,category_id,price,status,default_quota,image) VALUES ' +
+          Array.from(
+            { length: 5 },
+            (_, dish) =>
+              `(@perf_store,'Performance dish ${dish}',@perf_category,10,1,10000,'/demo-images/dish.svg')`,
+          ).join(',') +
+          ';',
+      );
+    }
     statements.push(
-      `INSERT INTO store(campus_id,name,open,delivery_fee,packaging_fee,hours) VALUES(@perf_campus,'${fixturePrefix}-${store}',true,0,0,'["00:00-24:00"]'); SET @perf_store=LAST_INSERT_ID();`,
+      'SELECT @perf_campus,MIN(s.id),MIN(d.id),COUNT(DISTINCT s.id),COUNT(d.id) FROM store s JOIN dish d ON d.store_id=s.id WHERE s.campus_id=@perf_campus;',
     );
-    statements.push(
-      "INSERT INTO category(store_id,name,type,sort,status) VALUES(@perf_store,'Performance',1,0,1); SET @perf_category=LAST_INSERT_ID();",
-    );
-    statements.push(
-      'INSERT INTO dish(store_id,name,category_id,price,status,default_quota,image) VALUES ' +
-        Array.from(
-          { length: 5 },
-          (_, dish) =>
-            `(@perf_store,'Performance dish ${dish}',@perf_category,10,1,10000,'/demo-images/dish.svg')`,
-        ).join(',') +
-        ';',
-    );
+    const fixtureValues = sql(statements.join('\n')).split('\t');
+    if (
+      fixtureValues.length !== 5 ||
+      fixtureValues.some((value) => !/^\d+$/.test(value)) ||
+      Number(fixtureValues[3]) !== 205 ||
+      Number(fixtureValues[4]) !== 1025
+    )
+      throw new FixtureError('Isolated dataset creation failed.');
+    fixture = {
+      campusId: fixtureValues[0],
+      storeId: fixtureValues[1],
+      productId: fixtureValues[2],
+      stores: 205,
+      products: 1025,
+    };
   }
-  statements.push(
-    'SELECT @perf_campus,MIN(s.id),MIN(d.id),COUNT(DISTINCT s.id),COUNT(d.id) FROM store s JOIN dish d ON d.store_id=s.id WHERE s.campus_id=@perf_campus;',
-  );
-  const fixtureValues = sql(statements.join('\n')).split('\t');
-  if (
-    fixtureValues.length !== 5 ||
-    fixtureValues.some((value) => !/^\d+$/.test(value)) ||
-    Number(fixtureValues[3]) !== 205 ||
-    Number(fixtureValues[4]) !== 1025
-  )
-    throw new FixtureError('Isolated dataset creation failed.');
-  const fixture = {
-    campusId: fixtureValues[0],
-    storeId: fixtureValues[1],
-    productId: fixtureValues[2],
-    stores: 205,
-    products: 1025,
-  };
   const sessions = [];
   const prefix = `perf-${randomUUID()}`;
   const issued = Math.floor(Date.now() / 1000);
@@ -285,8 +336,9 @@ async function main() {
   }
   const staff = [];
   if (args.includes('--lunch')) {
+    const reusedStaff = reusedSessions ? [...new Set(reusedSessions.map((session) => session.staffId))] : [];
     for (let index = 0; index < 3; index++) {
-      const id =
+      const id = reusedSessions ? reusedStaff[index] :
         sql(`INSERT INTO employee(name,username,password,role,store_id,campus_id,status,phone,sex,id_number,must_change_password)
       SELECT 'Performance manager','perf-${fixture.campusId}-${index}',password,'SHOP_MANAGER',${fixture.storeId},${fixture.campusId},1,'','','',false FROM employee WHERE id=1; SELECT LAST_INSERT_ID();`);
       staff.push({ id, token: await identity('ADMIN', id) });
@@ -294,7 +346,7 @@ async function main() {
   }
   for (let index = 0; index < userCount; index++) {
     const openid = `${prefix}-${index}`;
-    const id = sql(
+    const id = reusedSessions ? reusedSessions[index].id : sql(
       `INSERT INTO user(openid,name,create_time) VALUES('${openid}','Performance fixture ${index}',NOW()); SELECT LAST_INSERT_ID();`,
     );
     if (!/^\d+$/.test(id)) throw new FixtureError('Invalid fixture subject identifier.');
@@ -318,6 +370,7 @@ async function main() {
         preparedAt: new Date().toISOString(),
         userIds: sessions.map((session) => session.id),
         fixture,
+        ...(reusedSessions ? {refreshedFrom: path.relative(root, path.resolve(root, option('--source')))} : {}),
       },
       null,
       2,

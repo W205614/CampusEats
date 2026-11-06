@@ -215,6 +215,12 @@ public class LocalUserService {
     require(account != null, 404, "NOT_FOUND", "独立测试用户不存在");
     require(
         db.one("SELECT id FROM user WHERE id=? FOR UPDATE", id) != null, 404, "NOT_FOUND", "用户不存在");
+    require(
+        db.count("SELECT COUNT(*) FROM account_closure WHERE user_id=? AND state='COMPLETED'", id)
+            == 0,
+        409,
+        "ACCOUNT_CLOSED",
+        "已注销账号不能重新启用或重置密码");
     return account;
   }
 

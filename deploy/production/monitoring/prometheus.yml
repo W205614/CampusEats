@@ -1,0 +1,15 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+rule_files: [/etc/prometheus/alerts.yml]
+alerting:
+  alertmanagers:
+    - static_configs: [{ targets: ['alertmanager:9093'] }]
+scrape_configs:
+  - job_name: campuseats
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ['server:9090']
+        labels: { deployment: production }
+  # On the monitoring CVM, add the second node's private monitoring address;
+  # its CVM security group must allow this source only. Never use a public IP.

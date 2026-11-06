@@ -323,7 +323,7 @@ test('browser journey: meal selection, delivery, partial refund and platform int
     });
     await capture(customer, '01-customer-marketing-quote');
     const checkout = await postFromUI<Checkout>(customer, '/user/checkouts', () =>
-      customer.getByText('提交订单，随后模拟支付', { exact: true }).click(),
+      customer.getByText('提交订单，随后付款', { exact: true }).click(),
     );
     const payment = customer.locator('uni-view.card').filter({
       has: customer.getByText('待支付结算单 ' + checkout.id, { exact: true }),

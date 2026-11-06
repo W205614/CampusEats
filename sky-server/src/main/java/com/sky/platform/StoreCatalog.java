@@ -12,7 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class StoreCatalog {
-  /** Deliberate single-instance demo boundary, counting dishes and set meals, including disabled. */
+  /** Bounded per-store catalogue, counting dishes and set meals, including disabled products. */
   public static final int MAX_PRODUCTS_PER_STORE = 500;
 
   public static final int MAX_FLAVORS_PER_DISH = 20;
@@ -127,7 +127,7 @@ public class StoreCatalog {
         400,
         "INVALID_CATEGORY",
         "请选择本店相应类型分类");
-    if (id != null) product(store, type, id, true);
+    var current = id == null ? null : product(store, type, id, true);
     require(
         input.image() == null
             || input.image().isBlank()
@@ -135,7 +135,22 @@ public class StoreCatalog {
             || input.image().equals("/demo-images/dish.svg"),
         400,
         "INVALID_IMAGE",
-        "请使用本地商品图片");
+        "请使用上传后的商品图片");
+    if (input.image() != null
+        && input.image().startsWith("/uploads/")
+        && !Objects.equals(current == null ? null : current.get("image"), input.image())) {
+      String imageId = input.image().substring("/uploads/".length(), input.image().length() - 4);
+      var image = db.one("SELECT * FROM stored_image WHERE id=? FOR SHARE", imageId);
+      require(
+          image != null
+              && image.get("state").equals("READY")
+              && image.get("visibility").equals("PUBLIC")
+              && image.get("store_id") != null
+              && Db.id(image, "store_id") == store,
+          400,
+          "INVALID_IMAGE",
+          "请选择本店已上传完成的商品图片");
+    }
     var components = input.components() == null ? List.<Component>of() : input.components();
     var flavors = input.flavors() == null ? List.<Flavor>of() : input.flavors();
     if (type.equals("SETMEAL")) {

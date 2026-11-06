@@ -283,7 +283,11 @@ public class FinanceService {
         db.one(
             "SELECT COALESCE(SUM(CASE WHEN source_type='PAYMENT' THEN amount_cents ELSE 0 END),0)"
                 + " paid,COALESCE(SUM(CASE WHEN source_type='REFUND' THEN -amount_cents ELSE 0"
-                + " END),0) refunded FROM finance_ledger WHERE occurred_at>=? AND occurred_at<?"
+                + " END),0) refunded FROM finance_ledger"
+                // The narrower store index otherwise causes a row lookup for every historical
+                // entry.
+                + (store == null ? "" : " FORCE INDEX(ix_finance_ledger_period_cover)")
+                + " WHERE occurred_at>=? AND occurred_at<?"
                 + (store == null ? "" : " AND store_id=?"),
             args.toArray());
     return new FinanceViews.FinanceReconciliation(

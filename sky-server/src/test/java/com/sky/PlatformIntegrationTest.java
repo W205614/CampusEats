@@ -110,6 +110,11 @@ class PlatformIntegrationTest {
   @Autowired com.sky.infra.OperationalMetrics operationalMetrics;
   @Autowired RateLimits rateLimits;
   @Autowired com.sky.infra.RedisAccess redisAccess;
+
+  @Autowired
+  @org.springframework.beans.factory.annotation.Qualifier("cacheRedisAccess")
+  com.sky.infra.RedisAccess cacheRedisAccess;
+
   @Autowired org.springframework.transaction.PlatformTransactionManager transactionManager;
   @org.junit.jupiter.api.io.TempDir java.nio.file.Path evidenceRoot;
   long user, dish3;
@@ -138,7 +143,7 @@ class PlatformIntegrationTest {
 
   @BeforeEach
   void reset() {
-    RuntimeTestState.reset(rateLimits, redisAccess);
+    RuntimeTestState.reset(rateLimits, redisAccess, cacheRedisAccess);
     clock.advanceAfterRead.set(null);
     clock.value.set(Instant.parse("2026-10-15T04:00:00Z"));
     for (String table :
@@ -1619,8 +1624,9 @@ class PlatformIntegrationTest {
             + "next_attempt_at,created_at) VALUES(?,1,0,'SUCCEEDED',NOW(),NOW())",
         refunds);
     db.jdbc.batchUpdate(
-        "INSERT INTO outbox_event(event_type,aggregate_id,payload,state,"
-            + "next_attempt_at,created_at,store_id) VALUES('ORDER_REFUNDED',?,'{}','SUCCEEDED',NOW(),NOW(),1)",
+        "INSERT INTO"
+            + " outbox_event(event_type,aggregate_id,payload,state,next_attempt_at,created_at,store_id)"
+            + " VALUES('ORDER_REFUNDED',?,'{}','SUCCEEDED',NOW(),NOW(),1)",
         events);
 
     assertBatchPages("checkout", (before, limit) -> checkout.list(before, limit));
@@ -1974,7 +1980,8 @@ class PlatformIntegrationTest {
                 "INSERT INTO category(store_id,name,type,sort,status) VALUES(?,'菜品',1,0,1)", store);
         long dish =
             db.insert(
-                "INSERT INTO dish(store_id,category_id,name,price,status) VALUES(?,?,'Rice%_Exact',10,1)",
+                "INSERT INTO dish(store_id,category_id,name,price,status)"
+                    + " VALUES(?,?,'Rice%_Exact',10,1)",
                 store, category);
         expectedProducts.add(store + ":DISH:" + dish);
         if (i == 0) {
@@ -1984,7 +1991,8 @@ class PlatformIntegrationTest {
                   store);
           long setmeal =
               db.insert(
-                  "INSERT INTO setmeal(store_id,category_id,name,price,status) VALUES(?,?,'Rice%_Exact',15,1)",
+                  "INSERT INTO setmeal(store_id,category_id,name,price,status)"
+                      + " VALUES(?,?,'Rice%_Exact',15,1)",
                   store, setCategory);
           expectedProducts.add(store + ":SETMEAL:" + setmeal);
         }
@@ -2054,11 +2062,13 @@ class PlatformIntegrationTest {
     try {
       long closed =
           db.insert(
-              "INSERT INTO store(campus_id,name,open,hours) VALUES(?,'A休息店',true,'[\"00:00-01:00\"]')",
+              "INSERT INTO store(campus_id,name,open,hours)"
+                  + " VALUES(?,'A休息店',true,'[\"00:00-01:00\"]')",
               campus);
       long opened =
           db.insert(
-              "INSERT INTO store(campus_id,name,open,hours) VALUES(?,'B营业店',true,'[\"12:00-24:00\"]')",
+              "INSERT INTO store(campus_id,name,open,hours)"
+                  + " VALUES(?,'B营业店',true,'[\"12:00-24:00\"]')",
               campus);
       long category =
           db.insert(

@@ -52,7 +52,7 @@ class PublicReadLimitsTest {
         .when(limits)
         .check(anyString(), eq(10), eq(60));
     var auth = mock(AuthService.class);
-    var controller = new AuthController(auth, limits);
+    var controller = new AuthController(auth, limits, mock(UserIdentityService.class));
     assertThrows(BusinessException.class, () -> controller.login(new Login("Admin", "secret")));
     assertThrows(BusinessException.class, () -> controller.login(new Login("admin", "secret")));
     verify(limits, times(2))

@@ -13,6 +13,9 @@
 | 凭据权限 | `secure-files.ps1` | 写前限制权限并核验，失败中止；普通临时文件使用回收站清理 |
 | 制品身份核验 | `image-identity.ps1` | 发布内部辅助：验证OCI内容图及配置／平台清单身份，不能凭标签或revision代替内容校验 |
 | 前端源码构建 | `build-frontends.ps1` | 安装依赖，检查兼容层和类型，构建管理端、H5、小程序 |
+| 小程序生产构建 | `build-mini-program.mjs` | 由客户端 `build:mp-weixin:production` 调用，读取进程环境中的真实 AppID/HTTPS 源并生成配置，见[接入说明](../docs/production-readiness.md#小程序生产构建) |
+| 生产配置预检 | `production-preflight.ps1` | 检查镜像摘要、HTTPS、双 Redis 隔离及恢复证据；配置通过不等于云连通或资金验收通过，见[生产部署](../docs/production-deployment.md) |
+| 双节点验收 | `verify-cluster.ps1`、`check-multi-instance.mjs` | 在隔离项目验证会话、目录、票据、广播、幂等与节点停止恢复；不证明真实微信/COS 接入 |
 | 基础可用性 | `smoke.ps1` | HTTP 就绪与入口检查 |
 | 运维只读检查 | `ops-check.ps1` | 任务、积压、图片、空间及验证备份；发现异常返回非零 |
 | 一次性运维入口 | `ops-run.ps1 -Action Check\|Backup` | 可接定时调用，项目互斥；按配置复制验证备份、发送变化或恢复通知；不会自动注册定时任务 |
@@ -27,7 +30,7 @@
 | 通知验收 | `check-websocket.mjs` | 连接实际后端校验票据与会话边界，需要正确环境 |
 | 用户端依赖审计 | `check-client-audit.mjs` | 检查 `.local/audit-client.json`，发现漏洞或无效报告即失败 |
 | 后端与镜像安全 | `scan-images.ps1` | 固定版本Trivy，扫描应用镜像及显式指定的MySQL／Redis镜像系统包、Java运行依赖；任意已知漏洞阻断，保留完整报告和CycloneDX清单 |
-| 性能身份与历史夹具 | `prepare-performance.mjs` | 核验隔离项目、端口及卷；`--lunch` 增加3名热店员工会话，`--grow-history --history-orders` 将同一夹具递增至最多20万笔合成历史；不测登录容量 |
+| 性能身份与历史夹具 | `prepare-performance.mjs` | 核验隔离项目、端口及卷；`--lunch` 增加3名热店员工会话，`--grow-history --history-orders` 将同一夹具递增至最多20万笔合成历史；`--refresh-sessions --source <原私有会话> --output <新文件>` 校验并重新鉴权同30用户/3店员，保留历史，不测登录容量 |
 | 有限性能测量 | `measure-performance.mjs` | 默认测量1／5／10／30客户端读取及30客户端混合交易；`PERF_SCENARIO=lunch` 测量30用户三波集中交易与历史／对账读取，操作说明见运维指南 |
 
 `docker-read.ps1` 为运维命令提供带超时的 Docker 读取。制品下载入口调用 `github-artifact-transfer.ps1` 分段传输，并校验完整制品。

@@ -209,6 +209,7 @@ onHide(() => {
     <view class="row">
       <text class="tap" @click="navTo('/pages/addresses/index')">收货地址</text>
       <text class="tap" @click="navTo('/pages/login/index')">账户与退出</text>
+      <text class="tap" @click="navTo('/pages/profile/index')">个人资料与通知</text>
       <text class="tap" @click="navTo('/pages/messages/index')">站内消息</text>
     </view>
     <view class="section-title">领券中心</view>

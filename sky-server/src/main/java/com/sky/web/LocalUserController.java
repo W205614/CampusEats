@@ -28,6 +28,8 @@ public class LocalUserController {
 
   @PostMapping("/user/auth/login")
   public SessionView login(@Valid @RequestBody LocalUserService.Login input) {
+    com.sky.common.BusinessException.require(
+        auth.capabilities().localLoginEnabled(), 404, "NOT_FOUND", "独立测试账号登录未启用");
     limits.check(
         "login-account:USER:" + Hashes.sha256(LocalUserService.username(input.username())), 10, 60);
     return ViewFactory.session(users.login(input));

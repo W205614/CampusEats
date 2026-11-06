@@ -13,6 +13,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class CheckoutService {
+  @org.springframework.beans.factory.annotation.Value("${campus.payment.provider:mock}")
+  private String paymentProvider = "mock";
+
   public record Line(
       long cartId,
       String itemType,
@@ -107,7 +110,12 @@ public class CheckoutService {
   }
 
   private Quote prepare(long user, PlatformCommands.Checkout input, LocalDateTime at) {
-    db.one("SELECT id FROM user WHERE id=? FOR UPDATE", user);
+    var activeUser = db.one("SELECT id,status FROM user WHERE id=? FOR UPDATE", user);
+    require(
+        activeUser != null && Db.integer(activeUser, "status") == 1,
+        401,
+        "ACCOUNT_DISABLED",
+        "账号已停用");
     var parts = new ArrayList<Part>();
     var rules = new ArrayList<Map<String, Object>>();
     Set<Long> stores = new HashSet<>();
@@ -115,6 +123,16 @@ public class CheckoutService {
     for (var selection : selections(input)) {
       long store = selection.storeId();
       require(stores.add(store), 400, "DUPLICATE_STORE", "同一店铺不能重复结算");
+      if (paymentProvider.equals("wechat"))
+        require(
+            db.count(
+                    "SELECT COUNT(*) FROM merchant_payment_config WHERE store_id=? AND"
+                        + " enabled=true",
+                    store)
+                == 1,
+            409,
+            "MERCHANT_PAYMENT_UNAVAILABLE",
+            "店铺尚未启用真实收款");
       var s = scope.store(store, true);
       require(directory.accepting(s, at), 409, "SHOP_CLOSED", "店铺当前不接单：" + s.get("name"));
       long version = carts.lock(user, store);
@@ -214,6 +232,18 @@ public class CheckoutService {
     }
     if (input.platformCouponId() != null)
       require(coupons.add(input.platformCouponId()), 400, "DUPLICATE_COUPON", "同一张券不能重复使用");
+    if (paymentProvider.equals("wechat") && input.platformCouponId() != null)
+      for (var part : parts)
+        require(
+            db.count(
+                    "SELECT COUNT(*) FROM joint_coupon_store j JOIN user_coupon u ON"
+                        + " u.coupon_id=j.coupon_id WHERE u.id=? AND j.store_id=?",
+                    input.platformCouponId(),
+                    part.storeId())
+                == 1,
+            409,
+            "JOINT_COUPON_SCOPE",
+            "跨店联合优惠仅限参与商家使用");
     long available = parts.stream().mapToLong(p -> p.subtotalCents - p.shopDiscountCents).sum();
     long platformDiscount = marketing.discount(user, input.platformCouponId(), null, available, at);
     if (input.platformCouponId() != null)
@@ -311,6 +341,10 @@ public class CheckoutService {
             at.plusMinutes(15),
             at,
             json.write(q));
+    db.update(
+        "UPDATE checkout SET payment_provider=? WHERE id=?",
+        paymentProvider.equals("wechat") ? "WECHAT" : "MOCK",
+        checkout);
     marketing.reserve(user, q.platformCouponId, checkout);
     for (var p : q.stores) {
       marketing.reserve(user, p.couponId, checkout);
@@ -394,10 +428,11 @@ public class CheckoutService {
     if (beforeId != null) args.add(beforeId);
     args.add(pageLimit);
     return db.rows(
-        "SELECT id,state,total_cents,paid_at,created_at,expires_at,version FROM checkout WHERE"
-            + " user_id=?"
-            + (beforeId == null ? "" : " AND id<?")
-            + " ORDER BY id DESC LIMIT ?",
+        "SELECT c.id,c.state,c.total_cents,c.paid_at,c.created_at,c.expires_at,c.version,p.state"
+            + " payment_state,p.close_requested payment_close_requested FROM checkout c LEFT JOIN"
+            + " payment_intent p ON p.checkout_id=c.id WHERE c.user_id=?"
+            + (beforeId == null ? "" : " AND c.id<?")
+            + " ORDER BY c.id DESC LIMIT ?",
         args.toArray());
   }
 
@@ -409,7 +444,13 @@ public class CheckoutService {
   }
 
   public Map<String, Object> detail(long id) {
-    var c = db.one("SELECT * FROM checkout WHERE id=? AND user_id=?", id, Actor.user().id());
+    var c =
+        db.one(
+            "SELECT c.*,p.state payment_state,p.close_requested payment_close_requested FROM"
+                + " checkout c LEFT JOIN payment_intent p ON p.checkout_id=c.id WHERE c.id=? AND"
+                + " c.user_id=?",
+            id,
+            Actor.user().id());
     require(c != null, 404, "NOT_FOUND", "结算单不存在");
     c.remove("request_hash");
     var orders =
@@ -427,6 +468,7 @@ public class CheckoutService {
 
   @Transactional
   public Map<String, Object> pay(long id, long version) {
+    require(!paymentProvider.equals("wechat"), 404, "NOT_FOUND", "生产环境请使用支付意图接口");
     var c = lockUser(id);
     if (c.get("state").equals("PAID")) return detail(id);
     require(c.get("state").equals("PENDING"), 409, "CHECKOUT_STATE", "结算单不能支付");
@@ -441,6 +483,33 @@ public class CheckoutService {
                 .pay(new PaymentGateway.Payment("checkout:" + id, Db.id(c, "total_cents"), "CNY"))
                 .reference()
             : "ZERO-CHECKOUT-" + id;
+    var refs = new LinkedHashMap<Long, String>();
+    for (var order : db.rows("SELECT id FROM orders WHERE checkout_id=? ORDER BY id", id))
+      refs.put(Db.id(order, "id"), paymentRef + "-" + order.get("id"));
+    recordPaid(id, refs);
+    scope.audit("CHECKOUT_PAY", id, null, "整批模拟支付成功");
+    return detail(id);
+  }
+
+  @Transactional
+  public void completeChannelPayment(long id, Map<Long, String> refs) {
+    var checkout = db.one("SELECT * FROM checkout WHERE id=? FOR UPDATE", id);
+    require(
+        checkout != null && checkout.get("payment_provider").equals("WECHAT"),
+        409,
+        "PAYMENT_PROVIDER",
+        "结算单收款渠道不匹配");
+    if (checkout.get("state").equals("PAID")) return;
+    require(checkout.get("state").equals("PENDING"), 409, "CHECKOUT_STATE", "已取消结算单不能确认支付");
+    require(
+        db.count("SELECT COUNT(*) FROM orders WHERE checkout_id=?", id) == refs.size(),
+        409,
+        "PAYMENT_MISMATCH",
+        "支付凭据数量不匹配");
+    recordPaid(id, refs);
+  }
+
+  private void recordPaid(long id, Map<Long, String> refs) {
     db.update("UPDATE checkout SET state='PAID',paid_at=?,version=version+1 WHERE id=?", now(), id);
     for (var o : db.rows("SELECT * FROM orders WHERE checkout_id=? ORDER BY id FOR UPDATE", id)) {
       db.update(
@@ -452,14 +521,12 @@ public class CheckoutService {
       db.update(
           "INSERT INTO payment_attempt(order_id,gateway_ref,created_at) VALUES(?,?,?)",
           o.get("id"),
-          paymentRef + "-" + o.get("id"),
+          refs.get(Db.id(o, "id")),
           now());
       scope.event(Db.id(o, "id"), "ORDER_PAID");
       ledger.payment(Db.id(o, "id"));
     }
     db.update("UPDATE user_coupon SET state='USED' WHERE checkout_id=? AND state='LOCKED'", id);
-    scope.audit("CHECKOUT_PAY", id, null, "整批模拟支付成功");
-    return detail(id);
   }
 
   @Transactional
@@ -471,6 +538,7 @@ public class CheckoutService {
         409,
         "CHECKOUT_STATE",
         "仅能取消当前版本的待支付结算单");
+    if (requestChannelClose(c)) return;
     cancelLocked(c);
   }
 
@@ -500,12 +568,24 @@ public class CheckoutService {
     db.update("UPDATE checkout SET state='CANCELLED',version=version+1 WHERE id=?", id);
   }
 
+  private boolean requestChannelClose(Map<String, Object> checkout) {
+    if (!checkout.get("payment_provider").equals("WECHAT")) return false;
+    return db.update(
+            "UPDATE payment_intent SET close_requested=true,next_check_at=? WHERE checkout_id=? AND"
+                + " state NOT IN ('CLOSED','FAILED')",
+            now(),
+            checkout.get("id"))
+        > 0;
+  }
+
   @Transactional
   public void expire(long id) {
     var c = db.one("SELECT * FROM checkout WHERE id=? FOR UPDATE", id);
     if (c != null
         && c.get("state").equals("PENDING")
-        && !now().isBefore(Db.time(c.get("expires_at")))) cancelLocked(c);
+        && !now().isBefore(Db.time(c.get("expires_at")))) {
+      if (!requestChannelClose(c)) cancelLocked(c);
+    }
   }
 
   private LocalDateTime now() {

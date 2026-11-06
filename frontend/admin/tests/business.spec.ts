@@ -196,7 +196,7 @@ test('user selects two campuses and mixed fulfillment entirely through H5 checko
   const submitted = page.waitForResponse(
     (r) => r.url().endsWith('/user/checkouts') && r.request().method() === 'POST',
   );
-  await page.getByText('提交订单，随后模拟支付', { exact: true }).click();
+  await page.getByText('提交订单，随后付款', { exact: true }).click();
   const created = await (await submitted).json();
   expect(created.code).toBe('OK');
   const c = created.data as Checkout;

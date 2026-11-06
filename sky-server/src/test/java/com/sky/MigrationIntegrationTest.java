@@ -90,8 +90,8 @@ class MigrationIntegrationTest {
     var originalColumns = businessColumns(url);
     var originalRows = originalRows(url, originalColumns);
     var flyway = Flyway.configure().dataSource(url, "root", "test").load();
-    assertEquals(7, flyway.migrate().migrationsExecuted);
-    assertEquals("19", flyway.info().current().getVersion().toString());
+    assertEquals(12, flyway.migrate().migrationsExecuted);
+    assertEquals("24", flyway.info().current().getVersion().toString());
     assertEquals(
         originalRows,
         originalRows(url, originalColumns),

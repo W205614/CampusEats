@@ -15,8 +15,8 @@ import java.sql.DriverManager;
 import java.time.*;
 import java.util.*;
 import java.util.concurrent.*;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.atomic.AtomicReference;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -114,12 +114,17 @@ class CommerceIntegrationTest {
   @Autowired BackgroundJobs jobs;
   @Autowired RateLimits rateLimits;
   @Autowired RedisAccess redisAccess;
+
+  @Autowired
+  @org.springframework.beans.factory.annotation.Qualifier("cacheRedisAccess")
+  RedisAccess cacheRedisAccess;
+
   @Autowired org.springframework.transaction.PlatformTransactionManager manager;
   Actor admin = new Actor(1, "ADMIN", "ADMIN", "", false);
 
   @BeforeEach
   void reset() {
-    RuntimeTestState.reset(rateLimits, redisAccess);
+    RuntimeTestState.reset(rateLimits, redisAccess, cacheRedisAccess);
     clock.value.set(Instant.parse("2026-10-07T04:00:00Z"));
     gateway.failNextPayments(0);
     gateway.failNextRefunds(0);
@@ -725,6 +730,11 @@ class CommerceIntegrationTest {
 
   @Test
   void cacheInvalidationSurvivesRedisFailureAndTransactionRollback() {
+    assertFalse(catalog.menu(1, "DISH").isEmpty());
+    long generation =
+        db.count(
+            "SELECT COALESCE(MAX(generation),0) FROM catalog_cache_version WHERE"
+                + " cache_key='menu:DISH:1'");
     String container = redisContainer.getContainerId();
     redisContainer.getDockerClient().pauseContainerCmd(container).exec();
     try {
@@ -734,9 +744,18 @@ class CommerceIntegrationTest {
           db.count(
               "SELECT COUNT(*) FROM outbox_event WHERE event_type='CACHE_INVALIDATE' AND"
                   + " state='REQUESTED'"));
+      assertEquals(
+          generation + 1,
+          db.count("SELECT generation FROM catalog_cache_version WHERE cache_key='menu:DISH:1'"));
+      assertFalse(catalog.menu(1, "DISH").isEmpty());
+      assertTrue(cacheRedisAccess.isOpen());
     } finally {
       redisContainer.getDockerClient().unpauseContainerCmd(container).exec();
     }
+    org.awaitility.Awaitility.await()
+        .pollInSameThread()
+        .atMost(Duration.ofSeconds(10))
+        .until(() -> !catalog.menu(1, "DISH").isEmpty() && !cacheRedisAccess.isOpen());
     assertTrue(tasks.runEvent());
     assertTrue(tasks.runEvent());
     assertTrue(tasks.runEvent());
@@ -754,6 +773,9 @@ class CommerceIntegrationTest {
     assertEquals(
         3, db.count("SELECT COUNT(*) FROM outbox_event WHERE event_type='CACHE_INVALIDATE'"));
     assertEquals("校园热餐", db.one("SELECT name FROM category WHERE id=1").get("name"));
+    assertEquals(
+        generation + 1,
+        db.count("SELECT generation FROM catalog_cache_version WHERE cache_key='menu:DISH:1'"));
   }
 
   @Test
@@ -852,7 +874,8 @@ class CommerceIntegrationTest {
       assertEquals(
           0,
           db.count(
-              "SELECT COUNT(*) FROM dish d LEFT JOIN category c ON c.id=d.category_id WHERE c.id IS NULL"));
+              "SELECT COUNT(*) FROM dish d LEFT JOIN category c ON c.id=d.category_id WHERE c.id IS"
+                  + " NULL"));
       assertEquals(
           0,
           db.count(
@@ -873,8 +896,9 @@ class CommerceIntegrationTest {
             DriverManager.getConnection(mysql.getJdbcUrl(), "root", mysql.getPassword());
         var statement =
             connection.prepareStatement(
-                "SELECT COUNT(*) FROM performance_schema.data_lock_waits w JOIN performance_schema.threads t"
-                    + " ON t.THREAD_ID=w.REQUESTING_THREAD_ID WHERE t.PROCESSLIST_ID=?")) {
+                "SELECT COUNT(*) FROM performance_schema.data_lock_waits w JOIN"
+                    + " performance_schema.threads t ON t.THREAD_ID=w.REQUESTING_THREAD_ID WHERE"
+                    + " t.PROCESSLIST_ID=?")) {
       statement.setLong(1, connectionId);
       long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(10);
       while (System.nanoTime() < deadline) {

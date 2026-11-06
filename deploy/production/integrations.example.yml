@@ -1,0 +1,55 @@
+# Copy to a protected file outside Git, fill the policy text and real values.
+# These mappings make ordinary cloud env names explicit Spring configuration.
+campus:
+  operations:
+    restore-evidence: /run/operations/restore-evidence.json
+  wechat-appid: ${WECHAT_APPID}
+  wechat-secret: ${WECHAT_SECRET}
+  payment:
+    provider: wechat
+    merchant-id: ${WECHATPAY_MCH_ID}
+    serial: ${WECHATPAY_SERIAL}
+    private-key-path: ${WECHATPAY_PRIVATE_KEY_PATH}
+    public-key-path: ${WECHATPAY_PUBLIC_KEY_PATH}
+    public-key-id: ${WECHATPAY_PUBLIC_KEY_ID}
+    api-v3-key: ${WECHATPAY_API_V3_KEY}
+    mini-app-id: ${WECHAT_APPID}
+    mp-app-id: ${WECHAT_MP_APPID}
+    notify-base: ${PUBLIC_BASE_URL}
+  identity:
+    phone-enabled: true
+    policy-version: ${POLICY_VERSION}
+    operator: ${OPERATOR_NAME}
+    contact: ${OPERATOR_CONTACT}
+    privacy-text: |
+      部署前填写运营方正式确认的隐私政策全文。
+    terms-text: |
+      部署前填写运营方正式确认的用户协议全文。
+    oauth-appid: ${WECHAT_MP_APPID}
+    oauth-secret: ${WECHAT_MP_SECRET}
+    oauth-redirect-uri: ${PUBLIC_BASE_URL}/api/v1/user/auth/wechat/oauth/callback
+  storage:
+    backend: cos
+    region: ${CAMPUS_STORAGE_REGION}
+    product-bucket: ${CAMPUS_STORAGE_PRODUCT_BUCKET}
+    evidence-bucket: ${CAMPUS_STORAGE_EVIDENCE_BUCKET}
+    secret-id: ${CAMPUS_STORAGE_SECRET_ID}
+    secret-key: ${CAMPUS_STORAGE_SECRET_KEY}
+  notifications:
+    enabled: ${EXTERNAL_NOTIFICATIONS_ENABLED:false}
+    sms:
+      secret-id: ${TENCENT_SMS_SECRET_ID}
+      secret-key: ${TENCENT_SMS_SECRET_KEY}
+      app-id: ${TENCENT_SMS_APP_ID}
+      sign-name: ${TENCENT_SMS_SIGN_NAME}
+      otp-template-id: ${TENCENT_SMS_OTP_TEMPLATE_ID}
+      region: ap-guangzhou
+      templates:
+        ORDER_READY: ${TENCENT_SMS_READY_TEMPLATE_ID:}
+      fields:
+        ORDER_READY: '{"01":"orderNumber","02":"summary"}'
+    wechat:
+      templates:
+        ORDER_READY: ${WECHAT_READY_TEMPLATE_ID:}
+      fields:
+        ORDER_READY: '{"thing1":"summary","character_string2":"orderNumber"}'

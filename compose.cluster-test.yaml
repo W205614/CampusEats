@@ -1,0 +1,19 @@
+# Always combine with compose.yaml and an explicitly isolated project/env file.
+services:
+  server:
+    environment:
+      CAMPUS_CLUSTER_ENABLED: 'true'
+      CAMPUS_CACHE_SHARED_VERSIONS: 'true'
+      CAMPUS_INSTANCE_ID: node-a
+      ALLOWED_ORIGINS: http://127.0.0.1:${CLUSTER_A_PORT:-28097},http://127.0.0.1:${CLUSTER_B_PORT:-28098},http://127.0.0.1:${WEB_PORT:-28099}
+    ports: ['127.0.0.1:${CLUSTER_A_PORT:-28097}:8080']
+  server-b:
+    extends:
+      file: compose.yaml
+      service: server
+    environment:
+      CAMPUS_CLUSTER_ENABLED: 'true'
+      CAMPUS_CACHE_SHARED_VERSIONS: 'true'
+      CAMPUS_INSTANCE_ID: node-b
+      ALLOWED_ORIGINS: http://127.0.0.1:${CLUSTER_A_PORT:-28097},http://127.0.0.1:${CLUSTER_B_PORT:-28098},http://127.0.0.1:${WEB_PORT:-28099}
+    ports: ['127.0.0.1:${CLUSTER_B_PORT:-28098}:8080']

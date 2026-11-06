@@ -30,6 +30,9 @@ public class ApiAdvice implements ResponseBodyAdvice<Object> {
   @Override
   public boolean supports(MethodParameter p, Class<? extends HttpMessageConverter<?>> c) {
     return !p.getContainingClass().equals(ApiAdvice.class)
+        && !(p.getContainingClass().equals(PaymentController.class)
+            && p.getMethod() != null
+            && java.util.Set.of("payment", "refund").contains(p.getMethod().getName()))
         && !byte[].class.equals(p.getParameterType());
   }
 

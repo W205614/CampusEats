@@ -43,6 +43,14 @@
       }
     },
     {
+      "path": "pages/profile/index",
+      "style": { "navigationBarTitleText": "个人资料与通知" }
+    },
+    {
+      "path": "pages/privacy/index",
+      "style": { "navigationBarTitleText": "隐私政策与用户协议" }
+    },
+    {
       "path": "pages/messages/index",
       "style": { "navigationBarTitleText": "站内消息" }
     }

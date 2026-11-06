@@ -69,6 +69,15 @@ class RuntimeOperationsTest {
   }
 
   @Test
+  void unconfiguredExternalNotificationsAreDisabledWithoutBecomingStale() {
+    var clock = new MutableClock();
+    var ops = new RuntimeOperations(clock, true, false);
+    clock.advance(600);
+    assertEquals("DISABLED", job(ops, "externalNotifications").get("status"));
+    assertEquals("DISABLED", job(ops, "smsReceipts").get("status"));
+  }
+
+  @Test
   void poisonedFirstPageDoesNotStarveLaterRecordsAndWraps() {
     var ops = new RuntimeOperations(new MutableClock(), true);
     var sweep = new ExpirySweep();

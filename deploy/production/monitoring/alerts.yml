@@ -1,0 +1,58 @@
+groups:
+  - name: campuseats
+    rules:
+      - alert: CampusEatsInstanceDown
+        expr: up{job="campuseats"} == 0
+        for: 1m
+        labels: { severity: critical }
+        annotations: { summary: 'CampusEats instance cannot be scraped' }
+      - alert: CampusEatsHttpErrors
+        expr: sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m])) / clamp_min(sum(rate(http_server_requests_seconds_count[5m])), 0.01) > 0.01
+        for: 5m
+        labels: { severity: warning }
+        annotations: { summary: 'HTTP 5xx ratio exceeds 1% for five minutes' }
+      - alert: CampusEatsReadLatency
+        expr: histogram_quantile(0.95, sum by(le) (rate(http_server_requests_seconds_bucket{method="GET"}[5m]))) > 1
+        for: 5m
+        labels: { severity: warning }
+        annotations: { summary: 'GET P95 exceeds one second' }
+      - alert: CampusEatsRefundFailures
+        expr: max(campus_refund_failed) > 0
+        for: 1m
+        labels: { severity: critical }
+        annotations: { summary: 'Refund task requires intervention' }
+      - alert: CampusEatsOutboxStalled
+        expr: max(campus_outbox_oldest_wait_seconds) > 120
+        for: 2m
+        labels: { severity: warning }
+        annotations: { summary: 'Oldest event has waited over two minutes' }
+      - alert: CampusEatsRedisProtectionUnavailable
+        expr: max(campus_redis_degraded) > 0
+        for: 1m
+        labels: { severity: critical }
+        annotations: { summary: 'Control Redis is degraded; sensitive admission may be unavailable' }
+      - alert: CampusEatsPaymentUnknown
+        expr: max(campus_payment_unknown) > 0
+        for: 5m
+        labels: { severity: critical }
+        annotations: { summary: 'Unresolved payment result; query channel before any manual action' }
+      - alert: CampusEatsBackupVerificationMissing
+        expr: time() - max(campus_backup_last_verified_timestamp_seconds) > 172800 or absent(campus_backup_last_verified_timestamp_seconds)
+        for: 15m
+        labels: { severity: critical }
+        annotations: { summary: 'No independently verified production restore within 48 hours' }
+      - alert: CampusEatsNotificationFailures
+        expr: max(campus_notification_failed) > 0 or max(campus_notification_unknown) > 0
+        for: 5m
+        labels: { severity: warning }
+        annotations: { summary: 'External notification failed or has an unknown result; inspect before resending' }
+      - alert: CampusEatsNotificationStalled
+        expr: max(campus_notification_oldest_wait_seconds) > 120
+        for: 2m
+        labels: { severity: warning }
+        annotations: { summary: 'External notification has waited over two minutes' }
+      - alert: CampusEatsMetricCollectionInvalid
+        expr: campus_metrics_valid == 0
+        for: 1m
+        labels: { severity: warning }
+        annotations: { summary: 'Database operational metrics are unavailable; zero failures cannot be inferred' }

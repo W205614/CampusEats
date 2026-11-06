@@ -24,6 +24,11 @@ public class AftersaleService {
   @Transactional
   public long apply(long order, PlatformCommands.Aftersale input) {
     long user = Actor.user().id();
+    require(
+        db.one("SELECT id FROM user WHERE id=? AND status=1 FOR UPDATE", user) != null,
+        401,
+        "ACCOUNT_DISABLED",
+        "账号已停用");
     var o = scope.order(order, true);
     int status = Db.integer(o, "status");
     boolean cancel = input.kind().equals("CANCEL");
@@ -174,7 +179,8 @@ public class AftersaleService {
     args.add(pageLimit);
     var rows =
         db.rows(
-            "SELECT a.*,o.number,o.status order_status FROM aftersale a JOIN orders o ON o.id=a.order_id WHERE 1=1"
+            "SELECT a.*,o.number,o.status order_status FROM aftersale a JOIN orders o ON"
+                + " o.id=a.order_id WHERE 1=1"
                 + filter
                 + " ORDER BY a.id DESC LIMIT ?",
             args.toArray());
@@ -290,7 +296,12 @@ public class AftersaleService {
 
   @Transactional
   public void appeal(long id, long version) {
-    Actor.user();
+    long user = Actor.user().id();
+    require(
+        db.one("SELECT id FROM user WHERE id=? AND status=1 FOR UPDATE", user) != null,
+        401,
+        "ACCOUNT_DISABLED",
+        "账号已停用");
     var initial = request(id, false);
     var o = scope.order(Db.id(initial, "order_id"), true);
     var r = request(id, true);

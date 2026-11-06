@@ -246,6 +246,14 @@ test('a delayed unauthorized private read neither replays nor clears a newer use
         paymentMode: 'MOCK',
         mode: 'DEMO',
       });
+    if (path === '/user/auth/identity-capabilities')
+      return ok({
+        phoneLoginEnabled: false,
+        oauthEnabled: false,
+        policyVersion: 'browser-fixture-v1',
+        privacyUrl: '/app/pages/privacy/index',
+        termsUrl: '/app/pages/privacy/index',
+      });
     if (path === '/user/auth/account') return ok({ localAccount: false, username: null });
     if (path === '/user/wallet/page') {
       if (request.headers().authorization === 'Bearer ' + oldSession.token) {

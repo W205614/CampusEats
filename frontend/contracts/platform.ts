@@ -114,6 +114,8 @@ export interface Checkout {
   totalCents: Id;
   version: Id;
   orders: Order[];
+  paymentState?: string | null;
+  paymentCloseRequested?: boolean | null;
 }
 export type Order = Fields<
   components['schemas']['OrderResponse'],

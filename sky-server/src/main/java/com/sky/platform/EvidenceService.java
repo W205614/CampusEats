@@ -5,9 +5,8 @@ import static com.sky.common.BusinessException.require;
 import com.sky.business.ImageStorage;
 import com.sky.infra.Db;
 import com.sky.security.Actor;
+import com.sky.storage.*;
 import java.io.*;
-import java.nio.ByteBuffer;
-import java.nio.channels.SeekableByteChannel;
 import java.nio.file.*;
 import java.util.*;
 import org.springframework.beans.factory.annotation.Value;
@@ -16,12 +15,23 @@ import org.springframework.web.multipart.MultipartFile;
 
 @Service
 public class EvidenceService {
-  private final Path root;
+  private final LocalBlobStore local;
+  private final StoredImages objects;
   private final Db db;
   private final PlatformScope scope;
   private final ImageStorage storage;
   private final org.springframework.transaction.support.TransactionTemplate tx;
   private final EvidenceReadLimits reads;
+
+  public EvidenceService(
+      @Value("${campus.uploads}") String root,
+      Db db,
+      PlatformScope scope,
+      ImageStorage storage,
+      org.springframework.transaction.PlatformTransactionManager manager,
+      EvidenceReadLimits reads) {
+    this(root, db, scope, storage, manager, reads, null);
+  }
 
   @org.springframework.beans.factory.annotation.Autowired
   public EvidenceService(
@@ -30,8 +40,10 @@ public class EvidenceService {
       PlatformScope scope,
       ImageStorage storage,
       org.springframework.transaction.PlatformTransactionManager manager,
-      EvidenceReadLimits reads) {
-    this.root = Path.of(root).toAbsolutePath().normalize().resolve(".private");
+      EvidenceReadLimits reads,
+      StoredImages objects) {
+    this.local = new LocalBlobStore(Path.of(root));
+    this.objects = objects;
     this.db = db;
     this.scope = scope;
     this.storage = storage;
@@ -59,47 +71,32 @@ public class EvidenceService {
   public String upload(long order, MultipartFile file) throws java.io.IOException {
     long user = Actor.user().id();
     scope.order(order, false);
+    requirePendingCapacity(order, user);
     try (var image = storage.stage(file)) {
-      var published = new java.util.concurrent.atomic.AtomicReference<String>();
+      // Object I/O precedes the business transaction; the authorization is rechecked under lock.
+      String published = image.publish(true);
       try {
         String id =
             tx.execute(
                 status -> {
                   scope.order(order, true);
-                  require(
-                      db.count(
-                              "SELECT COUNT(*) FROM evidence WHERE order_id=? AND user_id=? AND"
-                                  + " request_id IS NULL",
-                              order,
-                              user)
-                          < 20,
-                      400,
-                      "EVIDENCE_LIMIT",
-                      "待绑定图片数量已达上限");
-                  try {
-                    String name = image.publish(true);
-                    published.set(name);
-                    db.update(
-                        "INSERT INTO evidence(id,user_id,order_id,path,created_at)"
-                            + " VALUES(?,?,?,?,CURRENT_TIMESTAMP)",
-                        name,
-                        user,
-                        order,
-                        name + ".png");
-                    return name;
-                  } catch (java.io.IOException ex) {
-                    throw new com.sky.common.BusinessException(
-                        503, "UPLOAD_UNAVAILABLE", "图片存储暂不可用");
-                  }
+                  requirePendingCapacity(order, user);
+                  db.update(
+                      "INSERT INTO evidence(id,user_id,order_id,path,created_at)"
+                          + " VALUES(?,?,?,?,CURRENT_TIMESTAMP)",
+                      published,
+                      user,
+                      order,
+                      published + ".png");
+                  return published;
                 });
         image.accept();
         return id;
       } catch (RuntimeException ex) {
         // A lost COMMIT acknowledgement must not remove a possibly committed image.
-        if (published.get() != null) {
+        if (published != null) {
           try {
-            if (db.count("SELECT COUNT(*) FROM evidence WHERE id=?", published.get()) > 0)
-              image.accept();
+            if (db.count("SELECT COUNT(*) FROM evidence WHERE id=?", published) > 0) image.accept();
           } catch (RuntimeException unknownOutcome) {
             image.accept();
             org.slf4j.LoggerFactory.getLogger(getClass())
@@ -111,6 +108,19 @@ public class EvidenceService {
     }
   }
 
+  private void requirePendingCapacity(long order, long user) {
+    require(
+        db.count(
+                "SELECT COUNT(*) FROM evidence WHERE order_id=? AND user_id=? AND request_id IS"
+                    + " NULL",
+                order,
+                user)
+            < 20,
+        400,
+        "EVIDENCE_LIMIT",
+        "待绑定图片数量已达上限");
+  }
+
   public Read open(String id) throws IOException {
     require(id.matches("[a-f0-9-]{36}"), 404, "NOT_FOUND", "图片不存在");
     var e = db.one("SELECT * FROM evidence WHERE id=?", id);
@@ -120,18 +130,16 @@ public class EvidenceService {
     scope.order(Db.id(e, "order_id"), false);
     require((id + ".png").equals(e.get("path")), 404, "NOT_FOUND", "图片不存在");
     var lease = reads.acquire(a.type() + ":" + a.id());
-    SeekableByteChannel channel = null;
+    BlobStore.Content content = null;
     try {
-      var file = root.resolve(id + ".png");
-      require(Files.isRegularFile(file, LinkOption.NOFOLLOW_LINKS), 404, "NOT_FOUND", "图片不存在");
-      channel = Files.newByteChannel(file, StandardOpenOption.READ, LinkOption.NOFOLLOW_LINKS);
-      long size = channel.size();
+      content = objects == null ? local.open("", id + ".png", null, true) : objects.open(id, true);
+      long size = content.size();
       require(size > 0 && size <= 5L * 1024 * 1024, 503, "EVIDENCE_UNAVAILABLE", "举证图片暂不可用");
-      return new Read(channel, size, lease);
+      return new Read(content, size, lease);
     } catch (Exception ex) {
-      if (channel != null)
+      if (content != null)
         try {
-          channel.close();
+          content.close();
         } catch (IOException ignored) {
         }
       lease.close();
@@ -144,12 +152,12 @@ public class EvidenceService {
   }
 
   public static final class Read implements AutoCloseable {
-    private final SeekableByteChannel channel;
+    private final BlobStore.Content content;
     private final long size;
     private final EvidenceReadLimits.Lease lease;
 
-    private Read(SeekableByteChannel channel, long size, EvidenceReadLimits.Lease lease) {
-      this.channel = channel;
+    private Read(BlobStore.Content content, long size, EvidenceReadLimits.Lease lease) {
+      this.content = content;
       this.size = size;
       this.lease = lease;
     }
@@ -160,22 +168,13 @@ public class EvidenceService {
 
     /** Synchronous, bounded-memory transfer on the authenticated request thread. */
     public void transferTo(OutputStream output) throws IOException {
-      var buffer = ByteBuffer.allocate(16 * 1024);
-      long remaining = size;
-      while (remaining > 0) {
-        buffer.clear();
-        buffer.limit((int) Math.min(buffer.capacity(), remaining));
-        int count = channel.read(buffer);
-        if (count < 0) throw new EOFException("Evidence file changed during transfer");
-        output.write(buffer.array(), 0, count);
-        remaining -= count;
-      }
+      content.transferTo(output);
     }
 
     @Override
     public void close() throws IOException {
       try {
-        channel.close();
+        content.close();
       } finally {
         lease.close();
       }

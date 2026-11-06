@@ -37,6 +37,13 @@ public class SecurityConfiguration {
                         "/api/v1/user/auth/login",
                         "/api/v1/user/auth/capabilities",
                         "/api/v1/user/auth/wechat",
+                        "/api/v1/user/auth/identity-capabilities",
+                        "/api/v1/user/auth/privacy-policy",
+                        "/api/v1/user/auth/wechat/oauth/callback",
+                        "/api/v1/user/auth/otp/send",
+                        "/api/v1/user/auth/otp/login",
+                        "/api/v1/payments/wechat/notify",
+                        "/api/v1/payments/wechat/refund-notify",
                         "/actuator/health",
                         "/actuator/health/readiness",
                         "/actuator/health/liveness",
@@ -48,6 +55,7 @@ public class SecurityConfiguration {
                     .permitAll()
                     .requestMatchers(
                         org.springframework.http.HttpMethod.GET,
+                        "/api/v1/user/payment-capabilities",
                         "/api/v1/user/campuses",
                         "/api/v1/user/campuses/*/buildings",
                         "/api/v1/user/stores",

@@ -28,11 +28,11 @@ public class ImageStorage {
   private final long quota, minFree;
   private final MeterRegistry metrics;
   private final LongSupplier nanoTime;
+  private final com.sky.storage.StoredImages objects;
   // All file mutations and ledger changes share this monitor with reconciliation.
   private boolean usageKnown;
   private long usedBytes, publicFiles, reconciledAt;
 
-  @Autowired
   public ImageStorage(
       @Value("${campus.uploads}") String root,
       @Value("${campus.upload-concurrency:1}") int concurrency,
@@ -42,6 +42,17 @@ public class ImageStorage {
     this(root, concurrency, quota, minFree, metrics, System::nanoTime);
   }
 
+  @Autowired
+  public ImageStorage(
+      @Value("${campus.uploads}") String root,
+      @Value("${campus.upload-concurrency:1}") int concurrency,
+      @Value("${campus.upload-quota-bytes:2147483648}") long quota,
+      @Value("${campus.upload-min-free-bytes:268435456}") long minFree,
+      MeterRegistry metrics,
+      com.sky.storage.StoredImages objects) {
+    this(root, concurrency, quota, minFree, metrics, System::nanoTime, objects);
+  }
+
   ImageStorage(
       String root,
       int concurrency,
@@ -49,6 +60,17 @@ public class ImageStorage {
       long minFree,
       MeterRegistry metrics,
       LongSupplier nanoTime) {
+    this(root, concurrency, quota, minFree, metrics, nanoTime, null);
+  }
+
+  private ImageStorage(
+      String root,
+      int concurrency,
+      long quota,
+      long minFree,
+      MeterRegistry metrics,
+      LongSupplier nanoTime,
+      com.sky.storage.StoredImages objects) {
     require(
         concurrency > 0 && concurrency <= 4 && quota > 0 && minFree >= 0,
         503,
@@ -60,6 +82,7 @@ public class ImageStorage {
     this.minFree = minFree;
     this.metrics = metrics;
     this.nanoTime = nanoTime;
+    this.objects = objects;
   }
 
   public Stage stage(MultipartFile file) throws IOException {
@@ -107,7 +130,8 @@ public class ImageStorage {
   }
 
   private BufferedImage decode(MultipartFile file) throws IOException {
-    try (var input = ImageIO.createImageInputStream(file.getInputStream())) {
+    try (var source = file.getInputStream();
+        var input = ImageIO.createImageInputStream(source)) {
       var readers = ImageIO.getImageReaders(input);
       require(readers.hasNext(), 400, "INVALID_IMAGE", "图片无法解码");
       var reader = readers.next();
@@ -197,12 +221,17 @@ public class ImageStorage {
   public final class Stage implements AutoCloseable {
     private Path path;
     private boolean accepted, closed;
+    private String objectId;
 
     private Stage(Path path) {
       this.path = path;
     }
 
     public String publish(boolean privateFile) throws IOException {
+      return publish(privateFile, null);
+    }
+
+    public String publish(boolean privateFile, Long store) throws IOException {
       synchronized (ImageStorage.this) {
         // Staged files are included in the budget, including concurrent writers.
         checkSpace();
@@ -210,6 +239,13 @@ public class ImageStorage {
           require(publicFiles < 10000, 400, "UPLOAD_QUOTA", "图片数量达到上限");
         }
         String id = UUID.randomUUID().toString();
+        if (objects != null) {
+          objectId = id;
+          objects.publish(id, path, privateFile, store);
+          // The object store owns the published copy; this path remains temporary staging only.
+          if (!objects.remote()) usageKnown = false;
+          return id;
+        }
         Path directory = privateFile ? root.resolve(".private") : root;
         try {
           Files.createDirectories(directory);
@@ -238,7 +274,10 @@ public class ImageStorage {
         if (closed) return;
         closed = true;
         try {
-          if (!accepted) removeFile(path);
+          if (objects != null && objectId != null) {
+            if (!accepted) objects.unreferenced(objectId);
+            removeFile(path);
+          } else if (!accepted) removeFile(path);
         } finally {
           slots.release();
         }

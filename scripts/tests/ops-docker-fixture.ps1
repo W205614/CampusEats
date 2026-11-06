@@ -37,8 +37,9 @@ if ($command -like 'curl *') {
     exit
   }
   $jobs = [ordered]@{}
-  foreach ($name in @('checkoutExpiry', 'platformRefunds', 'legacyRefunds', 'outbox', 'legacyExpiry', 'deliveryOverdue', 'fulfillmentExceptions', 'maintenance', 'metrics')) {
+  foreach ($name in @('checkoutExpiry', 'channelPayments', 'platformRefunds', 'legacyRefunds', 'outbox', 'legacyExpiry', 'deliveryOverdue', 'fulfillmentExceptions', 'externalNotifications', 'smsReceipts', 'maintenance', 'metrics')) {
     $enabled = $name -eq 'metrics' -or !$config.disabled
+    if ($config.notificationsDisabled -and $name -in @('externalNotifications', 'smsReceipts')) { $enabled = $false }
     $status = if ($enabled) { 'OK' } else { 'DISABLED' }
     if ($config.failedJob -eq $name) { $status = 'FAILED' }
     if ($config.staleJob -eq $name) { $status = 'STALE' }

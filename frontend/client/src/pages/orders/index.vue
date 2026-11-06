@@ -4,6 +4,7 @@ import { onShow, onHide, onUnload } from '@dcloudio/uni-app';
 import { api, toast, loggedIn, confirm, base, ApiError } from '../../api';
 import { useSession } from '../../stores/session';
 import { readPages } from '../../../../contracts/paging';
+import { startPayment, paymentQr, type PaymentView } from '../../payments';
 import {
   cents,
   states,
@@ -30,6 +31,7 @@ const session = useSession(),
   busy = ref(false),
   loading = ref(false),
   hasMore = ref(false);
+const paymentMode = ref(''), activePayment = ref<PaymentView>(), qrImage = ref('');
 let loadedPages = 1;
 const emptyFilters = (): HistoryFilters => ({ state: '', orderNumber: '', begin: '', end: '' });
 const requestStateLabels = ['全部状态', ...aftersaleStates.map((state) => states[state] || state)];
@@ -48,6 +50,8 @@ watch(
     sessionVersion++;
     loadSequence++;
     orders.value = [];
+    activePayment.value = undefined;
+    qrImage.value = '';
     checkouts.value = [];
     requests.value = [];
     chosen.value = undefined;
@@ -97,6 +101,12 @@ async function load(pages = loadedPages, afterAction = false) {
       checkoutPages = checkoutResult.value;
     orders.value = orderPages.items;
     checkouts.value = checkoutPages.items;
+    if (activePayment.value) {
+      const current = await api<PaymentView>('/checkouts/' + activePayment.value.checkoutId + '/payment');
+      if (owner !== sessionVersion || sequence !== loadSequence) return;
+      activePayment.value = current;
+      if (current.action.type !== 'qrCode') qrImage.value = '';
+    }
     hasMore.value = orderPages.hasMore || checkoutPages.hasMore;
     loadedPages = pages;
     if (chosen.value) chosen.value = orders.value.find((o) => o.id === chosen.value?.id);
@@ -152,10 +162,19 @@ async function searchRequests(clear = false) {
 const loadMore = () => load(loadedPages + 1);
 const refresh = () => load(1);
 async function pay(c: Checkout) {
-  if (!visible || busy.value || loading.value || requestsLoading.value) return;
+  if (!visible || busy.value || loading.value || requestsLoading.value || !paymentMode.value) return;
   const owner = sessionVersion;
   busy.value = true;
   try {
+    if (paymentMode.value === 'WECHAT') {
+      const result = await startPayment(c.id, c.version);
+      if (owner !== sessionVersion) return;
+      activePayment.value = result;
+      qrImage.value = result.action.type === 'qrCode' ? await paymentQr(result.action.url!) : '';
+      uni.showToast({ title: result.state === 'SUCCEEDED' ? '支付已确认' : '请等待服务端确认结果', icon: 'none' });
+      await load(loadedPages, true);
+      return;
+    }
     const result = await api<Checkout>('/checkouts/' + c.id + '/pay', 'POST', {
       version: c.version,
     });
@@ -361,6 +380,10 @@ function stop() {
   timer = undefined;
 }
 onShow(() => {
+  void api<{paymentMode:string}>('/auth/capabilities').then(value => {
+    if (!['MOCK','WECHAT'].includes(value.paymentMode)) throw new Error('支付配置响应不正确');
+    paymentMode.value = value.paymentMode;
+  }).catch(toast);
   stop();
   visible = true;
   void load();
@@ -375,16 +398,22 @@ onUnload(stop);
       <view class="title">我的订单</view>
       <text class="tap" @click="refresh">重新加载</text>
     </view>
-    <view class="subtitle">合单支付，店铺分别履约。支付和退款均为模拟。</view>
+    <view class="subtitle">合单支付，店铺分别履约。{{ paymentMode === 'MOCK' ? '支付和退款均为模拟。' : '付款结果以服务端确认状态为准。' }}</view>
+    <view v-if="activePayment" class="card" aria-live="polite">
+      <view>支付状态：{{ ({NEW:'准备支付',PENDING:'待支付',UNKNOWN:'结果确认中',REVIEW:'平台核对中',CLOSING:'正在关闭',CLOSED:'已关闭',SUCCEEDED:'支付已确认'} as Record<string,string>)[activePayment.state] || activePayment.state }}</view>
+      <view v-if="activePayment.closeRequested && !['SUCCEEDED','CLOSED'].includes(activePayment.state)">取消处理中，确认渠道未付款后释放库存和优惠。</view>
+      <image v-if="qrImage" :src="qrImage" style="width:280px;height:280px" mode="aspectFit" />
+      <view v-if="qrImage">请使用微信扫码付款，付款后点击重新加载确认。</view>
+    </view>
     <view v-for="c in checkouts.filter((c) => c.state === 'PENDING')" :key="c.id" class="card">
       <view class="row">
-        <text>待支付结算单 {{ c.id }}</text>
+        <text>{{ c.paymentCloseRequested ? '取消处理中' : '待支付结算单' }} {{ c.id }}</text>
         <text class="price">¥{{ cents(c.totalCents) }}</text>
       </view>
       <view class="row" style="margin-top: 20rpx">
-        <button class="secondary small-button" @click="cancelCheckout(c)">取消整批</button>
-        <button class="primary small-button" :disabled="busy" @click="pay(c)">
-          整批模拟支付
+        <button class="secondary small-button" :disabled="busy || !!c.paymentCloseRequested" @click="cancelCheckout(c)">取消整批</button>
+        <button class="primary small-button" :disabled="busy || !paymentMode || !!c.paymentCloseRequested" @click="pay(c)">
+          {{ paymentMode === 'MOCK' ? '整批模拟支付' : '整批付款' }}
         </button>
       </view>
     </view>
