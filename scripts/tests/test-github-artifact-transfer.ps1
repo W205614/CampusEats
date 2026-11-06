@@ -317,7 +317,7 @@ try {
     try { [void](& $actualCallback $requestCancellation.Token) } catch { $rejected = $true }
     if (!$rejected) { throw 'Actual callback accepted a non-302 or invalid redirect.' }
   }
-  $apiHandler.Status = 302; $apiHandler.Stall = $true
+  $apiHandler.Status = 302; $apiHandler.Location = [uri]'https://storage-fixture.invalid/refreshed'; $apiHandler.Stall = $true
   $cancel = [Threading.CancellationTokenSource]::new([TimeSpan]::FromMilliseconds(40))
   try {
     $rejected = $false
