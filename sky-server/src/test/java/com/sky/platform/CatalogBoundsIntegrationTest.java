@@ -16,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
@@ -31,6 +32,7 @@ import org.testcontainers.mysql.MySQLContainer;
       "campus.tasks-enabled=false"
     })
 @Testcontainers
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class CatalogBoundsIntegrationTest {
   @Container
   static final MySQLContainer mysql =
@@ -173,8 +175,8 @@ class CatalogBoundsIntegrationTest {
   void boundedBranchesKeepCompleteTypedPagingAndSparseCaseSensitiveLiteralMatches() {
     var indexes =
         db.rows(
-            "SELECT INDEX_NAME,GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) index_columns"
-                + " FROM information_schema.statistics WHERE TABLE_SCHEMA=DATABASE() AND INDEX_NAME IN"
+            "SELECT INDEX_NAME,GROUP_CONCAT(COLUMN_NAME ORDER BY SEQ_IN_INDEX) index_columns FROM"
+                + " information_schema.statistics WHERE TABLE_SCHEMA=DATABASE() AND INDEX_NAME IN"
                 + " ('ix_dish_search_order','ix_setmeal_search_order') GROUP BY INDEX_NAME");
     assertEquals(2, indexes.size());
     for (var index : indexes) assertEquals("store_id,status,id", index.get("index_columns"));
@@ -189,7 +191,8 @@ class CatalogBoundsIntegrationTest {
           db.rows(
               "SELECT id FROM "
                   + table
-                  + " WHERE store_id=? AND LOCATE(BINARY 'Needle%_Exact',BINARY name)>0 ORDER BY id",
+                  + " WHERE store_id=? AND LOCATE(BINARY 'Needle%_Exact',BINARY name)>0 ORDER BY"
+                  + " id",
               store)) expected.add(type + ":" + Db.id(row, "id"));
     }
     var actual = new ArrayList<String>();

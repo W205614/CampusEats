@@ -59,7 +59,6 @@ function Read-GitHubReleaseToken {
 $token = $null
 $client = $null
 $handler = $null
-$response = $null
 try {
   $token = Read-GitHubReleaseToken
   $handler = [Net.Http.HttpClientHandler]::new()
@@ -81,18 +80,24 @@ try {
     throw 'A unique unexpired release artifact with a service-provided digest is required.'
   }
   $artifact = $selected[0]
-  $response = $client.GetAsync('https://api.github.com/repos/W205614/CampusEats/actions/artifacts/' + $artifact.id + '/zip', [Net.Http.HttpCompletionOption]::ResponseHeadersRead).GetAwaiter().GetResult()
-  if ([int]$response.StatusCode -ne 302) {
-    throw 'GitHub did not return the expected artifact redirect.'
-  }
-  $location = $response.Headers.Location
-  if (!$location.IsAbsoluteUri -or $location.Scheme -cne 'https' -or $location.UserInfo) {
-    throw 'Invalid artifact storage redirect.'
-  }
+  if ([string]$artifact.id -cnotmatch '^[1-9][0-9]*$') { throw 'Invalid trusted artifact identity.' }
+  $artifactEndpoint = [uri]('https://api.github.com/repos/W205614/CampusEats/actions/artifacts/' + $artifact.id + '/zip')
+  # Only this fixed official API endpoint receives authorization, including refreshes.
+  $refreshStorage = { param($CancellationToken)
+    $redirectResponse = $client.GetAsync($artifactEndpoint, [Net.Http.HttpCompletionOption]::ResponseHeadersRead, $CancellationToken).GetAwaiter().GetResult()
+    try {
+      if ([int]$redirectResponse.StatusCode -ne 302) { throw 'GitHub did not return the expected artifact redirect.' }
+      $redirect = $redirectResponse.Headers.Location
+      Assert-GitHubArtifactStorageUri $redirect
+      return $redirect
+    } finally { $redirectResponse.Dispose() }
+  }.GetNewClosure()
+  $initialCancellation = [Threading.CancellationTokenSource]::new([TimeSpan]::FromSeconds(90))
+  try { $location = & $refreshStorage $initialCancellation.Token } finally { $initialCancellation.Dispose() }
   $parent = New-SecureDirectory -Path (Split-Path $destinationPath -Parent)
   $zip = Join-Path $parent ('download-' + [guid]::NewGuid().ToString('N') + '.zip')
   # The signed storage URL is fetched WITHOUT the GitHub authorization header.
-  Receive-GitHubArtifactRanges -StorageUri $location -Path $zip -ExpectedBytes ([long]$artifact.size_in_bytes) -ExpectedSha256 $artifact.digest.Substring(7) -ReportProgress
+  Receive-GitHubArtifactRanges -StorageUri $location -Path $zip -ExpectedBytes ([long]$artifact.size_in_bytes) -ExpectedSha256 $artifact.digest.Substring(7) -RefreshStorageUri $refreshStorage -ReportProgress
   if ((Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant() -cne $artifact.digest.Substring(7)) {
     throw 'Downloaded GitHub artifact digest mismatch.'
   }
@@ -134,12 +139,11 @@ try {
   Move-ProjectFileToRecycleBin -Path $zip
   Write-Host "Matching successful CI bundle downloaded and strictly verified: $destinationPath"
 } catch {
-  throw 'Release download or verification failed. No deployment was performed; retained partial files are not usable releases.'
+  $category = 'DOWNLOAD_OR_VERIFICATION'
+  if ($_.Exception.Message -cmatch '^(ARTIFACT_(?:TRANSFER_BUDGET|STORAGE_AUTH|REFRESH_LIMIT|REFRESH_URI|REFRESH_FAILED)):') { $category = $Matches[1] }
+  throw ('Release download or verification failed [' + $category + ']. No deployment was performed; retained partial files are not usable releases.')
 }
 finally {
-  if ($response) {
-    $response.Dispose()
-  }
   if ($client) {
     $client.Dispose()
   }

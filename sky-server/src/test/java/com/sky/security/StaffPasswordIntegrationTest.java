@@ -9,6 +9,7 @@ import java.util.*;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.*;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.junit.jupiter.*;
@@ -23,6 +24,7 @@ import org.testcontainers.mysql.MySQLContainer;
       "campus.tasks-enabled=false"
     })
 @Testcontainers
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class StaffPasswordIntegrationTest {
   @Container
   static final MySQLContainer mysql =
@@ -54,7 +56,8 @@ class StaffPasswordIntegrationTest {
   private String employee() {
     String username = "pwd_" + UUID.randomUUID().toString().substring(0, 12);
     db.insert(
-        "INSERT INTO employee(name,username,password,role,status,must_change_password,phone,sex,id_number)"
+        "INSERT INTO"
+            + " employee(name,username,password,role,status,must_change_password,phone,sex,id_number)"
             + " VALUES('密码边界人员',?,?,'PLATFORM_ADMIN',1,true,'','','')",
         username,
         auth.encodePassword(INITIAL));
@@ -92,7 +95,8 @@ class StaffPasswordIntegrationTest {
     assertEquals(
         0,
         db.count(
-            "SELECT COUNT(*) FROM auth_session WHERE subject_type='ADMIN' AND subject_id=? AND revoked=true",
+            "SELECT COUNT(*) FROM auth_session WHERE subject_type='ADMIN' AND subject_id=? AND"
+                + " revoked=true",
             actor.id()));
   }
 
@@ -113,7 +117,8 @@ class StaffPasswordIntegrationTest {
     assertEquals(
         2,
         db.count(
-            "SELECT COUNT(*) FROM auth_session WHERE subject_type='ADMIN' AND subject_id=? AND revoked=true",
+            "SELECT COUNT(*) FROM auth_session WHERE subject_type='ADMIN' AND subject_id=? AND"
+                + " revoked=true",
             actor.id()));
     assertEquals(version + 1, db.count("SELECT auth_version FROM employee WHERE id=?", actor.id()));
     var rejected = assertThrows(BusinessException.class, () -> login(username, INITIAL));

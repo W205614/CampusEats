@@ -14,6 +14,7 @@ import org.springframework.boot.test.context.*;
 import org.springframework.context.annotation.*;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.*;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -31,6 +32,7 @@ import org.testcontainers.mysql.MySQLContainer;
 @org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc(
     print = org.springframework.boot.webmvc.test.autoconfigure.MockMvcPrint.NONE)
 @Testcontainers
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class OperationsIntegrationTest {
   @Container
   static final MySQLContainer mysql =

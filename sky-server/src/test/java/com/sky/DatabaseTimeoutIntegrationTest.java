@@ -15,6 +15,7 @@ import org.springframework.dao.CannotAcquireLockException;
 import org.springframework.dao.QueryTimeoutException;
 import org.springframework.jdbc.core.PreparedStatementCallback;
 import org.springframework.jdbc.datasource.DataSourceTransactionManager;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -31,6 +32,7 @@ import org.testcontainers.mysql.MySQLContainer;
       "campus.tasks-enabled=false"
     })
 @Testcontainers
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class DatabaseTimeoutIntegrationTest {
   @Container
   static final MySQLContainer mysql =

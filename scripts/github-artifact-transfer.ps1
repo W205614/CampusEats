@@ -1,5 +1,11 @@
 . (Join-Path $PSScriptRoot 'secure-files.ps1')
 
+function Assert-GitHubArtifactStorageUri($Uri) {
+  if ($Uri -isnot [uri] -or !$Uri.IsAbsoluteUri -or $Uri.Scheme -cne 'https' -or !$Uri.Host -or $Uri.UserInfo -or $Uri.Fragment) {
+    throw 'Invalid artifact storage URL.'
+  }
+}
+
 # Storage transport only. The caller obtains this signed URL, length and digest from the
 # fixed official GitHub API. No credential is accepted or forwarded to storage requests.
 function Receive-GitHubArtifactRanges {
@@ -11,11 +17,10 @@ function Receive-GitHubArtifactRanges {
     [int]$ChunkBytes = 4194304, [int]$MaxAttempts = 3,
     [TimeSpan]$OverallTimeout = ([TimeSpan]::FromMinutes(15)),
     [TimeSpan]$RequestTimeout = ([TimeSpan]::FromSeconds(90)),
-    [scriptblock]$SendRange, [scriptblock]$ElapsedMilliseconds, [switch]$ReportProgress
+    [scriptblock]$SendRange, [scriptblock]$ElapsedMilliseconds,
+    [scriptblock]$RefreshStorageUri, [switch]$ReportProgress
   )
-  if (!$StorageUri.IsAbsoluteUri -or $StorageUri.Scheme -cne 'https' -or $StorageUri.UserInfo -or $StorageUri.Fragment) {
-    throw 'Invalid artifact storage URL.'
-  }
+  Assert-GitHubArtifactStorageUri $StorageUri
   if ($ExpectedBytes -le 0 -or $ExpectedBytes -gt 8589934592 -or $ExpectedSha256 -notmatch '^[a-fA-F0-9]{64}$') {
     throw 'Invalid trusted artifact length or digest.'
   }
@@ -44,6 +49,7 @@ function Receive-GitHubArtifactRanges {
   $budgetMilliseconds = [long][Math]::Floor($OverallTimeout.TotalMilliseconds)
   $remaining = { $budgetMilliseconds - [long](& $ElapsedMilliseconds) }.GetNewClosure()
   $confirmed = 0L
+  $refreshes = 0
   $buffer = [byte[]]::new(65536)
   $output = [IO.File]::Open($target, [IO.FileMode]::Open, [IO.FileAccess]::Write, [IO.FileShare]::None)
   try {
@@ -68,11 +74,16 @@ function Receive-GitHubArtifactRanges {
         $rangeResponse = $null
         $rangeStream = $null
         $invalidResponse = $false
+        $authorizationExpired = $false
         try {
           $rangeResponse = & $SendRange $storageClient $rangeRequest $cancellation.Token
           if ($rangeResponse -isnot [Net.Http.HttpResponseMessage]) {
             $invalidResponse = $true
             throw 'Invalid artifact storage response.'
+          }
+          if ([int]$rangeResponse.StatusCode -in @(401,403)) {
+            $authorizationExpired = $true
+            throw 'Artifact storage authorization expired.'
           }
           $range = $rangeResponse.Content.Headers.ContentRange
           if ([int]$rangeResponse.StatusCode -ne 206 -or $null -eq $range -or $range.Unit -ine 'bytes' -or !$range.HasRange -or !$range.HasLength -or $range.From -ne $confirmed -or $range.To -ne $last -or $range.Length -ne $ExpectedBytes -or $rangeResponse.Content.Headers.ContentLength -ne $chunkLength) {
@@ -104,6 +115,30 @@ function Receive-GitHubArtifactRanges {
           # partially received chunk is removed before a bounded retry of that same range.
           $output.SetLength($confirmed)
           $output.Position = $confirmed
+          if ($authorizationExpired) {
+            if ((& $remaining) -le 0) { throw 'ARTIFACT_TRANSFER_BUDGET: Artifact transfer exceeded its overall time budget.' }
+            if (!$RefreshStorageUri) { throw 'ARTIFACT_STORAGE_AUTH: Artifact storage authorization cannot be refreshed.' }
+            if ($refreshes -ge 2) { throw 'ARTIFACT_REFRESH_LIMIT: Artifact storage refresh limit reached.' }
+            if ($attempt -eq $MaxAttempts) { throw 'ARTIFACT_STORAGE_AUTH: Artifact range exhausted its bounded attempts.' }
+            $refreshes++
+            $refreshLeft = [Math]::Min([long](& $remaining), [long][Math]::Floor($RequestTimeout.TotalMilliseconds))
+            if ($refreshLeft -le 0) { throw 'ARTIFACT_TRANSFER_BUDGET: Artifact transfer exceeded its overall time budget.' }
+            $refreshCancellation = [Threading.CancellationTokenSource]::new([TimeSpan]::FromMilliseconds($refreshLeft))
+            $invalidRedirect = $false
+            try {
+              $renewed = & $RefreshStorageUri $refreshCancellation.Token
+              $refreshCancellation.Token.ThrowIfCancellationRequested()
+              $invalidRedirect = $true
+              Assert-GitHubArtifactStorageUri $renewed
+              $invalidRedirect = $false
+              if ((& $remaining) -le 0) { throw 'Artifact transfer budget exhausted.' }
+              $StorageUri = $renewed
+            } catch {
+              if ((& $remaining) -le 0) { throw 'ARTIFACT_TRANSFER_BUDGET: Artifact transfer exceeded its overall time budget.' }
+              if ($invalidRedirect) { throw 'ARTIFACT_REFRESH_URI: Refreshed artifact storage URL is invalid.' }
+              throw 'ARTIFACT_REFRESH_FAILED: Artifact storage URL refresh failed or timed out.'
+            } finally { $refreshCancellation.Dispose() }
+          }
           if ($invalidResponse) { throw 'Artifact storage returned invalid range metadata or length.' }
           if ((& $remaining) -le 0) { throw 'Artifact transfer exceeded its overall time budget.' }
           if ($attempt -eq $MaxAttempts) {

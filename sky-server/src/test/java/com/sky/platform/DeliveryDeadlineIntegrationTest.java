@@ -19,6 +19,7 @@ import org.springframework.boot.test.context.*;
 import org.springframework.context.annotation.*;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.*;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -35,6 +36,7 @@ import org.testcontainers.mysql.MySQLContainer;
       "campus.tasks-enabled=false"
     })
 @Testcontainers
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class DeliveryDeadlineIntegrationTest {
   @Container
   static final MySQLContainer mysql =
@@ -117,13 +119,15 @@ class DeliveryDeadlineIntegrationTest {
             at());
     long courier =
         db.insert(
-            "INSERT INTO employee(name,username,password,role,campus_id,status,must_change_password,phone,sex,id_number)"
+            "INSERT INTO"
+                + " employee(name,username,password,role,campus_id,status,must_change_password,phone,sex,id_number)"
                 + " VALUES('测试配送员',?,'test-only','DELIVERER',?,1,false,'','','')",
             "deadline-" + UUID.randomUUID().toString().substring(0, 12),
             campus);
     long checkout =
         db.insert(
-            "INSERT INTO checkout(user_id,request_id,request_hash,state,total_cents,expires_at,created_at,paid_at,quote_json)"
+            "INSERT INTO"
+                + " checkout(user_id,request_id,request_hash,state,total_cents,expires_at,created_at,paid_at,quote_json)"
                 + " VALUES(?,?,?,'PAID',1000,?,?,?,'{}')",
             user,
             UUID.randomUUID().toString(),
@@ -133,7 +137,8 @@ class DeliveryDeadlineIntegrationTest {
             at());
     order =
         db.insert(
-            "INSERT INTO orders(number,status,user_id,address_book_id,order_time,amount,store_id,campus_id,checkout_id,paid_cents,pay_status,fulfillment,ready,delivery_started_at,courier_id)"
+            "INSERT INTO"
+                + " orders(number,status,user_id,address_book_id,order_time,amount,store_id,campus_id,checkout_id,paid_cents,pay_status,fulfillment,ready,delivery_started_at,courier_id)"
                 + " VALUES(?,4,?,0,?,10,?,?,?,1000,1,'DELIVERY',true,?,?)",
             "DEADLINE-" + UUID.randomUUID(),
             user,
@@ -193,7 +198,9 @@ class DeliveryDeadlineIntegrationTest {
         "SELECT COUNT(*) FROM order_exception WHERE order_id=? AND kind='STAGE_OVERDUE'", order);
   }
 
-  /** Execute the actual operational query against MySQL, replacing wall time with the fixed Clock. */
+  /**
+   * Execute the actual operational query against MySQL, replacing wall time with the fixed Clock.
+   */
   private long operationalCount(int fromEnd) throws Exception {
     var script = Files.readString(Path.of("..", "scripts", "ops-check.ps1"));
     var sql = Pattern.compile("(?s)\\$sql\\h*=\\h*@'\\R(.*?)\\R'@").matcher(script);
@@ -250,7 +257,8 @@ class DeliveryDeadlineIntegrationTest {
     assertEquals(
         1,
         db.count(
-            "SELECT COUNT(*) FROM outbox_event WHERE aggregate_id=? AND event_type='ORDER_EXCEPTION'",
+            "SELECT COUNT(*) FROM outbox_event WHERE aggregate_id=? AND"
+                + " event_type='ORDER_EXCEPTION'",
             order));
   }
 
@@ -276,7 +284,8 @@ class DeliveryDeadlineIntegrationTest {
     db.update(
         "UPDATE orders SET delivery_started_at=?,delivery_overdue=true WHERE id=?", pickup, order);
     db.update(
-        "INSERT INTO order_stage(order_id,stage,stage_seq,started_at,deadline_at,migrated) VALUES(?,'DELIVERING',0,?,?,true)",
+        "INSERT INTO order_stage(order_id,stage,stage_seq,started_at,deadline_at,migrated)"
+            + " VALUES(?,'DELIVERING',0,?,?,true)",
         order,
         baseline,
         baseline.plusMinutes(60));

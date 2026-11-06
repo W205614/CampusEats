@@ -17,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.*;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.testcontainers.containers.GenericContainer;
@@ -32,6 +33,7 @@ import org.testcontainers.mysql.MySQLContainer;
       "campus.tasks-enabled=false"
     })
 @Testcontainers
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class BehaviorBoundaryIntegrationTest {
   @Container
   static final MySQLContainer mysql =
@@ -75,15 +77,17 @@ class BehaviorBoundaryIntegrationTest {
     customer = new Actor(user, "USER", "USER", "", false);
     order =
         db.insert(
-            "INSERT INTO orders(number,status,user_id,address_book_id,order_time,amount,"
-                + "store_id,campus_id,paid_cents,pay_status,fulfillment) VALUES(?,3,?,0,CURRENT_TIMESTAMP,10,?,?,1000,1,'DELIVERY')",
+            "INSERT INTO"
+                + " orders(number,status,user_id,address_book_id,order_time,amount,store_id,campus_id,paid_cents,pay_status,fulfillment)"
+                + " VALUES(?,3,?,0,CURRENT_TIMESTAMP,10,?,?,1000,1,'DELIVERY')",
             "BOUNDARY-" + UUID.randomUUID(),
             user,
             store,
             campus);
     detail =
         db.insert(
-            "INSERT INTO order_detail(order_id,name,number,amount,line_total_cents) VALUES(?,'测试餐品',1,10,1000)",
+            "INSERT INTO order_detail(order_id,name,number,amount,line_total_cents)"
+                + " VALUES(?,'测试餐品',1,10,1000)",
             order);
   }
 

@@ -44,6 +44,7 @@ function New-RangeFixture {
     Mode = $Mode; Bytes = [Text.Encoding]::ASCII.GetBytes('0123456789'); Elapsed = 0L;
     Starts = [Collections.Generic.List[long]]::new();
     Clients = [Collections.Generic.HashSet[Net.Http.HttpClient]]::new();
+    Refreshes = 0; RefreshTokenChecked = $false;
     Output = (Join-Path $fixture ($Name + '.zip'))
   }
 }
@@ -59,6 +60,16 @@ function New-RangeSender {
     $start = [long]$range.From
     $last = [long]$range.To
     [void]$State.Starts.Add($start)
+    if ($State.Mode.StartsWith('refresh-') -and $start -ge 4) {
+      $firstAtOffset = @($State.Starts | Where-Object { $_ -eq $start }).Count -eq 1
+      if (($State.Mode -eq 'refresh-multi-limit' -and $firstAtOffset) -or
+          ($State.Mode -ne 'refresh-multi-limit' -and $RangeRequest.RequestUri.AbsolutePath -eq '/local')) {
+        $status = if ($State.Mode -eq 'refresh-unauthorized') { [Net.HttpStatusCode]::Unauthorized }
+          elseif ($State.Mode -eq 'refresh-nonauth') { [Net.HttpStatusCode]::InternalServerError }
+          else { [Net.HttpStatusCode]::Forbidden }
+        return [Net.Http.HttpResponseMessage]::new($status)
+      }
+    }
     $length = [int]($last - $start + 1)
     $bytes = [byte[]]::new($length)
     [Array]::Copy($State.Bytes, [int]$start, $bytes, 0, $length)
@@ -83,6 +94,25 @@ function New-RangeSender {
     return $response
   }.GetNewClosure()
 }
+function New-RangeRefresher {
+  param($State)
+  return {
+    param($CancellationToken)
+    $State.Refreshes++
+    if (!$CancellationToken.CanBeCanceled) { throw 'Refresh request was not cancellable.' }
+    $State.RefreshTokenChecked = $true
+    switch ($State.Mode) {
+      'refresh-http' { return [uri]'http://artifact-fixture.invalid/refreshed' }
+      'refresh-userinfo' { return [uri]'https://credential@artifact-fixture.invalid/refreshed' }
+      'refresh-fragment' { return [uri]'https://artifact-fixture.invalid/refreshed#private' }
+      'refresh-relative' { return [uri]'/refreshed' }
+      'refresh-budget' { $State.Elapsed += 1100 }
+      'refresh-timeout' { [void][Threading.Tasks.Task]::Delay(1000,$CancellationToken).GetAwaiter().GetResult() }
+      'refresh-error' { throw 'fixture-sensitive-signed-url-or-token' }
+    }
+    return [uri]'https://another-artifact-fixture.invalid/refreshed'
+  }.GetNewClosure()
+}
 function Invoke-RangeFixture {
   param($State, [string]$Digest = '', [TimeSpan]$OverallTimeout = ([TimeSpan]::FromMinutes(15)), [TimeSpan]$RequestTimeout = ([TimeSpan]::FromSeconds(90)))
   if (!$Digest) {
@@ -90,7 +120,8 @@ function Invoke-RangeFixture {
   }
   $arguments = @{StorageUri = [uri]'https://artifact-fixture.invalid/local'; Path = $State.Output; ExpectedBytes = $State.Bytes.Length;
     ExpectedSha256 = $Digest; ChunkBytes = 4; SendRange = (New-RangeSender $State); OverallTimeout = $OverallTimeout; RequestTimeout = $RequestTimeout }
-  if ($State.Mode -eq 'budget') { $arguments.ElapsedMilliseconds = { $State.Elapsed }.GetNewClosure() }
+  if ($State.Mode -in @('budget','refresh-budget')) { $arguments.ElapsedMilliseconds = { $State.Elapsed }.GetNewClosure() }
+  if ($State.Mode.StartsWith('refresh-')) { $arguments.RefreshStorageUri = New-RangeRefresher $State }
   Receive-GitHubArtifactRanges @arguments
 }
 function Assert-RangeRejected {
@@ -173,3 +204,43 @@ if (!$rejected -or $badUrl.Starts.Count -ne 0 -or (Test-Path -LiteralPath $badUr
 }
 
 Write-Host 'Artifact range transport: normal chunks, interrupted chunk recovery, strict headers/body/digest, fresh clients without authorization, bounded body timeout, overall budget and unknown-file refusal passed without network or Docker.'
+
+foreach ($mode in @('refresh-normal','refresh-unauthorized')) {
+  $refreshed = New-RangeFixture $mode $mode
+  Invoke-RangeFixture $refreshed
+  Assert-RangeBytes $refreshed
+  if (($refreshed.Starts -join ',') -cne '0,4,4,8' -or $refreshed.Refreshes -ne 1 -or !$refreshed.RefreshTokenChecked) {
+    throw 'Expired storage authorization did not refresh only the confirmed range prefix.'
+  }
+}
+$nonAuth = New-RangeFixture 'refresh-nonauth' 'refresh-nonauth'
+Assert-RangeRejected $nonAuth
+if ($nonAuth.Refreshes -ne 0 -or ($nonAuth.Starts -join ',') -cne '0,4' -or (Get-Item -LiteralPath $nonAuth.Output).Length -ne 4) {
+  throw 'A nonauthorization error triggered URL refresh or retained uncertain bytes.'
+}
+foreach ($mode in @('refresh-http','refresh-userinfo','refresh-fragment','refresh-relative','refresh-error','refresh-budget','refresh-timeout','refresh-multi-limit')) {
+  $state = New-RangeFixture $mode $mode
+  $expectedCode = if ($mode -eq 'refresh-multi-limit') { 'ARTIFACT_REFRESH_LIMIT' }
+    elseif ($mode -eq 'refresh-budget') { 'ARTIFACT_TRANSFER_BUDGET' }
+    elseif ($mode -in @('refresh-error','refresh-timeout')) { 'ARTIFACT_REFRESH_FAILED' }
+    else { 'ARTIFACT_REFRESH_URI' }
+  if ($mode -eq 'refresh-multi-limit') { $state.Bytes = [Text.Encoding]::ASCII.GetBytes('0123456789abcdef') }
+  $arguments = @{State=$state}
+  if ($mode -eq 'refresh-budget') { $arguments.OverallTimeout = [TimeSpan]::FromMilliseconds(1000) }
+  if ($mode -eq 'refresh-timeout') { $arguments.RequestTimeout = [TimeSpan]::FromMilliseconds(40) }
+  $rejected = $false
+  try { Invoke-RangeFixture @arguments } catch {
+    if ($_.Exception.Message -notlike ($expectedCode + ':*') -or $_.Exception.Message -match 'https?://|credential|fixture-sensitive') {
+      throw 'Refresh failure classification was unsafe or incorrect.'
+    }
+    $rejected = $true
+  }
+  $prefix = if ($mode -eq 'refresh-multi-limit') { 12 } else { 4 }
+  if (!$rejected -or (Get-Item -LiteralPath $state.Output).Length -ne $prefix -or !$state.RefreshTokenChecked) {
+    throw 'Refresh failure retained uncertain bytes or bypassed cancellation.'
+  }
+  if ($mode -eq 'refresh-multi-limit' -and ($state.Refreshes -ne 2 -or ($state.Starts -join ',') -cne '0,4,4,8,8,12')) {
+    throw 'Storage refresh exceeded the global two-refresh bound.'
+  }
+}
+Write-Host 'Artifact refresh: confirmed prefix, official-API callback cancellation, global two-refresh limit, invalid URLs, safe failure classification and shared overall/request budgets passed without network or Docker.'

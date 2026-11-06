@@ -14,6 +14,7 @@ import org.springframework.boot.test.context.*;
 import org.springframework.context.annotation.*;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.*;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -29,6 +30,7 @@ import org.testcontainers.mysql.MySQLContainer;
       "campus.tasks-enabled=false"
     })
 @Testcontainers
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class WalletExpiryIntegrationTest {
   @Container
   static final MySQLContainer mysql =
@@ -107,7 +109,8 @@ class WalletExpiryIntegrationTest {
   long coupon(String state, LocalDateTime end, boolean enabled) {
     long template =
         db.insert(
-            "INSERT INTO coupon(name,kind,threshold_cents,value,total,claimed,per_user,starts_at,ends_at,enabled)"
+            "INSERT INTO"
+                + " coupon(name,kind,threshold_cents,value,total,claimed,per_user,starts_at,ends_at,enabled)"
                 + " VALUES(?,'REDUCTION',0,100,1,1,1,?,?,?)",
             "边界券-" + UUID.randomUUID(),
             LocalDateTime.now(clock).minusDays(1),

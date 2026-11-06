@@ -15,6 +15,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.*;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
@@ -31,6 +32,7 @@ import org.testcontainers.mysql.MySQLContainer;
     })
 @AutoConfigureMockMvc
 @Testcontainers
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class CartReadIntegrationTest {
   @Container
   static final MySQLContainer mysql =
@@ -72,12 +74,14 @@ class CartReadIntegrationTest {
         db.insert("INSERT INTO category(store_id,name,type,status) VALUES(?,'菜',1,1)", store);
     dish =
         db.insert(
-            "INSERT INTO dish(store_id,category_id,name,price,status,image) VALUES(?,?,'菜品',12,0,'/demo-images/dish.svg')",
+            "INSERT INTO dish(store_id,category_id,name,price,status,image)"
+                + " VALUES(?,?,'菜品',12,0,'/demo-images/dish.svg')",
             store,
             category);
     meal =
         db.insert(
-            "INSERT INTO setmeal(store_id,category_id,name,price,status,image) VALUES(?,?,'套餐',20,1,'/demo-images/dish.svg')",
+            "INSERT INTO setmeal(store_id,category_id,name,price,status,image)"
+                + " VALUES(?,?,'套餐',20,1,'/demo-images/dish.svg')",
             store,
             category);
     act();
@@ -97,7 +101,9 @@ class CartReadIntegrationTest {
 
   void item(String type, long id, String flavor) {
     db.update(
-        "INSERT INTO store_cart_item(user_id,store_id,item_type,item_id,quantity,flavors,flavor_hash) VALUES(?,?,?,?,2,?,?)",
+        "INSERT INTO"
+            + " store_cart_item(user_id,store_id,item_type,item_id,quantity,flavors,flavor_hash)"
+            + " VALUES(?,?,?,?,2,?,?)",
         user,
         store,
         type,
@@ -149,7 +155,9 @@ class CartReadIntegrationTest {
     long other = db.insert("INSERT INTO user(openid) VALUES(?)", UUID.randomUUID().toString());
     db.update("INSERT INTO store_cart_state(user_id,store_id) VALUES(?,?)", other, store);
     db.update(
-        "INSERT INTO store_cart_item(user_id,store_id,item_type,item_id,quantity,flavors,flavor_hash) VALUES(?,?,'SETMEAL',?,1,'{}',?)",
+        "INSERT INTO"
+            + " store_cart_item(user_id,store_id,item_type,item_id,quantity,flavors,flavor_hash)"
+            + " VALUES(?,?,'SETMEAL',?,1,'{}',?)",
         other,
         store,
         meal,
@@ -181,26 +189,32 @@ class CartReadIntegrationTest {
   void explicitContractsMatchActualDatabaseProjectionsWithoutWideningFields() {
     long order =
         db.insert(
-            "INSERT INTO orders(number,user_id,address_book_id,order_time,amount,status,store_id,campus_id,paid_cents)"
+            "INSERT INTO"
+                + " orders(number,user_id,address_book_id,order_time,amount,status,store_id,campus_id,paid_cents)"
                 + " VALUES(?,?,0,NOW(),12,3,?,?,1200)",
             "typed-" + UUID.randomUUID(),
             user,
             store,
             campus);
     db.update(
-        "INSERT INTO order_detail(order_id,dish_id,name,number,amount,line_total_cents) VALUES(?,?,'快照菜品',2,6,1200)",
+        "INSERT INTO order_detail(order_id,dish_id,name,number,amount,line_total_cents)"
+            + " VALUES(?,?,'快照菜品',2,6,1200)",
         order,
         dish);
     db.update(
         "INSERT INTO delivery_task(order_id,campus_id,state) VALUES(?,?,'OPEN')", order, campus);
     long sale =
         db.insert(
-            "INSERT INTO aftersale(order_id,user_id,store_id,kind,state,reason,amount_cents,created_at) VALUES(?,?,?,'CANCEL','REJECTED','契约验证',100,NOW())",
+            "INSERT INTO"
+                + " aftersale(order_id,user_id,store_id,kind,state,reason,amount_cents,created_at)"
+                + " VALUES(?,?,?,'CANCEL','REJECTED','契约验证',100,NOW())",
             order,
             user,
             store);
     db.update(
-        "INSERT INTO refund_request(order_id,aftersale_id,store_id,amount_cents,next_attempt_at,created_at) VALUES(?,?,?,100,NOW(),NOW())",
+        "INSERT INTO"
+            + " refund_request(order_id,aftersale_id,store_id,amount_cents,next_attempt_at,created_at)"
+            + " VALUES(?,?,?,100,NOW(),NOW())",
         order,
         sale,
         store);

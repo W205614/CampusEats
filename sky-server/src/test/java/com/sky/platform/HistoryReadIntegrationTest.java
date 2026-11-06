@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.containers.GenericContainer;
@@ -28,6 +29,7 @@ import org.testcontainers.mysql.MySQLContainer;
       "campus.tasks-enabled=false"
     })
 @Testcontainers
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class HistoryReadIntegrationTest {
   @Container
   static final MySQLContainer mysql =
@@ -133,7 +135,8 @@ class HistoryReadIntegrationTest {
         new Object[] {11L, "STORE_SAVE", "日期外", day.plusDays(1).atStartOfDay(), store, campus});
     values.add(new Object[] {11L, "STORE_SAVE", "其他店铺", day.atStartOfDay(), otherStore, campus});
     db.jdbc.batchUpdate(
-        "INSERT INTO audit_log(actor_type,actor_id,action,target_id,detail,created_at,store_id,campus_id)"
+        "INSERT INTO"
+            + " audit_log(actor_type,actor_id,action,target_id,detail,created_at,store_id,campus_id)"
             + " VALUES('ADMIN',?,?,0,?,?,?,?)",
         values);
     var query = new AuditQuery(null, null, 11L, "STORE_SAVE", day, day);

@@ -25,6 +25,7 @@ import org.springframework.http.client.JdkClientHttpRequestFactory;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.*;
 import org.springframework.web.client.RestClient;
 import org.testcontainers.containers.GenericContainer;
@@ -54,6 +55,7 @@ import org.testcontainers.mysql.MySQLContainer;
       "campus.notifications.wechat.fields.ORDER_READY={\"thing1\":\"summary\",\"character_string2\":\"orderNumber\"}"
     })
 @Testcontainers
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class IdentityNotificationIntegrationTest {
   @Container
   static final MySQLContainer mysql =

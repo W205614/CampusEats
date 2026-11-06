@@ -11,6 +11,7 @@ import java.util.concurrent.*;
 import org.junit.jupiter.api.*;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.PlatformTransactionManager;
@@ -27,6 +28,7 @@ import org.testcontainers.mysql.MySQLContainer;
       "campus.tasks-enabled=false"
     })
 @Testcontainers
+@DirtiesContext(classMode = DirtiesContext.ClassMode.AFTER_CLASS)
 class MockGatewayIntegrationTest {
   @Container
   static final MySQLContainer mysql =
@@ -62,7 +64,8 @@ class MockGatewayIntegrationTest {
   @Test
   void historicalSucceededRefundIsNotSentToTheGatewayAgain() {
     db.update(
-        "INSERT INTO refund_request(order_id,store_id,amount_cents,state,next_attempt_at,created_at)"
+        "INSERT INTO"
+            + " refund_request(order_id,store_id,amount_cents,state,next_attempt_at,created_at)"
             + " VALUES(900001,1,1500,'SUCCEEDED',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)");
     assertFalse(jobs.refund());
     assertEquals(0, db.count("SELECT COUNT(*) FROM mock_refund_receipt"));

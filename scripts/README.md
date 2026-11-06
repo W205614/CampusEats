@@ -34,6 +34,7 @@
 | 有限性能测量 | `measure-performance.mjs` | 默认测量1／5／10／30客户端读取及30客户端混合交易；`PERF_SCENARIO=lunch` 测量30用户三波集中交易与历史／对账读取，操作说明见运维指南 |
 
 `docker-read.ps1` 为运维命令提供带超时的 Docker 读取。制品下载入口调用 `github-artifact-transfer.ps1` 分段传输，并校验完整制品。
+签名存储地址返回401/403时，在原15分钟预算内最多向同一GitHub artifact刷新两次，仅续传本次调用已确认的前缀；未知旧文件仍拒绝续传。
 
 PowerShell 回归测试与夹具集中在 [tests/](tests/)。例如，从项目根目录运行 `pwsh -NoProfile -File ./scripts/tests/test-release-safety.ps1` 验证发布时的写入隔离。镜像身份与制品分段传输分别由 `tests/test-image-identity.ps1` 和 `tests/test-github-artifact-transfer.ps1` 在 Windows、Linux 两端验证。Node.js 脚本的测试以 `.test.mjs` 结尾，与被测脚本同目录。
 
