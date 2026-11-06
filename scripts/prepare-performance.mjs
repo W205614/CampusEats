@@ -234,7 +234,9 @@ async function main() {
       throw new FixtureError(
         'Session refresh requires a private JSON source and the original 30-user lunch fixture.',
       );
-    const metadata = JSON.parse(await fs.readFile(source.replace(/\.json$/, '.metadata.json'), 'utf8'));
+    const metadata = JSON.parse(
+      await fs.readFile(source.replace(/\.json$/, '.metadata.json'), 'utf8'),
+    );
     reusedSessions = JSON.parse(await fs.readFile(source, 'utf8'));
     if (!Array.isArray(reusedSessions) || reusedSessions.length !== 30)
       throw new FixtureError('Session source must contain the original thirty identities.');
@@ -261,13 +263,23 @@ async function main() {
     const { campusId, storeId, productId } = fixture;
     if (
       sql(`SELECT COUNT(*) FROM user WHERE id IN (${ids.join(',')});`) !== '30' ||
-      sql(`SELECT COUNT(*) FROM employee WHERE id IN (${staffIds.join(',')}) AND store_id=${storeId} AND role='SHOP_MANAGER';`) !== '3' ||
+      sql(
+        `SELECT COUNT(*) FROM employee WHERE id IN (${staffIds.join(',')}) AND store_id=${storeId} AND role='SHOP_MANAGER';`,
+      ) !== '3' ||
       sql(`SELECT COUNT(*) FROM store WHERE campus_id=${campusId};`) !== '205' ||
-      sql(`SELECT COUNT(*) FROM dish d JOIN store s ON s.id=d.store_id WHERE s.campus_id=${campusId};`) !== '1025' ||
-      sql(`SELECT COUNT(*) FROM dish d JOIN store s ON s.id=d.store_id WHERE d.id=${productId} AND s.id=${storeId} AND s.campus_id=${campusId};`) !== '1' ||
-      sql(`SELECT COUNT(*) FROM orders WHERE campus_id=${campusId} AND number LIKE 'perf-history-${campusId}-%';`) !== '200000'
+      sql(
+        `SELECT COUNT(*) FROM dish d JOIN store s ON s.id=d.store_id WHERE s.campus_id=${campusId};`,
+      ) !== '1025' ||
+      sql(
+        `SELECT COUNT(*) FROM dish d JOIN store s ON s.id=d.store_id WHERE d.id=${productId} AND s.id=${storeId} AND s.campus_id=${campusId};`,
+      ) !== '1' ||
+      sql(
+        `SELECT COUNT(*) FROM orders WHERE campus_id=${campusId} AND number LIKE 'perf-history-${campusId}-%';`,
+      ) !== '200000'
     )
-      throw new FixtureError('The live isolated fixture no longer matches the original session evidence.');
+      throw new FixtureError(
+        'The live isolated fixture no longer matches the original session evidence.',
+      );
   } else {
     const fixturePrefix = `perf-${randomUUID()}`;
     const statements = [
@@ -336,19 +348,24 @@ async function main() {
   }
   const staff = [];
   if (args.includes('--lunch')) {
-    const reusedStaff = reusedSessions ? [...new Set(reusedSessions.map((session) => session.staffId))] : [];
+    const reusedStaff = reusedSessions
+      ? [...new Set(reusedSessions.map((session) => session.staffId))]
+      : [];
     for (let index = 0; index < 3; index++) {
-      const id = reusedSessions ? reusedStaff[index] :
-        sql(`INSERT INTO employee(name,username,password,role,store_id,campus_id,status,phone,sex,id_number,must_change_password)
+      const id = reusedSessions
+        ? reusedStaff[index]
+        : sql(`INSERT INTO employee(name,username,password,role,store_id,campus_id,status,phone,sex,id_number,must_change_password)
       SELECT 'Performance manager','perf-${fixture.campusId}-${index}',password,'SHOP_MANAGER',${fixture.storeId},${fixture.campusId},1,'','','',false FROM employee WHERE id=1; SELECT LAST_INSERT_ID();`);
       staff.push({ id, token: await identity('ADMIN', id) });
     }
   }
   for (let index = 0; index < userCount; index++) {
     const openid = `${prefix}-${index}`;
-    const id = reusedSessions ? reusedSessions[index].id : sql(
-      `INSERT INTO user(openid,name,create_time) VALUES('${openid}','Performance fixture ${index}',NOW()); SELECT LAST_INSERT_ID();`,
-    );
+    const id = reusedSessions
+      ? reusedSessions[index].id
+      : sql(
+          `INSERT INTO user(openid,name,create_time) VALUES('${openid}','Performance fixture ${index}',NOW()); SELECT LAST_INSERT_ID();`,
+        );
     if (!/^\d+$/.test(id)) throw new FixtureError('Invalid fixture subject identifier.');
     const token = await identity('USER', id);
     sessions.push({
@@ -370,7 +387,9 @@ async function main() {
         preparedAt: new Date().toISOString(),
         userIds: sessions.map((session) => session.id),
         fixture,
-        ...(reusedSessions ? {refreshedFrom: path.relative(root, path.resolve(root, option('--source')))} : {}),
+        ...(reusedSessions
+          ? { refreshedFrom: path.relative(root, path.resolve(root, option('--source'))) }
+          : {}),
       },
       null,
       2,

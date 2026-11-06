@@ -6,11 +6,66 @@
   "refresh": "15s",
   "time": { "from": "now-1h", "to": "now" },
   "panels": [
-    { "id": 1, "title": "Backend instances", "type": "stat", "gridPos": { "x": 0, "y": 0, "w": 6, "h": 5 }, "datasource": { "type": "prometheus", "uid": "campuseats-prometheus" }, "targets": [{ "expr": "sum(up{job=\"campuseats\"})", "refId": "A" }] },
-    { "id": 2, "title": "HTTP requests / second", "type": "timeseries", "gridPos": { "x": 6, "y": 0, "w": 18, "h": 8 }, "datasource": { "type": "prometheus", "uid": "campuseats-prometheus" }, "targets": [{ "expr": "sum by(status) (rate(http_server_requests_seconds_count[5m]))", "refId": "A" }] },
-    { "id": 3, "title": "HTTP P95 (seconds)", "type": "timeseries", "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "campuseats-prometheus" }, "targets": [{ "expr": "histogram_quantile(0.95,sum by(le,method)(rate(http_server_requests_seconds_bucket[5m])))", "refId": "A" }] },
-    { "id": 4, "title": "Durable work backlog", "type": "timeseries", "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "campuseats-prometheus" }, "targets": [{ "expr": "max(campus_outbox_backlog)", "refId": "A", "legendFormat": "outbox" }, { "expr": "max(campus_refund_failed)", "refId": "B", "legendFormat": "failed refunds" }, { "expr": "max(campus_payment_unknown)", "refId": "C", "legendFormat": "unknown payments" }] },
-    { "id": 5, "title": "Redis protection", "type": "timeseries", "gridPos": { "x": 0, "y": 16, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "campuseats-prometheus" }, "targets": [{ "expr": "campus_redis_degraded", "refId": "A" }] },
-    { "id": 6, "title": "JVM used heap bytes", "type": "timeseries", "gridPos": { "x": 12, "y": 16, "w": 12, "h": 8 }, "datasource": { "type": "prometheus", "uid": "campuseats-prometheus" }, "targets": [{ "expr": "sum by(instance)(jvm_memory_used_bytes{area=\"heap\"})", "refId": "A" }] }
+    {
+      "id": 1,
+      "title": "Backend instances",
+      "type": "stat",
+      "gridPos": { "x": 0, "y": 0, "w": 6, "h": 5 },
+      "datasource": { "type": "prometheus", "uid": "campuseats-prometheus" },
+      "targets": [{ "expr": "sum(up{job=\"campuseats\"})", "refId": "A" }]
+    },
+    {
+      "id": 2,
+      "title": "HTTP requests / second",
+      "type": "timeseries",
+      "gridPos": { "x": 6, "y": 0, "w": 18, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "campuseats-prometheus" },
+      "targets": [
+        { "expr": "sum by(status) (rate(http_server_requests_seconds_count[5m]))", "refId": "A" }
+      ]
+    },
+    {
+      "id": 3,
+      "title": "HTTP P95 (seconds)",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 8, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "campuseats-prometheus" },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.95,sum by(le,method)(rate(http_server_requests_seconds_bucket[5m])))",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "id": 4,
+      "title": "Durable work backlog",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 8, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "campuseats-prometheus" },
+      "targets": [
+        { "expr": "max(campus_outbox_backlog)", "refId": "A", "legendFormat": "outbox" },
+        { "expr": "max(campus_refund_failed)", "refId": "B", "legendFormat": "failed refunds" },
+        { "expr": "max(campus_payment_unknown)", "refId": "C", "legendFormat": "unknown payments" }
+      ]
+    },
+    {
+      "id": 5,
+      "title": "Redis protection",
+      "type": "timeseries",
+      "gridPos": { "x": 0, "y": 16, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "campuseats-prometheus" },
+      "targets": [{ "expr": "campus_redis_degraded", "refId": "A" }]
+    },
+    {
+      "id": 6,
+      "title": "JVM used heap bytes",
+      "type": "timeseries",
+      "gridPos": { "x": 12, "y": 16, "w": 12, "h": 8 },
+      "datasource": { "type": "prometheus", "uid": "campuseats-prometheus" },
+      "targets": [
+        { "expr": "sum by(instance)(jvm_memory_used_bytes{area=\"heap\"})", "refId": "A" }
+      ]
+    }
   ]
 }

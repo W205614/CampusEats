@@ -14,7 +14,10 @@ export const router = createRouter({
     { path: '/users', component: () => import('./pages/Users.vue') },
     { path: '/finance', component: () => import('./pages/Finance.vue') },
     { path: '/channel-payments', component: () => import('./pages/ChannelPayments.vue') },
-    { path: '/notification-deliveries', component: () => import('./pages/NotificationDeliveries.vue') },
+    {
+      path: '/notification-deliveries',
+      component: () => import('./pages/NotificationDeliveries.vue'),
+    },
     { path: '/service-operations', component: () => import('./pages/ServiceOperations.vue') },
     { path: '/messages', component: () => import('./pages/Inbox.vue') },
     { path: '/password', component: () => import('./pages/Password.vue') },

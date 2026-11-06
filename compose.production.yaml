@@ -75,7 +75,8 @@ services:
     image: ${ALERTMANAGER_IMAGE:-prom/alertmanager:v0.34.2@sha256:39d8bb3966c694a124428a3a88fbcffd40bd069129ecd47c059f8a3f17c55f3b}
     restart: unless-stopped
     logging: *logging
-    volumes: ['./deploy/production/monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro']
+    volumes:
+      ['./deploy/production/monitoring/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro']
     ports: ['127.0.0.1:19093:9093']
   grafana:
     profiles: [monitoring]

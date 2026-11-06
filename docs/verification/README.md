@@ -1,7 +1,6 @@
-# 当前版本验证
+# 验证记录导航
 
-[当前版本验证与维护记录](current.md) 是唯一的版本证据入口，包含源码改动、定向验证、容量测量、同CI制品的角色页面体验及日常部署。当前本地候选与已部署制品分别记录。
+- [当前版本验证与维护记录](current.md)：最终应用提交、CI、回归、容量测量、日常部署及按需维护方式。
+- [生产能力补齐首轮候选留档](production-upgrade.md)：早期候选阶段的验证过程。
 
-记录区分本地定向检查、既有部署证据和最终提交的CI；数字只适用于注明的源码与环境。完整自动验证以该提交SHA对应的 [GitHub Actions](https://github.com/W205614/CampusEats/actions/workflows/verify.yml) 为准。
-
-旧日期报告、性能JSON和历史截图不再累计，按明确清单移入回收站。本机材料放在 `.local/verification/`，各次范围与实际目录由 `current.md` 列明，历史验证不代表当前运行状态。完整备份与离线镜像恢复包已停用，恢复指针保持禁用；凭据和临时校验材料受Git忽略。操作说明见[文档导航](../README.md)。
+完整自动验证结果保存在对应提交的 [GitHub Actions](https://github.com/W205614/CampusEats/actions/workflows/verify.yml) 运行中。本机证据目录和运行制品由 `current.md` 列明；材料保留规则见[本机保留策略](../platform-deployment.md#本机保留策略)。

@@ -213,7 +213,9 @@ onHide(() => {
 <template>
   <view class="screen">
     <view class="title">确认合并订单</view>
-    <view class="notice">一次付款，各店分别履约。任一家店校验失败时整批不创建。跨店联合优惠由参与商家承担。</view>
+    <view class="notice"
+      >一次付款，各店分别履约。任一家店校验失败时整批不创建。跨店联合优惠由参与商家承担。</view
+    >
     <view v-if="pending" class="card">
       <view>上次提交结果尚未确认，请先恢复查询。</view>
       <button class="primary" :loading="busy" @click="recover">查询并恢复原请求</button>

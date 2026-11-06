@@ -36,7 +36,7 @@ npm run build:h5 --prefix frontend/client
 npm run build:mp-weixin --prefix frontend/client
 ```
 
-完整自动检查以 [GitHub Actions 工作流](.github/workflows/verify.yml)为准，其中包括 Maven 验证、前端构建、依赖审计、脚本测试、契约比对、浏览器回归、双实例验证、独立恢复及镜像安全检查。提交后检查该提交对应的 CI 结果；未执行、跳过或仍在运行的检查不能记为通过。构建成功与真实微信、短信、COS 或小程序真机验收分别记录。
+完整自动检查由 [GitHub Actions 工作流](.github/workflows/verify.yml)执行，包括 Maven 验证、前端构建、依赖审计、脚本测试、契约比对、浏览器回归、双实例验证、独立恢复及镜像安全检查。提交后等待对应 CI 完成并检查结果。涉及外部服务时，另行记录真实账号与设备上的验收结果。
 
 ## 接口与数据变更
 
@@ -49,7 +49,7 @@ git diff -- frontend/contracts/openapi.ts
 
 接口变更需要同步真实 OpenAPI 快照并重新生成类型。`generate-contracts.mjs --fetch` 会登录指定后端，应先按[开发说明](docs/development.md)和[脚本导航](scripts/README.md)准备隔离环境，再检查快照与生成结果。
 
-数据库使用新增 Flyway 迁移，保留已经执行过的历史迁移。涉及升级时验证旧记录与新结构，不通过改写旧脚本规避校验。写入式浏览器测试、容量测试、迁移及恢复使用独立 Compose 项目、端口、凭据和数据卷，不指向日常环境。发布与备份脚本可能暂停写入或更新恢复指针，执行前先核对[升级与回滚说明](docs/platform-deployment.md)，不要把部署命令当作只读检查。
+数据库使用新增 Flyway 迁移，保留已经执行过的历史迁移，并验证升级后的旧记录与新结构。写入式浏览器测试、容量测试、迁移及恢复使用独立 Compose 项目、端口、凭据和数据卷。发布与备份脚本会暂停写入或更新恢复指针，执行前按[升级与回滚说明](docs/platform-deployment.md)安排维护窗口。
 
 ## 提交说明
 

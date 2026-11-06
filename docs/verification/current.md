@@ -1,36 +1,54 @@
-# 当前版本验证与发布入口
+# 当前版本验证与维护记录
 
-本页说明验证和发布状态的判定方法。源码、CI 与运行实例可能处于不同阶段，不能把历史成功提交、某个镜像标签或旧部署截图称为当前版本。
+本地点餐、合单、履约、售后、权限和账务功能已完成回归，当前进入按需维护阶段。出现可复现问题、依赖升级或新业务需求时再修改；微信与腾讯云接入按专题指南另行安排。
 
-## 当前源码范围
+## 已完成的业务基线验收
 
-当前源码包含多校区合单、履约、优惠、售后与账务，以及微信服务商支付退款、手机号/微信身份、外部通知、COS、多实例和生产部署能力。数据库迁移至 V24，具体变化及兼容边界见[变更记录](../../CHANGELOG.md)。
+2026-11-06 完成应用提交 `58fac94e5dca7531d241d37c3d90722b167740cc` 的验证与日常部署，数据库升级至 V24。[CI 运行 42226756510](https://github.com/W205614/CampusEats/actions/runs/42226756510) 成功，部署使用该次 CI 测试并扫描的同一制品。
 
-默认启动为本机演示；真实渠道必须完成[生产接入](../production-readiness.md)和[生产部署验收](../production-deployment.md)。历史模拟数据和本地签名 HTTP 测试不作为真实云验收。
+| 检查             | 结果                                                                            |
+| ---------------- | ------------------------------------------------------------------------------- |
+| 后端完整验证     | 343 项通过，失败、错误、跳过均为 0                                              |
+| 前端与接口       | 两端工具链、类型、管理台/H5/小程序构建及 OpenAPI 生成比对通过                   |
+| 浏览器与实时通知 | 95 项浏览器测试及 WebSocket 检查通过                                            |
+| 双实例           | 会话、目录版本、票据、广播、幂等与停止节点恢复共 7 项通过                       |
+| 数据与文件       | 独立恢复通过；日常升级时原 49 张表的旧字段与主键核对通过，10 个上传文件摘要一致 |
+| 安全与制品       | 依赖审计、四服务镜像扫描及制品内容核验通过                                      |
 
-## 提交与 CI
+本机证据目录为 `.local/enterprise-release-20261106/`：`final-validation.json` 为最终回执，`ci-final-success.json` 为 CI 记录，`artifact-qa-final/summary.json` 为最终制品验收。早期候选阶段另见[历史留档](production-upgrade.md)。
 
-- 使用 `git rev-parse HEAD`、`git status --short` 和 `git ls-remote origin refs/heads/master` 核对提交及工作区，未提交文件不属于远端版本。
-- [Verify CampusEats](https://github.com/W205614/CampusEats/actions/workflows/verify.yml) 执行 Windows 权限、后端、前端、契约、浏览器、WebSocket、双节点、独立恢复、安全扫描及制品导出检查。
-- 只有同一提交、同一成功 master push run 的发布包可进入日常发布；运行中、跳过、失败或旧提交的检查不能记作本次通过。
-- CI 的 `release-<SHA>` 制品包含绑定来源的镜像、迁移和扫描证据；下载和发布必须核对 run、attempt、来源 SHA 与完整清单摘要。
+## 容量测量
 
-## 运行实例与本机验收
+使用原午餐场景：30 个用户、3 个员工、20 万条合成历史订单、300 秒三波交易。读取 P95 目标为 1 秒，交易 P95 目标为 10 秒。
 
-日常部署操作按[发布与恢复](../platform-deployment.md)执行。使用 `docker compose ps -a` 查看实际容器，用 `docker inspect` 查看镜像内容摘要及 revision，并与本次成功 CI 制品核对；重启旧容器不会更新镜像。
+| 指标                                  | 最终实测          |
+| ------------------------------------- | ----------------- |
+| HTTP 请求 / 完整交易                  | 9,727 / 90        |
+| 非预期错误 / 失败工作线程             | 0 / 0             |
+| 总体读取 P95                          | 124.50 ms         |
+| 商家历史 / 对账 P95                   | 76.20 / 610.18 ms |
+| 完整交易 P95                          | 5,219.08 ms       |
+| 任务积压、业务约束、OOM、异常重启检查 | 通过              |
 
-本机发布回执位于受保护的 `.local/releases/artifact-*/release.json`，记录来源提交、CI、镜像、迁移、数据与文件核对及发布结果。本轮企业级复核的本机证据入口为 `.local/enterprise-release-20261106/`；最终结果、清理清单和停止状态在操作完成后保存。回执中的时间、内容摘要与成功状态需要一同检查，目录名本身不是验收证明。
+资源条件为 Windows / Docker Desktop / WSL2 共享开发主机，MySQL 内存上限 2 GiB、memory+swap 上限 4 GiB、InnoDB 缓冲池 512 MiB；Java 768 MiB、Redis 160 MiB、Web 128 MiB。结果对应本机合成数据与模拟资金场景。原始报告为 `performance-provisioned/report.json`，资源依据为同目录 `resource-decision.md`；前两轮未达标报告保留在 `performance/` 和 `performance-final/`。
 
-写入式全量回归使用隔离项目、端口和合成数据。日常验收只做必要的健康、角色及只读数据/文件检查，不把测试订单混入原业务库。发生新源码修复后，重新验证直接影响范围和最终发布制品。
+## 源码、CI 与运行实例
 
-## 容量与恢复的适用范围
+上述提交是本轮业务验收基线。收尾整理统一了新增页面、脚本与配置的排版，并将订单页的支付状态名称映射移入脚本区；应用制品按后续成功 CI 更新，实际提交与镜像以 `.local/releases/artifact-*/release.json` 为准。收尾检查记录在 `.local/maintenance-closeout-20261106/`。
 
-首轮生产能力本地验证见[2026-11-06 候选留档](production-upgrade.md)，保留原失败及通过报告。30 用户、20 万合成历史、300 秒午餐场景的结果仅适用于记录的实际资源和模拟资金环境，不代表生产峰值或真实渠道容量。
+- 使用 `git rev-parse HEAD`、`git status --short` 和 `git ls-remote origin refs/heads/master` 核对本地与远端。
+- [Verify CampusEats](https://github.com/W205614/CampusEats/actions/workflows/verify.yml) 保存各提交的完整自动验证结果。
+- CI 的 `release-<SHA>` 制品绑定来源、run、attempt、镜像和扫描摘要；发布按该清单核验。
+- 使用 `docker compose ps -a` 查看容器状态，以 `docker inspect` 的内容摘要对照本机 `.local/releases/artifact-*/release.json` 中的部署记录。
 
-生产托管 MySQL PITR、COS 版本恢复、外部告警与真实微信/短信/真机验收仍需在真实资源中完成。软件配置检查、人工回执格式检查和本地独立恢复各自有明确边界，不相互替代。
+写入式回归在独立项目、端口和合成数据中执行。日常环境检查健康、角色权限、只读数据和文件。
 
-## 本机保留策略
+## 本机收尾状态
 
-仅保留当前日常制品、三个业务数据卷、上传文件、必要配置及紧凑验收证据。原停机状态在发布验收后恢复；清理仅处理已核实归属和引用的本项目资源，不执行全局 prune。
+日常四个容器在健康验收后已停止，三个业务卷和上传文件保留。已清理 24 个测试容器、18 个测试卷、6 个旧网络和 13 个旧镜像；78 项过时文件及临时备份共 4,001,984,923 字节已移入 Windows 回收站并核验。文件仍占用回收站空间。
 
-完整数据备份、离线镜像包与自动备份保持停用，`LATEST.json` / `LATEST.txt` 为 `DISABLED_BY_USER` 禁用标记。发布时生成的临时恢复材料仅用于该次验证，成功后按明确清单移入 Windows 回收站并恢复禁用指针；不能把历史恢复成功当作当前仍有恢复集。
+完整数据备份、离线镜像包与自动备份保持停用，`LATEST.json` / `LATEST.txt` 为 `DISABLED_BY_USER` 标记，当前没有可用恢复集。详细操作见[本机保留策略](../platform-deployment.md#本机保留策略)。
+
+## 后续外部接入
+
+微信商户权限、真实付款退款、腾讯云短信与 COS、CLB/CVM、云端监控、托管 MySQL PITR、COS 版本恢复及小程序真机验收，在准备好真实资源后按[生产接入](../production-readiness.md)和[生产部署](../production-deployment.md)执行。

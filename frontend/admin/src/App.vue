@@ -105,7 +105,11 @@ const links = computed(() => {
       ['/operations/audit', '操作记录'],
     );
   if (role.value === 'PLATFORM_ADMIN')
-    base.push(['/operations/buildings', '校区楼栋'], ['/users', '用户账号'], ['/notification-deliveries','外部通知']);
+    base.push(
+      ['/operations/buildings', '校区楼栋'],
+      ['/users', '用户账号'],
+      ['/notification-deliveries', '外部通知'],
+    );
   return base;
 });
 </script>

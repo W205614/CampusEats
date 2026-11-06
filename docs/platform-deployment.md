@@ -6,7 +6,7 @@
 
 本机继续采用单机、单实例演示部署。完整数据备份与离线镜像恢复包已按用户要求停用，`.local/backups/LATEST.json`、`LATEST.txt` 为 `DISABLED_BY_USER` 禁用标记，不提供恢复能力；历史恢复记录只证明当时校验通过。当前镜像、业务卷、上传文件及必要配置继续保留。
 
-下述备份、恢复和回退步骤是明确执行发布或人工恢复时的工具契约，不表示已启用定时备份。发布期间仍执行临时备份与独立恢复校验；`release.ps1` 会生成材料并更新LATEST，不会自动回收或重新禁用指针。维护者须在成功验证后按明确清单将临时恢复材料移入Windows回收站，并将LATEST恢复为禁用标记，才能完成当前本机保留策略。发布失败时保留现场，不能提前清理仍用于处理该次失败的材料。
+下述备份、恢复和回退工具在人工发布或恢复时执行，定时备份保持停用。发布期间仍执行临时备份与独立恢复校验；`release.ps1` 会生成材料并更新LATEST，不会自动回收或重新禁用指针。维护者须在成功验证后按明确清单将临时恢复材料移入Windows回收站，并将LATEST恢复为禁用标记，才能完成当前本机保留策略。发布失败时保留现场和处理该次失败所需材料。
 
 ## 已采用 CI 制品的日常环境
 
@@ -21,7 +21,7 @@ pwsh -NoProfile -File ./scripts/release.ps1 -BundleDirectory .local/releases/dow
 
 大文件使用4 MiB分段传输，每段最多3次尝试；只恢复本次调用已经确认的前缀，不接续已有文件。单次请求90秒取消覆盖响应体，整体传输预算15分钟；每段的范围、总长度和实际字节数均须匹配，最终仍校验GitHub提供的完整归档SHA-256。GitHub认证只发送到官方API，存储地址不携带该认证，下载失败不进入发布。
 
-发布清单分别记录源引擎运行ID、配置摘要和平台清单摘要。读取可信OCI归档时逐项验证索引、清单、配置及有序层的内容地址；导入后本机ID必须属于该图中已验证的配置／平台清单身份，文件系统层顺序、平台和源码revision也必须匹配。Compose固定本机已解析的内容ID，容器再次核对实际引用。仅有同名标签、相同revision或相同架构不能通过验证。
+发布清单分别记录源引擎运行ID、配置摘要和平台清单摘要。读取可信OCI归档时逐项验证索引、清单、配置及有序层的内容地址；导入后本机ID必须属于该图中已验证的配置／平台清单身份，文件系统层顺序、平台和源码revision也必须匹配。Compose固定本机已解析的内容ID，容器再次核对实际引用。身份核验以内容图及上述字段为准。
 
 清单格式V3包含Java、Web及已安装安全补丁的MySQL三个镜像；V1／V2仍严格验证原两个应用镜像。MySQL保持8.4.13及原入口、配置和数据目录，安装 Oracle ELSA-2026-92907 的 curl/libcurl 补丁和 [ELSA-2026-79281](https://linux.oracle.com/errata/ELSA-2026-79281.html) 的 glibc、glibc-common、glibc-minimal-langpack 补丁，下载时核对官方SHA-256，安装时校验RPM签名。源构建的 `MYSQL_IMAGE` 默认为 `campuseats-mysql:v1`，已采用制品的日常环境继续固定内容ID。
 
@@ -31,9 +31,9 @@ pwsh -NoProfile -File ./scripts/release.ps1 -BundleDirectory .local/releases/dow
 
 发布失败保持停写并保存现场，不自动切旧应用搭配新 schema。成功后将应用引用固定为 CI 标签、依赖固定为原镜像 ID；后续普通 Compose 启动继续使用该版本。`start.ps1` 拒绝在这种环境中源码覆盖构建。
 
-独立角色验收采用全新 `campuseats-improvement-...` 项目和非日常端口，使用同一制品及匹配依赖镜像。只在明确全新环境为发布入口增加 `-Initialize -ProjectName <独立项目> -EnvFile <独立配置>`；它拒绝复用已有同名容器或卷。验收数据不能复制回日常库。
+独立角色验收采用全新 `campuseats-improvement-...` 项目和非日常端口，使用同一制品及匹配依赖镜像。只在明确全新环境为发布入口增加 `-Initialize -ProjectName <独立项目> -EnvFile <独立配置>`；它拒绝复用已有同名容器或卷。验收数据留在独立项目中。
 
-发布验证使用的临时恢复材料须配套包含已验证数据库／上传／配置、匹配的应用制品与所需镜像，记录摘要及来源；不能仅依赖浮动镜像标签或GitHub短期artifact。发布完成前不提前清理临时留底。当前本机不长期保留完整恢复集，验证成功后按上方策略回收，不能将发布过程中的恢复验证表述为当前仍可恢复。
+发布验证使用的临时恢复材料须配套包含已验证数据库／上传／配置、匹配的应用制品与所需镜像，记录摘要及来源，并保留该次发布所需的实际文件。发布完成前不提前清理临时留底。当前本机在验证成功后按上方策略回收完整恢复集，仅保留验收记录。
 
 ## 首次本机部署与尚未采用制品的源码环境
 
@@ -63,9 +63,9 @@ pwsh -NoProfile -File ./scripts/release.ps1 -BundleDirectory .local/releases/dow
 
 备份和回滚材料保存在受保护的本机 `.local`。清理重复镜像前可先用 `docker image save` 导出匹配备份的镜像，并记录 SHA-256；需要回滚时先 `docker image load`。只清理明确归属 CampusEats 的冗余容器、镜像和本轮验收专用卷，禁止全局 prune。
 
-本机仅保留当前镜像、业务卷、上传文件及必要配置。新版健康、业务数据及文件一致、镜像安全门禁和临时备份独立恢复均通过后，旧应用镜像仅按明确归属及引用关系清理；完整备份、离线镜像包及过时验证文件按明确清单移入Windows回收站，包括本次发布成功后的临时恢复材料。`.local/backups/LATEST.json` 和 `LATEST.txt` 保持禁用，[当前版本记录](verification/current.md)中的历史摘要不代表材料仍存在。此策略不授权清理其它项目、日常业务卷或归属不明的匿名卷。
+本机仅保留当前镜像、业务卷、上传文件及必要配置。新版健康、业务数据及文件一致、镜像安全门禁和临时备份独立恢复均通过后，旧应用镜像仅按明确归属及引用关系清理；完整备份、离线镜像包及过时验证文件按明确清单移入Windows回收站，包括本次发布成功后的临时恢复材料。`.local/backups/LATEST.json` 和 `LATEST.txt` 保持禁用。当前镜像、日常业务卷、其他项目及归属不明的资源继续保留。
 
-源码构建可能复用旧系统包层：Dockerfile里有更新命令不代表实际执行了更新。源码开发环境应刷新过期运行层并扫描实际镜像。已采用CI制品的环境应修复CI构建并重新获取通过门禁的包，不以本机重建替代同一制品，不在运行容器中手改包或放宽门禁。
+源码构建会复用 Docker 缓存；更新系统包时刷新过期运行层并扫描实际镜像。已采用CI制品的环境应修复CI构建并重新获取通过门禁的包，不以本机重建替代同一制品，不在运行容器中手改包或放宽门禁。
 
 菜单缓存属于可重建数据，不包含在数据库／上传恢复集内。缓存使用epoch和代际封装；跨缓存格式回滚到旧镜像时，应在暂停Web／Java、恢复匹配数据库与上传文件后，仅清理本项目Redis中的菜单键，再启动应用。保留限流等其它Redis状态，不能用全库清空替代。以下命令只针对日常项目的派生菜单键，不能在仍接受业务写入时执行：
 
@@ -73,12 +73,12 @@ pwsh -NoProfile -File ./scripts/release.ps1 -BundleDirectory .local/releases/dow
 docker compose -p campuseats-v1 exec -T redis sh -c 'export REDISCLI_AUTH="$REDIS_PASSWORD"; redis-cli --scan --pattern "campus:store:*:catalog" | while IFS= read -r key; do redis-cli UNLINK "$key" >/dev/null; done'
 ```
 
-历史支付、退款或完成时间缺失时标记或保留为未知，不以订单／任务创建时间冒充实际发生时间；按日统计不计入没有可验证事件日期的历史金额。缺少完成时间的历史订单不能自动判定7天售后窗口。
+历史支付、退款或完成时间缺失时保留为未知，按日统计只计入有可验证事件日期的金额。缺少完成时间的历史订单由人工核对售后期限。
 
 ## 构建与旧数据库注意事项
 
 后端镜像使用 `MAVEN_MIRROR_URL` 构建参数选择 Maven 源，默认值见根目录 `Dockerfile`，可改为 `https://repo.maven.apache.org/maven2`。直接调用 `docker compose build` 前也应保留旧镜像；`start.ps1` 会先建立 `rollback-时间戳` 标签，构建失败不会停止旧应用。
 
-无 Flyway 历史的非空数据库不能交给启动脚本自动 baseline。先保留旧镜像、数据库与上传备份，再恢复到独立克隆。可用 `scripts/migration-preflight.ps1 -ProjectName <克隆项目名>` 检查重复订单号、用户标识和孤立归属，并人工对照 `V1__legacy_schema.sql`；脚本不是完整 schema 一致性证明，也不会自动解决冲突。
+无 Flyway 历史的非空数据库不能交给启动脚本自动 baseline。先保留旧镜像、数据库与上传备份，再恢复到独立克隆。可用 `scripts/migration-preflight.ps1 -ProjectName <克隆项目名>` 检查重复订单号、用户标识和孤立归属，并人工对照 `V1__legacy_schema.sql`；脚本检查上述重复标识和归属；完整 schema 对照与冲突处理由维护者完成。
 
 只有确认克隆 schema 与 V1 一致后，才能在该克隆明确使用 `SPRING_FLYWAY_BASELINE_ON_MIGRATE=true`、`SPRING_FLYWAY_BASELINE_VERSION=1` 做一次性基线，之后移除配置，由 Flyway 执行后续迁移。克隆验收通过后再规划目标库维护窗口；不要对未知结构的日常库直接复制这些设置。
