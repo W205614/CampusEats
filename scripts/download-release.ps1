@@ -83,12 +83,13 @@ try {
   if ([string]$artifact.id -cnotmatch '^[1-9][0-9]*$') { throw 'Invalid trusted artifact identity.' }
   $artifactEndpoint = [uri]('https://api.github.com/repos/W205614/CampusEats/actions/artifacts/' + $artifact.id + '/zip')
   # Only this fixed official API endpoint receives authorization, including refreshes.
+  $validateStorageUri = ${function:Assert-GitHubArtifactStorageUri}
   $refreshStorage = { param($CancellationToken)
     $redirectResponse = $client.GetAsync($artifactEndpoint, [Net.Http.HttpCompletionOption]::ResponseHeadersRead, $CancellationToken).GetAwaiter().GetResult()
     try {
       if ([int]$redirectResponse.StatusCode -ne 302) { throw 'GitHub did not return the expected artifact redirect.' }
       $redirect = $redirectResponse.Headers.Location
-      Assert-GitHubArtifactStorageUri $redirect
+      & $validateStorageUri $redirect
       return $redirect
     } finally { $redirectResponse.Dispose() }
   }.GetNewClosure()

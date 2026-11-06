@@ -244,3 +244,85 @@ foreach ($mode in @('refresh-http','refresh-userinfo','refresh-fragment','refres
   }
 }
 Write-Host 'Artifact refresh: confirmed prefix, official-API callback cancellation, global two-refresh limit, invalid URLs, safe failure classification and shared overall/request budgets passed without network or Docker.'
+
+# Execute the real download entry's RHS expressions, including its local-function capture.
+# Only the HTTP handler is a fixture; the callback and URI validator are read from source AST.
+$tokens = $null; $parseErrors = $null
+$downloadAst = [Management.Automation.Language.Parser]::ParseFile((Join-Path $scriptsDir 'download-release.ps1'), [ref]$tokens, [ref]$parseErrors)
+if ($parseErrors.Count) { throw 'Download entry could not be parsed.' }
+$actualAssignments = @{}
+foreach ($name in @('artifactEndpoint','validateStorageUri','refreshStorage')) {
+  $matches = @($downloadAst.FindAll({param($node) $node -is [Management.Automation.Language.AssignmentStatementAst] -and $node.Left.Extent.Text -ceq ('$' + $name)}, $true))
+  if ($matches.Count -ne 1) { throw 'Download callback source assignment is missing or ambiguous.' }
+  $actualAssignments[$name] = $matches[0].Right.Extent.Text
+}
+$helperAst = [Management.Automation.Language.Parser]::ParseFile((Join-Path $scriptsDir 'github-artifact-transfer.ps1'), [ref]$tokens, [ref]$parseErrors)
+$validatorDefinition = $helperAst.Find({param($node) $node -is [Management.Automation.Language.FunctionDefinitionAst] -and $node.Name -ceq 'Assert-GitHubArtifactStorageUri'}, $true).Extent.Text
+if (!('CampusEatsArtifactRedirectHandler' -as [type])) {
+  Add-Type -TypeDefinition @'
+using System;
+using System.Net;
+using System.Net.Http;
+using System.Threading;
+using System.Threading.Tasks;
+public sealed class CampusEatsArtifactRedirectHandler : HttpMessageHandler {
+ public int Status = 302; public Uri Location = new Uri("https://storage-fixture.invalid/refreshed");
+ public bool Stall; public int Calls; public bool OfficialEndpoint = true;
+ public bool Authorized = true; public bool Cancellable = true;
+ protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellation) {
+  Calls++;
+  OfficialEndpoint &= request.RequestUri.AbsoluteUri == "https://api.github.com/repos/W205614/CampusEats/actions/artifacts/13501263137/zip";
+  Authorized &= request.Headers.Authorization?.Scheme == "Bearer" && request.Headers.Authorization?.Parameter == "fixture-in-memory-token";
+  Cancellable &= cancellation.CanBeCanceled;
+  if(Stall) await Task.Delay(1000,cancellation);
+  cancellation.ThrowIfCancellationRequested();
+  var response = new HttpResponseMessage((HttpStatusCode)Status);
+  response.Headers.Location = Location;
+  return response;
+ }
+}
+'@
+}
+function New-ActualDownloadRedirectCallback {
+  param([Net.Http.HttpClient]$Client)
+  . ([scriptblock]::Create($validatorDefinition))
+  $artifact = @{id='13501263137'}
+  $artifactEndpoint = . ([scriptblock]::Create($actualAssignments['artifactEndpoint']))
+  $validateStorageUri = . ([scriptblock]::Create($actualAssignments['validateStorageUri']))
+  $refreshStorage = . ([scriptblock]::Create($actualAssignments['refreshStorage']))
+  return $refreshStorage
+}
+$apiHandler = [CampusEatsArtifactRedirectHandler]::new()
+$apiClient = [Net.Http.HttpClient]::new($apiHandler)
+$apiClient.Timeout = [Threading.Timeout]::InfiniteTimeSpan
+$apiClient.DefaultRequestHeaders.Authorization = [Net.Http.Headers.AuthenticationHeaderValue]::new('Bearer','fixture-in-memory-token')
+$actualCallback = New-ActualDownloadRedirectCallback $apiClient
+$requestCancellation = [Threading.CancellationTokenSource]::new([TimeSpan]::FromSeconds(5))
+try {
+  $actual = New-RangeFixture 'actual-entry-closure' 'refresh-normal'
+  Receive-GitHubArtifactRanges -StorageUri 'https://artifact-fixture.invalid/local' -Path $actual.Output -ExpectedBytes $actual.Bytes.Length -ExpectedSha256 ([Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($actual.Bytes))) -ChunkBytes 4 -SendRange (New-RangeSender $actual) -RefreshStorageUri $actualCallback
+  Assert-RangeBytes $actual
+  if ($apiHandler.Calls -ne 1 -or !$apiHandler.OfficialEndpoint -or !$apiHandler.Authorized -or !$apiHandler.Cancellable -or ($actual.Starts -join ',') -cne '0,4,4,8') { throw 'Actual download callback did not preserve endpoint, auth, cancellation or prefix boundaries.' }
+  foreach ($case in @('status','http','userinfo','fragment','relative','missing')) {
+    $apiHandler.Status = if ($case -eq 'status') { 200 } else { 302 }
+    $apiHandler.Location = switch ($case) {
+      'http' { [uri]'http://storage-fixture.invalid/refreshed' }
+      'userinfo' { [uri]'https://credential@storage-fixture.invalid/refreshed' }
+      'fragment' { [uri]'https://storage-fixture.invalid/refreshed#private' }
+      'relative' { [uri]'/refreshed' }
+      'missing' { $null }
+      default { [uri]'https://storage-fixture.invalid/refreshed' }
+    }
+    $rejected = $false
+    try { [void](& $actualCallback $requestCancellation.Token) } catch { $rejected = $true }
+    if (!$rejected) { throw 'Actual callback accepted a non-302 or invalid redirect.' }
+  }
+  $apiHandler.Status = 302; $apiHandler.Stall = $true
+  $cancel = [Threading.CancellationTokenSource]::new([TimeSpan]::FromMilliseconds(40))
+  try {
+    $rejected = $false
+    try { [void](& $actualCallback $cancel.Token) } catch { $rejected = $true }
+    if (!$rejected -or !$cancel.IsCancellationRequested) { throw 'Actual API callback ignored its cancellation token.' }
+  } finally { $cancel.Dispose() }
+} finally { $requestCancellation.Dispose(); $apiClient.Dispose(); $apiHandler.Dispose() }
+Write-Host 'Actual download entry AST closure: local validator capture, real HttpClient fixture handler, fixed official endpoint auth, prefix refresh, 302/URI rejection and cancellation passed without network or Docker.'
