@@ -67,12 +67,13 @@ public class FulfillmentService {
       args.add(beforeId);
     }
     args.add(pageLimit);
+    // Bound the order page before metadata joins; join reordering can otherwise scan all history.
     var rows =
         db.rows(
-            "SELECT o.*,s.name store_name,c.name campus_name FROM orders o JOIN store s ON"
-                + " s.id=o.store_id JOIN campus c ON c.id=o.campus_id WHERE "
+            "SELECT o.*,s.name store_name,c.name campus_name FROM (SELECT o.* FROM orders o WHERE "
                 + where
-                + " ORDER BY o.id DESC LIMIT ?",
+                + " ORDER BY o.id DESC LIMIT ?) o JOIN store s ON s.id=o.store_id JOIN campus c ON"
+                + " c.id=o.campus_id ORDER BY o.id DESC",
             args.toArray());
     decorateAll(rows, a);
     return rows;

@@ -55,6 +55,7 @@ class HistoryReadIntegrationTest {
   @Autowired Db db;
   @Autowired DiscoveryService discovery;
   @Autowired AuditHistory audit;
+  @Autowired FulfillmentService fulfillment;
   long campus, store, otherStore;
   final Actor platform = new Actor(1, "ADMIN", "PLATFORM_ADMIN", "", false);
   final LocalDate day = LocalDate.of(2026, 10, 26);
@@ -161,6 +162,89 @@ class HistoryReadIntegrationTest {
                 BusinessException.class,
                 () -> discovery.merchantReviews(otherStore, new ReviewQuery(null, null)))
             .code());
+  }
+
+  @Test
+  void orderPagesKeepCrossCampusLabelsGlobalCursorOrderAndAccountScope() {
+    db.update("UPDATE campus SET name='历史北校区' WHERE id=?", campus);
+    long south = db.insert("INSERT INTO campus(name) VALUES('历史南校区')");
+    long remoteStore = db.insert("INSERT INTO store(campus_id,name) VALUES(?,'南区店铺')", south);
+    long user = db.insert("INSERT INTO user(name) VALUES('历史用户')");
+    long otherUser = db.insert("INSERT INTO user(name) VALUES('其他用户')");
+    var ids = new ArrayList<Long>();
+    var labels = new HashMap<Long, List<String>>();
+    for (long selected : List.of(store, otherStore, remoteStore, store, otherStore, remoteStore)) {
+      boolean remote = selected == remoteStore;
+      long id =
+          db.insert(
+              "INSERT INTO"
+                  + " orders(number,user_id,address_book_id,order_time,amount,status,store_id,campus_id,fulfillment,ready,pickup_code,pickup_hash,request_hash)"
+                  + " VALUES(?,?,0,?,10,3,?,?,'PICKUP',true,'12345678',?,?)",
+              "history-" + UUID.randomUUID(),
+              user,
+              LocalDateTime.now(),
+              selected,
+              remote ? south : campus,
+              "p".repeat(64),
+              "r".repeat(64));
+      ids.add(id);
+      labels.put(
+          id,
+          List.of(
+              selected == store ? "历史店铺" : remote ? "南区店铺" : "其他店铺", remote ? "历史南校区" : "历史北校区"));
+    }
+    long foreign =
+        db.insert(
+            "INSERT INTO"
+                + " orders(number,user_id,address_book_id,order_time,amount,status,store_id,campus_id)"
+                + " VALUES(?,?,0,?,10,3,?,?)",
+            "foreign-" + UUID.randomUUID(),
+            otherUser,
+            LocalDateTime.now(),
+            remoteStore,
+            south);
+    db.update(
+        "INSERT INTO order_detail(order_id,name,number,amount) VALUES(?,'分页快照',1,10)",
+        ids.getLast());
+    act(new Actor(user, "USER", "USER", "", false));
+    var first = fulfillment.orders(null, null, 2);
+    var second = fulfillment.orders(null, Db.id(first.getLast(), "id"), 2);
+    var third = fulfillment.orders(null, Db.id(second.getLast(), "id"), 2);
+    var expected = new ArrayList<>(ids);
+    Collections.reverse(expected);
+    var actual = new ArrayList<Long>();
+    for (var page : List.of(first, second, third)) {
+      assertEquals(2, page.size());
+      for (var row : page) {
+        long id = Db.id(row, "id");
+        actual.add(id);
+        assertEquals(labels.get(id), List.of(row.get("store_name"), row.get("campus_name")));
+        assertEquals("12345678", row.get("pickup_code"));
+        assertFalse(row.containsKey("pickup_hash"));
+        assertFalse(row.containsKey("request_hash"));
+        assertEquals(false, row.get("reviewed"));
+      }
+    }
+    assertEquals(expected, actual);
+    assertTrue(fulfillment.orders(null, Db.id(third.getLast(), "id"), 2).isEmpty());
+    assertEquals(
+        "分页快照", ((Map<?, ?>) ((List<?>) first.getFirst().get("details")).getFirst()).get("name"));
+    act(new Actor(99, "ADMIN", "SHOP_MANAGER", "", false, store, campus));
+    var merchantFirst = fulfillment.orders(store, null, 1);
+    var merchantSecond = fulfillment.orders(store, Db.id(merchantFirst.getFirst(), "id"), 1);
+    assertEquals(ids.get(3).longValue(), Db.id(merchantFirst.getFirst(), "id"));
+    assertEquals(ids.getFirst().longValue(), Db.id(merchantSecond.getFirst(), "id"));
+    assertFalse(merchantFirst.getFirst().containsKey("pickup_code"));
+    assertEquals(
+        "FORBIDDEN",
+        assertThrows(BusinessException.class, () -> fulfillment.orders(remoteStore, null, 2))
+            .code());
+    act(platform);
+    var remotePage = fulfillment.orders(remoteStore, null, 2);
+    assertEquals(
+        List.of(foreign, ids.get(5)), remotePage.stream().map(row -> Db.id(row, "id")).toList());
+    var remoteOlder = fulfillment.orders(remoteStore, Db.id(remotePage.getLast(), "id"), 2);
+    assertEquals(List.of(ids.get(2)), remoteOlder.stream().map(row -> Db.id(row, "id")).toList());
   }
 
   @Test
