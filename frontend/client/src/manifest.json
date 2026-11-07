@@ -2,8 +2,8 @@
   "name": "CampusEats",
   "appid": "__UNI__CAMPUS_EATS",
   "description": "校园点餐演示，模拟支付",
-  "versionName": "1.0.0",
-  "versionCode": "100",
+  "versionName": "1.0.1",
+  "versionCode": "101",
   "transformPx": false,
   "mp-weixin": {
     "appid": "",

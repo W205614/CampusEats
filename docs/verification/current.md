@@ -2,6 +2,14 @@
 
 本地点餐、合单、履约、售后、权限和账务功能已完成回归，当前进入按需维护阶段。出现可复现问题、依赖升级或新业务需求时再修改；微信与腾讯云接入按专题指南另行安排。
 
+## v1.0.1 版本与运行核对
+
+当前版本入口为 [v1.0.1](https://github.com/W205614/CampusEats/releases/tag/v1.0.1)，后端模块为 `campuseats-common`、`campuseats-api` 和 `campuseats-server`，Java 包名为 `com.campuseats`，入口为 `CampusEatsApplication`。后端与两端应用版本统一为 `1.0.1`。本轮整理不增加业务功能，不改变 HTTP 契约或 V1—V24 迁移内容；数据库标识和业务卷保持原样。
+
+使用 `git rev-parse v1.0.1` 核对发布提交，按该提交的[CI 结果](https://github.com/W205614/CampusEats/actions/workflows/verify.yml)和 Release 附件验证源码与制品。本机完整收尾回执位于 `.local/release-1.0.1-20261107/final-validation.json`，其中记录本地与远端、Tag、Release、四个运行镜像的对应关系，以及数据核验、临时恢复负载回收和最终容器状态；实际部署记录仍保存在 `.local/releases/artifact-*/release.json`。
+
+下文是 2026-11-06 的历史业务基线、容量测量和当时的收尾统计；不将历史容量数字当成本轮重新执行的容量测试。当前发布和运行状态以上述版本回执为准。
+
 ## 已完成的业务基线验收
 
 2026-11-06 完成应用提交 `58fac94e5dca7531d241d37c3d90722b167740cc` 的验证与日常部署，数据库升级至 V24。[CI 运行 42226756510](https://github.com/W205614/CampusEats/actions/runs/42226756510) 成功，部署使用该次 CI 测试并扫描的同一制品。
