@@ -3,6 +3,7 @@ import vue from '@vitejs/plugin-vue';
 export default defineConfig({
   base: '/admin/',
   plugins: [vue()],
+  build: { license: { fileName: 'THIRD_PARTY_LICENSES.md' } },
   server: {
     port: 5173,
     proxy: {

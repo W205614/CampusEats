@@ -22,4 +22,11 @@ $blocked = Invoke-WebRequest "$BaseUrl/api/v1/merchant/stores/$storeId/orders" -
 if ($blocked.StatusCode -ne 401) { throw 'Unauthenticated admin access was not rejected' }
 $retired = Invoke-WebRequest "$BaseUrl/api/v1/user/shop" -SkipHttpErrorCheck
 if ($retired.StatusCode -ne 410) { throw 'Legacy unscoped entrypoint is still available' }
+foreach ($entry in @('/admin/THIRD_PARTY_LICENSES.md', '/app/THIRD_PARTY_LICENSES.md')) {
+  $notice = Invoke-WebRequest ($BaseUrl.TrimEnd('/') + $entry)
+  if ($notice.Content -notmatch '# Licenses' -or $notice.Content -notmatch '## vue -') {
+    throw "Bundled dependency license notice unavailable: $entry"
+  }
+}
 Write-Host 'Root redirect, readiness, scoped menu, string IDs/prices, authentication and retired legacy entrypoint checks passed.'
+Write-Host 'Admin and H5 dependency license notices are served with the application.'

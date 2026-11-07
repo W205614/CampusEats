@@ -81,6 +81,7 @@ jobs:
           ./scripts/tests/test-migration-hash.ps1
           ./scripts/tests/test-artifact-release.ps1
           ./scripts/tests/test-restore-ownership.ps1
+          ./scripts/tests/test-docker-context.ps1
           ./scripts/start.ps1 -SkipVerify
       - name: Verify real image archive before browser regression
         shell: pwsh

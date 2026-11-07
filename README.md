@@ -112,4 +112,4 @@ docker compose ps
 
 使用问题和经过脱敏的缺陷通过 [GitHub Issues](https://github.com/W205614/CampusEats/issues)反馈，附上版本、复现步骤和预期结果。安全漏洞及敏感材料通过[私有报告渠道](SECURITY.md)提交。
 
-项目级开源许可证待来源核对后确定。源码来源、第三方依赖与授权状态见[许可说明](docs/licensing.md)。
+项目自有源码、文档与素材以 [MIT License](LICENSE) 发布。第三方组件保留各自许可；依赖清单、构建产物中的版权说明与分发要求见[许可说明](docs/licensing.md)。

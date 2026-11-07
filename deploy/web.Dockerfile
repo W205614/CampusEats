@@ -30,3 +30,4 @@ COPY --from=build /workspace/frontend/client/dist/build/h5 /usr/share/nginx/html
 COPY deploy/nginx.conf /etc/nginx/conf.d/default.conf
 COPY deploy/proxy-headers.conf /etc/nginx/campus-proxy-headers.conf
 COPY deploy/dish.svg /usr/share/nginx/html/demo-images/dish.svg
+COPY LICENSE /usr/share/nginx/html/LICENSE

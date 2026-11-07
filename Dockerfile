@@ -13,8 +13,8 @@ RUN --mount=type=cache,target=/root/.m2 \
     mvn -s /workspace/maven-settings.xml -Dmaven.mirror.url=$MAVEN_MIRROR_URL -U -B -ntp \
       -Dmaven.test.skip=true -Dmaven.wagon.http.retryHandler.count=3 package
 RUN cd /workspace/sky-server/target && test -s bom.json && \
-    sha256sum sky-server-1.0-SNAPSHOT.jar bom.json | \
-    sed 's/sky-server-1.0-SNAPSHOT.jar/app.jar/; s/bom.json/sbom.cdx.json/' > runtime-manifest.sha256
+    sha256sum sky-server-1.0.0.jar bom.json | \
+    sed 's/sky-server-1.0.0.jar/app.jar/; s/bom.json/sbom.cdx.json/' > runtime-manifest.sha256
 
 FROM eclipse-temurin:21.0.13_9-jre-alpine-3.24@sha256:82cf3d9ccbe1ed46252008d51b2f2329e6b9e8a2f4394c4bebefc3ea7f4b1372 AS runtime
 ARG RUNTIME_REFRESH=initial
@@ -30,9 +30,10 @@ RUN test -n "$RUNTIME_REFRESH" && apk del --no-cache fontconfig ttf-dejavu gnupg
     done
 WORKDIR /app
 RUN mkdir -p /app/uploads && chown -R 10001:10001 /app
-COPY --from=build --chown=10001:10001 /workspace/sky-server/target/sky-server-1.0-SNAPSHOT.jar /app/app.jar
+COPY --from=build --chown=10001:10001 /workspace/sky-server/target/sky-server-1.0.0.jar /app/app.jar
 COPY --from=build --chown=10001:10001 /workspace/sky-server/target/bom.json /app/sbom.cdx.json
 COPY --from=build --chown=10001:10001 /workspace/sky-server/target/runtime-manifest.sha256 /app/runtime-manifest.sha256
+COPY LICENSE /app/LICENSE
 USER 10001:10001
 ENV TZ=Asia/Shanghai
 EXPOSE 8080
