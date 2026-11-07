@@ -28,5 +28,7 @@ foreach ($entry in @('/admin/THIRD_PARTY_LICENSES.md', '/app/THIRD_PARTY_LICENSE
     throw "Bundled dependency license notice unavailable: $entry"
   }
 }
+$projectLicense = Invoke-WebRequest ($BaseUrl.TrimEnd('/') + '/LICENSE')
+if ($projectLicense.Content -notmatch '^MIT License') { throw 'Project MIT license unavailable' }
 Write-Host 'Root redirect, readiness, scoped menu, string IDs/prices, authentication and retired legacy entrypoint checks passed.'
 Write-Host 'Admin and H5 dependency license notices are served with the application.'
