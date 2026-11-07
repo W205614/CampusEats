@@ -71,12 +71,16 @@ class PlatformIntegrationTest {
       return this;
     }
 
-    final AtomicReference<Instant> advanceAfterRead = new AtomicReference<>();
+    // Scheduled metrics share this clock; only the arming test thread advances midnight.
+    final ThreadLocal<Instant> advanceAfterRead = new ThreadLocal<>();
 
     public Instant instant() {
       Instant current = value.get();
-      Instant next = advanceAfterRead.getAndSet(null);
-      if (next != null) value.set(next);
+      Instant next = advanceAfterRead.get();
+      if (next != null) {
+        advanceAfterRead.remove();
+        value.set(next);
+      }
       return current;
     }
   }
@@ -1524,7 +1528,7 @@ class PlatformIntegrationTest {
   }
 
   @Test
-  void checkoutUsesOneShanghaiSnapshotAcrossMidnightAndRetriesOldKey() {
+  void checkoutUsesOneShanghaiSnapshotAcrossMidnightAndRetriesOldKey() throws Exception {
     Instant before = Instant.parse("2026-10-15T15:59:59Z");
     Instant after = before.plusSeconds(2);
     clock.value.set(before);
@@ -1559,6 +1563,9 @@ class PlatformIntegrationTest {
         new PlatformCommands.Checkout(source.stores(), null, quote.quoteHash(), source.remark());
     clock.value.set(before);
     clock.advanceAfterRead.set(after);
+    try (var sampler = Executors.newSingleThreadExecutor()) {
+      assertEquals(before, sampler.submit(clock::instant).get(5, TimeUnit.SECONDS));
+    }
     String key = UUID.randomUUID().toString();
     var result = checkout.submit(key, request);
     long id = Db.id(result, "id");

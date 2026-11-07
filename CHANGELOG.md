@@ -7,6 +7,7 @@
 - 将后端模块统一为 `campuseats-common`、`campuseats-api` 和 `campuseats-server`，分别承载公共工具、接口类型和应用服务；Java 包名统一为 `com.campuseats`，启动类改为 `CampusEatsApplication`。
 - 同步 Maven 坐标、Docker 构建、运维脚本、CI 报告路径和源码文档。已有 V1—V24 迁移内容、数据库标识及业务卷不变；旧版本镜像的 SBOM 继续支持核验。
 - 后端与两端应用版本统一为 `1.0.1`，小程序构建版本号更新为 `101`。二次开发时更新模块路径、Java 包引用及 Maven 坐标；HTTP 接口和业务行为保持不变。
+- 修复跨午夜结算回归中测试时钟与后台指标采样的竞争，补充跨线程读取场景；生产时钟与结算规则保持不变。
 
 ## v1.0.0 · 首次正式发布
 
