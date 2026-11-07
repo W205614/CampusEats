@@ -1,6 +1,6 @@
 # 源码与第三方许可
 
-项目自有源码、文档、演示 SVG、工具链 QR 夹具和演示截图以根目录 [MIT License](../LICENSE) 发布，版权人为 `W205614`。维护者于 2026-11-07 确认既有校园点餐源码及素材为其自有内容，并授权采用 MIT；第三方依赖不因此改变许可证。
+项目自有源码、文档、演示 SVG、工具链 QR 夹具和演示截图以根目录 [MIT License](../LICENSE) 发布，版权人为 `W205614`。维护者于 2026-11-07 确认源码为自行实现、开发中仅参考教程思路，素材为其自有内容，并授权采用 MIT；第三方依赖不因此改变许可证。
 
 ## 来源与第三方组件
 
@@ -8,7 +8,7 @@
 
 | 范围           | 许可与分发记录                                                                                                                                        |
 | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Java 运行依赖  | 构建生成 `sky-server/target/bom.json`，服务镜像保留 `/app/sbom.cdx.json`；嵌套 JAR 保留上游 LICENSE、NOTICE 和版权信息                                |
+| Java 运行依赖  | 构建生成 `campuseats-server/target/bom.json`，服务镜像保留 `/app/sbom.cdx.json`；嵌套 JAR 保留上游 LICENSE、NOTICE 和版权信息                                |
 | 管理台与 H5    | Vite 根据实际打包依赖生成 `THIRD_PARTY_LICENSES.md`，随各自静态目录分发，可从 `/admin/THIRD_PARTY_LICENSES.md` 和 `/app/THIRD_PARTY_LICENSES.md` 获取 |
 | 小程序构建     | 在 `frontend/client/dist/build/mp-weixin/` 中保留同名许可清单；微信平台、SDK 和外部服务条款仍分别适用                                                 |
 | 开发与构建工具 | 以 npm 发行包的 LICENSE/NOTICE 和锁文件为准；例如 Lightning CSS 为 MPL-2.0，caniuse-lite 数据为 CC-BY-4.0，均不将项目自有源码改为其许可证             |

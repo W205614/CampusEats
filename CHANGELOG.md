@@ -2,6 +2,11 @@
 
 正式版本使用语义化标签，首个版本为 `v1.0.0`；源码提交 SHA 和同次成功 CI 制品用于精确识别构建。实际运行实例以镜像内容摘要、revision 与发布回执为准，验证入口见[当前版本记录](docs/verification/current.md)。
 
+## 尚未发布
+
+- 将后端模块统一为 `campuseats-common`、`campuseats-api` 和 `campuseats-server`，分别承载公共工具、接口类型和应用服务；Java 包名统一为 `com.campuseats`，启动类改为 `CampusEatsApplication`。
+- 同步 Maven 坐标、Docker 构建、运维脚本、CI 报告路径和源码文档。已有 V1—V24 迁移内容、数据库标识及业务卷不变；旧版本镜像的 SBOM 继续支持核验。
+
 ## v1.0.0 · 首次正式发布
 
 - 发布现有校园多校区点餐、合单模拟支付、履约、售后、权限与账务能力，保留微信与腾讯云适配实现及接入说明。

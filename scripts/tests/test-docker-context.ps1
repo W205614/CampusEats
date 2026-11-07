@@ -8,10 +8,10 @@ New-Item -ItemType Directory -Path $fixture | Out-Null
 try {
   Copy-Item -LiteralPath (Join-Path $root '.dockerignore') -Destination $fixture
   $excluded = @('.env', '.env.local', '.local/private.txt', '.idea/dataSources.xml', '.git/config',
-    'sky-server/.local/uploads/private.txt', 'sky-server/.env', 'sky-server/.env.test',
-    'sky-server/target/app.jar', 'frontend/admin/node_modules/package/index.js',
+    'campuseats-server/.local/uploads/private.txt', 'campuseats-server/.env', 'campuseats-server/.env.test',
+    'campuseats-server/target/app.jar', 'frontend/admin/node_modules/package/index.js',
     'frontend/client/dist/app.js', 'deploy/uploads/private.txt', 'deploy/admin/index.html')
-  $included = @('README.md', 'LICENSE', '.env.example', 'sky-server/.env.example', 'sky-server/src/main/example.java')
+  $included = @('README.md', 'LICENSE', '.env.example', 'campuseats-server/.env.example', 'campuseats-server/src/main/example.java')
   foreach ($relative in @($excluded) + @($included)) {
     $path = Join-Path $fixture $relative
     [void][IO.Directory]::CreateDirectory((Split-Path $path -Parent))

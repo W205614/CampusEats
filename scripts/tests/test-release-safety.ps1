@@ -4,9 +4,9 @@ $scriptsDir = Split-Path $PSScriptRoot -Parent
 $root = Split-Path $scriptsDir -Parent
 $fixture = Join-Path $root ('.local/release-script-test-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path (Join-Path $fixture 'scripts') -Force | Out-Null
-New-Item -ItemType Directory -Path (Join-Path $fixture 'sky-server/src/main/resources/db/migration') -Force | Out-Null
+New-Item -ItemType Directory -Path (Join-Path $fixture 'campuseats-server/src/main/resources/db/migration') -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $scriptsDir 'start.ps1'), (Join-Path $scriptsDir 'safe-backup.ps1'), (Join-Path $scriptsDir 'ops-check.ps1'), (Join-Path $scriptsDir 'docker-read.ps1'), (Join-Path $scriptsDir 'operations-lock.ps1'), (Join-Path $scriptsDir 'operations-support.ps1'), (Join-Path $scriptsDir 'secure-files.ps1') -Destination (Join-Path $fixture 'scripts')
-'-- fixture' | Set-Content (Join-Path $fixture 'sky-server/src/main/resources/db/migration/V8__fixture.sql')
+'-- fixture' | Set-Content (Join-Path $fixture 'campuseats-server/src/main/resources/db/migration/V8__fixture.sql')
 'DEMO_ADMIN_PASSWORD=FixturePasswordOnly2026' | Set-Content (Join-Path $fixture '.env')
 @'
 param($ProjectName,$Destination,$EnvFile)

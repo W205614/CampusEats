@@ -44,7 +44,7 @@ $securityOutput = New-SecureDirectory -Path (Join-Path $output 'security')
 foreach ($name in @('summary.json', 'server-runtime-sbom.cdx.json', 'server-runtime-manifest.sha256', 'server-runtime-provenance.json', 'server-os-sbom.cdx.json', 'web-os-sbom.cdx.json', 'mysql-os-sbom.cdx.json', 'redis-os-sbom.cdx.json', 'server-os-gate.json', 'web-os-gate.json', 'mysql-os-gate.json', 'redis-os-gate.json', 'server-java-gate.json', 'server-os-vulnerabilities.json', 'web-os-vulnerabilities.json', 'mysql-os-vulnerabilities.json', 'redis-os-vulnerabilities.json', 'server-java-vulnerabilities.json')) {
   Copy-Item -LiteralPath (Join-Path $security $name) -Destination $securityOutput -ErrorAction Stop
 }
-$migrations = @(Get-ChildItem -LiteralPath (Join-Path $root 'sky-server/src/main/resources/db/migration') -Filter 'V*.sql' | Sort-Object Name | ForEach-Object {
+$migrations = @(Get-ChildItem -LiteralPath (Join-Path $root 'campuseats-server/src/main/resources/db/migration') -Filter 'V*.sql' | Sort-Object Name | ForEach-Object {
     if ($_.Name -notmatch '^V(\d+)__') {
       throw 'Unexpected migration name.'
     }

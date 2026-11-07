@@ -74,10 +74,10 @@ docker compose ps
 | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 改管理台页面               | [员工工作台页面](frontend/admin/src/pages/)按业务命名，[路由](frontend/admin/src/router.ts)定义访问入口                                                                                                                     |
 | 改用户点餐流程             | [用户端页面](frontend/client/src/pages/)包含选店、购物车、结算和订单，[页面配置](frontend/client/src/pages.json)列出导航顺序                                                                                                |
-| 查订单如何报价、支付和履约 | `sky-server/` 是后端主模块，从[HTTP 入口](sky-server/src/main/java/com/sky/web/)沿服务方法追踪，见[四条业务调用链](docs/development.md#按业务追踪请求)                                                                      |
-| 找数据库变更               | [Flyway 迁移](sky-server/src/main/resources/db/migration/)按版本保存数据库演进记录                                                                                                                                          |
-| 查接口契约                 | [共享契约](frontend/contracts/)包含 OpenAPI 快照、生成类型和前端共享模型；[Java 接口类型](sky-pojo/src/main/java/com/sky/api/)包含请求与响应定义                                                                            |
-| 找构建与部署入口           | [根 POM](pom.xml)聚合后端服务、接口类型和[共享异常与哈希工具](sky-common/src/main/java/com/sky/common/)；[Compose](compose.yaml)编排四个服务，[部署配置](deploy/README.md)和[脚本导航](scripts/README.md)列出构建与运维入口 |
+| 查订单如何报价、支付和履约 | `campuseats-server/` 是后端主模块，从[HTTP 入口](campuseats-server/src/main/java/com/campuseats/web/)沿服务方法追踪，见[四条业务调用链](docs/development.md#按业务追踪请求)                                                                      |
+| 找数据库变更               | [Flyway 迁移](campuseats-server/src/main/resources/db/migration/)按版本保存数据库演进记录                                                                                                                                          |
+| 查接口契约                 | [共享契约](frontend/contracts/)包含 OpenAPI 快照、生成类型和前端共享模型；[Java 接口类型](campuseats-api/src/main/java/com/campuseats/api/)包含请求与响应定义                                                                            |
+| 找构建与部署入口           | [根 POM](pom.xml)聚合后端服务、接口类型和[共享异常与哈希工具](campuseats-common/src/main/java/com/campuseats/common/)；[Compose](compose.yaml)编排四个服务，[部署配置](deploy/README.md)和[脚本导航](scripts/README.md)列出构建与运维入口 |
 | 查提交会运行哪些验证       | [GitHub Actions 工作流](.github/workflows/)定义 CI 的构建、测试、安全扫描与制品导出                                                                                                                                         |
 
 ## 界面预览

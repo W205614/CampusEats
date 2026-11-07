@@ -1,0 +1,259 @@
+package com.campuseats.business;
+
+import com.campuseats.infra.*;
+import java.time.*;
+import java.util.*;
+import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicLongArray;
+import java.util.function.Supplier;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.*;
+
+@Service
+public class MenuCache {
+  private final StringRedisTemplate redis;
+  private final Json json;
+  private final Db db;
+  private final Clock clock;
+  private final TransactionTemplate retryTx;
+  private final RedisAccess access;
+  private final Semaphore fallback = new Semaphore(8, true);
+
+  private record Loading(long generation, CompletableFuture<List<Map<String, Object>>> result) {}
+
+  private final ConcurrentHashMap<String, Loading> loading = new ConcurrentHashMap<>();
+  private static final long WAIT_NANOS = TimeUnit.MILLISECONDS.toNanos(1500);
+  private final AtomicLongArray generations = new AtomicLongArray(256);
+  private final String epoch = UUID.randomUUID().toString();
+
+  @org.springframework.beans.factory.annotation.Value("${campus.cache.shared-versions:true}")
+  private boolean sharedVersions;
+
+  public MenuCache(
+      StringRedisTemplate redis,
+      Json json,
+      Db db,
+      Clock clock,
+      org.springframework.transaction.PlatformTransactionManager manager) {
+    this(redis, json, db, clock, manager, new RedisAccess());
+  }
+
+  @org.springframework.beans.factory.annotation.Autowired
+  public MenuCache(
+      @org.springframework.beans.factory.annotation.Qualifier("cacheRedisTemplate")
+          StringRedisTemplate redis,
+      Json json,
+      Db db,
+      Clock clock,
+      org.springframework.transaction.PlatformTransactionManager manager,
+      @org.springframework.beans.factory.annotation.Qualifier("cacheRedisAccess")
+          RedisAccess access) {
+    this.retryTx = new TransactionTemplate(manager);
+    this.retryTx.setPropagationBehavior(
+        org.springframework.transaction.TransactionDefinition.PROPAGATION_REQUIRES_NEW);
+    this.redis = redis;
+    this.json = json;
+    this.db = db;
+    this.clock = clock;
+    this.access = access;
+  }
+
+  public List<Map<String, Object>> load(String key, Supplier<List<Map<String, Object>>> loader) {
+    long generation = generation(key);
+    long deadline = System.nanoTime() + WAIT_NANOS;
+    var hit = cached(key, generation);
+    if (hit != null) return hit;
+    var own = new Loading(generation, new CompletableFuture<>());
+    Loading current;
+    while ((current = loading.putIfAbsent(key, own)) != null && current.generation() < generation)
+      loading.remove(key, current);
+    if (current != null) {
+      try {
+        return copy(
+            current.result().get(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS));
+      } catch (InterruptedException ex) {
+        Thread.currentThread().interrupt();
+        throw busy();
+      } catch (TimeoutException ex) {
+        throw busy();
+      } catch (ExecutionException ex) {
+        if (ex.getCause() instanceof RuntimeException cause) throw cause;
+        if (ex.getCause() instanceof Error cause) throw cause;
+        throw new IllegalStateException(ex.getCause());
+      }
+    }
+    boolean admitted = false;
+    try {
+      admitted =
+          fallback.tryAcquire(Math.max(0, deadline - System.nanoTime()), TimeUnit.NANOSECONDS);
+      if (!admitted) throw busy();
+      // Recheck after admission: another fill can finish between the initial GET and registration.
+      var rows = cached(key, generation);
+      if (rows == null) {
+        rows = copy(loader.get());
+        try {
+          var snapshot = rows;
+          access.call(
+              () -> {
+                redis
+                    .opsForValue()
+                    .set(
+                        cacheKey(key, generation),
+                        json.write(
+                            Map.of(
+                                "epoch",
+                                sharedVersions ? "shared-v1" : epoch,
+                                "generation",
+                                generation,
+                                "items",
+                                snapshot)),
+                        Duration.ofSeconds(
+                            snapshot.isEmpty()
+                                ? 30
+                                : 240 + ThreadLocalRandom.current().nextInt(121)));
+                return true;
+              });
+        } catch (Exception ignored) {
+        }
+      }
+      own.result().complete(rows);
+      return copy(rows);
+    } catch (InterruptedException ex) {
+      Thread.currentThread().interrupt();
+      var failure = busy();
+      own.result().completeExceptionally(failure);
+      throw failure;
+    } catch (RuntimeException | Error ex) {
+      own.result().completeExceptionally(ex);
+      throw ex;
+    } finally {
+      loading.remove(key, own);
+      if (admitted) fallback.release();
+    }
+  }
+
+  @SuppressWarnings("unchecked")
+  private List<Map<String, Object>> cached(String key, long generation) {
+    try {
+      String hit = access.call(() -> redis.opsForValue().get(cacheKey(key, generation)));
+      if (hit != null) {
+        var envelope = json.map(hit);
+        if (!(sharedVersions ? "shared-v1" : epoch).equals(envelope.get("epoch"))
+            || !(envelope.get("generation") instanceof Number value)
+            || value.longValue() != generation) return null;
+        if (!(envelope.get("items") instanceof List<?> items)) return null;
+        var out = new ArrayList<Map<String, Object>>();
+        for (var item : items) {
+          if (!(item instanceof Map<?, ?>)) return null;
+          out.add((Map<String, Object>) item);
+        }
+        return out;
+      }
+    } catch (Exception ignored) {
+    }
+    return null;
+  }
+
+  private static com.campuseats.common.BusinessException busy() {
+    return new com.campuseats.common.BusinessException(503, "MENU_BUSY", "菜单繁忙，请稍后重试");
+  }
+
+  @SuppressWarnings("unchecked")
+  private static List<Map<String, Object>> copy(List<Map<String, Object>> rows) {
+    return (List<Map<String, Object>>) copyValue(rows);
+  }
+
+  private static Object copyValue(Object value) {
+    if (value instanceof Map<?, ?> map) {
+      var result = new LinkedHashMap<String, Object>();
+      map.forEach((key, item) -> result.put(String.valueOf(key), copyValue(item)));
+      return result;
+    }
+    if (value instanceof Collection<?> values) {
+      var result = new ArrayList<Object>();
+      values.forEach(item -> result.add(copyValue(item)));
+      return result;
+    }
+    if (value instanceof byte[] bytes) return bytes.clone();
+    if (value instanceof java.sql.Timestamp timestamp) return timestamp.clone();
+    if (value instanceof java.util.Date date) return date.clone();
+    return value;
+  }
+
+  /** The shared generation changes in the same transaction as the catalog write. */
+  public void afterCommit(String key) {
+    if (TransactionSynchronizationManager.isSynchronizationActive()) {
+      if (sharedVersions) advanceShared(key);
+      LocalDateTime now = LocalDateTime.now(clock);
+      Long storeId = key.matches("store:[0-9]+:catalog") ? Long.parseLong(key.split(":")[1]) : null;
+      db.update(
+          "INSERT INTO"
+              + " outbox_event(event_type,aggregate_id,payload,next_attempt_at,created_at,store_id,campus_id)"
+              + " VALUES('CACHE_INVALIDATE',0,?,?,?,?,(SELECT campus_id FROM store WHERE id=?))",
+          json.write(Map.of("key", key)),
+          now,
+          now,
+          storeId,
+          storeId);
+      TransactionSynchronizationManager.registerSynchronization(
+          new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+              // No Redis I/O or reader lock on the committed write's response path.
+              // The durable event removes the entry later; generations make old fills unreadable
+              // now.
+              if (!sharedVersions) advance(key);
+            }
+          });
+    } else invalidate(key);
+  }
+
+  public void invalidate(String key) {
+    if (sharedVersions) retryTx.executeWithoutResult(status -> advanceShared(key));
+    try {
+      retry(key);
+    } catch (Exception ex) {
+      LocalDateTime now = LocalDateTime.now(clock);
+      retryTx.executeWithoutResult(
+          status ->
+              db.update(
+                  "INSERT INTO"
+                      + " outbox_event(event_type,aggregate_id,payload,next_attempt_at,created_at)"
+                      + " VALUES('CACHE_INVALIDATE',0,?,?,?)",
+                  json.write(Map.of("key", key)),
+                  now,
+                  now));
+    }
+  }
+
+  public void retry(String key) {
+    if (!sharedVersions) advance(key);
+    access.call(() -> redis.delete("campus:" + key));
+  }
+
+  private long generation(String key) {
+    if (!sharedVersions) return generations.get(stripe(key));
+    var version = db.one("SELECT generation FROM catalog_cache_version WHERE cache_key=?", key);
+    return version == null ? 0 : Db.id(version, "generation");
+  }
+
+  private String cacheKey(String key, long generation) {
+    return sharedVersions ? "campus:catalog:v1:" + key + ":" + generation : "campus:" + key;
+  }
+
+  private void advanceShared(String key) {
+    db.update(
+        "INSERT INTO catalog_cache_version(cache_key,generation) VALUES(?,1)"
+            + " ON DUPLICATE KEY UPDATE generation=generation+1",
+        key);
+  }
+
+  private void advance(String key) {
+    generations.incrementAndGet(stripe(key));
+  }
+
+  private int stripe(String key) {
+    return (key.hashCode() & Integer.MAX_VALUE) % generations.length();
+  }
+}

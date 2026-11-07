@@ -25,7 +25,7 @@ npm ci --prefix frontend/client --include=optional
 
 ```powershell
 # 按实际改动选择测试类；这些集成测试使用独立 Testcontainers 依赖
-mvn -B -ntp -pl sky-server -am '-Dtest=StoredImagesIntegrationTest,ImageStorageTest' '-Dsurefire.failIfNoSpecifiedTests=false' test
+mvn -B -ntp -pl campuseats-server -am '-Dtest=StoredImagesIntegrationTest,ImageStorageTest' '-Dsurefire.failIfNoSpecifiedTests=false' test
 
 # 管理端改动
 npm run test:toolchain --prefix frontend/admin

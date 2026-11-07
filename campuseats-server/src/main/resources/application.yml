@@ -1,0 +1,97 @@
+server:
+  port: 8080
+  shutdown: graceful
+  forward-headers-strategy: framework
+  tomcat:
+    max-swallow-size: 5MB
+    threads:
+      max: 80
+      min-spare: 8
+    accept-count: 100
+    max-connections: 200
+spring:
+  profiles:
+    default: local
+  datasource:
+    url: ${DB_URL:jdbc:mysql://127.0.0.1:13383/sky_take_out?serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false}
+    username: ${DB_USER:campus}
+    password: ${MYSQL_PASSWORD:}
+    hikari:
+      transaction-isolation: TRANSACTION_READ_COMMITTED
+      maximum-pool-size: 20
+      minimum-idle: 20
+      connection-timeout: 3000
+      connection-init-sql: SET SESSION innodb_lock_wait_timeout=3
+      data-source-properties:
+        connectTimeout: 2000
+        socketTimeout: 12000
+  jdbc:
+    template:
+      query-timeout: 5s
+  transaction:
+    default-timeout: 10s
+  data:
+    redis:
+      host: ${REDIS_HOST:127.0.0.1}
+      port: ${REDIS_PORT:16383}
+      password: ${REDIS_PASSWORD:}
+      connect-timeout: 1s
+      timeout: 1s
+  task:
+    scheduling:
+      pool:
+        size: 3
+  flyway:
+    baseline-on-migrate: false
+    clean-disabled: true
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 6MB
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      group:
+        readiness:
+          include: readinessState,db
+        operations:
+          include: runtimeOperations
+          show-details: always
+          show-components: always
+      show-details: never
+  health:
+    redis:
+      enabled: false
+mybatis:
+  configuration:
+    map-underscore-to-camel-case: false
+springdoc:
+  swagger-ui:
+    path: /docs
+campus:
+  jwt-secret: ${JWT_ADMIN_SECRET:}
+  demo-admin-password: ${DEMO_ADMIN_PASSWORD:}
+  uploads: ${UPLOADS_PATH:./.local/uploads}
+  evidence-read-concurrency: ${EVIDENCE_READ_CONCURRENCY:4}
+  evidence-read-account-concurrency: ${EVIDENCE_READ_ACCOUNT_CONCURRENCY:2}
+  evidence-read-per-minute: ${EVIDENCE_READS_PER_MINUTE:120}
+  allowed-origins: ${ALLOWED_ORIGINS:http://localhost:18083,http://127.0.0.1:18083,http://localhost:5173,http://localhost:5174}
+  wechat-appid: ${WECHAT_APPID:}
+  wechat-secret: ${WECHAT_SECRET:}
+  tasks-enabled: ${TASKS_ENABLED:true}
+  rate:
+    search-per-minute: ${SEARCH_REQUESTS_PER_MINUTE:1200}
+    catalog-per-minute: ${CATALOG_REQUESTS_PER_MINUTE:3000}
+logging:
+  pattern:
+    level: '%5p [requestId:%X{requestId:-}]'
+  level:
+    com.qcloud.cos.http.DefaultCosHttpClient: 'OFF'
+    com.campuseats: INFO
+    org.springframework.security: WARN

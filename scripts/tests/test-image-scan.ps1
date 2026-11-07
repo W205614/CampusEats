@@ -37,8 +37,6 @@ $global:fixtureSbomContainer = 'c' * 64
 $global:fixtureSbomRoot = $fixture
 $global:fixtureRemoved = 0
 [IO.File]::WriteAllText((Join-Path $fixture 'app.jar'), 'fixture-actual-application-jar')
-@{bomFormat = 'CycloneDX'; specVersion = '1.6'; metadata = @{component = @{name = 'sky-server' } }; components = @(1..20 | ForEach-Object { @{name = "component-$_"; version = '1'; purl = "pkg:maven/fixture/component-$_@1" } }) } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $fixture 'sbom.cdx.json')
-@('app.jar', 'sbom.cdx.json') | ForEach-Object { ((Get-FileHash (Join-Path $fixture $_)).Hash.ToLowerInvariant() + '  ' + $_) } | Set-Content -LiteralPath (Join-Path $fixture 'runtime-manifest.sha256')
 function global:docker {
   $global:LASTEXITCODE = 0
   $a = @($args)
@@ -80,7 +78,10 @@ function global:docker {
   throw 'Unexpected Docker operation in SBOM extraction fixture.'
 }
 try {
-  foreach ($mode in @('clean', 'unfixed-only', 'os-fixable-high', 'java-fixable-high', 'medium-unfixed', 'low-fixable', 'mysql-unfixed', 'redis-unfixed', 'unreported-expat', 'missing-package-inventory', 'scanner-failed', 'java-scanner-failed', 'invalid-report', 'missing-bom', 'tampered-bom', 'wrong-image')) {
+  foreach ($mode in @('clean', 'legacy-application-name', 'unrelated-application-name', 'unfixed-only', 'os-fixable-high', 'java-fixable-high', 'medium-unfixed', 'low-fixable', 'mysql-unfixed', 'redis-unfixed', 'unreported-expat', 'missing-package-inventory', 'scanner-failed', 'java-scanner-failed', 'invalid-report', 'missing-bom', 'tampered-bom', 'wrong-image')) {
+    $applicationName = if ($mode -eq 'legacy-application-name') { 'sky-server' } elseif ($mode -eq 'unrelated-application-name') { 'unrelated-server' } else { 'campuseats-server' }
+    @{bomFormat = 'CycloneDX'; specVersion = '1.6'; metadata = @{component = @{name = $applicationName } }; components = @(1..20 | ForEach-Object { @{name = "component-$_"; version = '1'; purl = "pkg:maven/fixture/component-$_@1" } }) } | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $fixture 'sbom.cdx.json')
+    @('app.jar', 'sbom.cdx.json') | ForEach-Object { ((Get-FileHash (Join-Path $fixture $_)).Hash.ToLowerInvariant() + '  ' + $_) } | Set-Content -LiteralPath (Join-Path $fixture 'runtime-manifest.sha256')
     $env:CAMPUS_TRIVY_FIXTURE_MODE = $mode
     $out = Join-Path $fixture $mode
     $failed = $false
@@ -89,7 +90,7 @@ try {
     } catch {
       $failed = $true
     }
-    if ($failed -ne ($mode -ne 'clean')) {
+    if ($failed -ne ($mode -notin @('clean', 'legacy-application-name'))) {
       throw ('Scanner accepted a vulnerability/failure or rejected a clean report: ' + $mode)
     }
     $summary = @(Get-Content -LiteralPath (Join-Path $out 'summary.json') -Raw | ConvertFrom-Json)

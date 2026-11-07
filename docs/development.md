@@ -4,23 +4,27 @@
 
 ## 后端目录
 
-根目录 `pom.xml` 聚合三个 Maven 模块，Java 版本为 21。依赖方向为 `sky-server → sky-pojo / sky-common`。
+根目录 `pom.xml` 聚合三个 Maven 模块，Java 版本为 21。依赖方向为 `campuseats-server → campuseats-api / campuseats-common`。
+
+Java 包名为 `com.campuseats`，应用入口为 `CampusEatsApplication`。模块名称描述各自职责：`common` 放公共异常与摘要工具，`api` 放请求和响应类型，`server` 实现点餐、履约、账务与外部服务接入。
+
+命名整理没有改变现有数据库标识 `sky_take_out`、Flyway V1—V24 的内容或 Compose 业务卷；这些是既有数据和备份脚本使用的标识。升级时保留原数据，不需要改库名或重新初始化。历史发布回执和 `v1.0.0` 标签仍按当时的目录与 Maven 坐标记录。
 
 | 目录                                                        | 职责与建议入口                                                                                                                     |
 | ----------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `sky-common/src/main/java/com/sky/common/`                  | 公共异常 `BusinessException`、摘要工具 `Hashes`                                                                                    |
-| `sky-pojo/src/main/java/com/sky/api/`                       | 请求 `Commands` 和响应 `Views`                                                                                                     |
-| `sky-server/src/main/java/com/sky/web/`                     | HTTP 入口；按目录、结算、履约、售后和管理控制器阅读，再看认证与统一异常处理                                                        |
-| `sky-server/src/main/java/com/sky/platform/`                | 多校区主业务：`PlatformScope` 权限、`StoreCart` 购物车、`CheckoutService` 合单、`FulfillmentService` 履约、`AftersaleService` 售后 |
-| `sky-server/src/main/java/com/sky/finance/`                 | `LedgerService` 事务内业务流水、`FinanceService` 期初、日结预览、冻结账单及对账；平台账单用于经营核对，商家资金由渠道独立收取      |
-| `sky-server/src/main/java/com/sky/payment/`                 | 持久支付意图、微信验签解密、查单关单、异步退款、商户快照与渠道账单；模拟与真实交易按渠道区分                                       |
-| `sky-server/src/main/java/com/sky/storage/`、`integration/` | LOCAL/COS 文件和元数据、身份与短信/订阅适配器及接入状态                                                                            |
-| `sky-server/src/main/java/com/sky/business/`                | 商品、地址、配额、缓存、支付接口等复用服务，也保留旧接口使用的交易服务                                                             |
-| `sky-server/src/main/java/com/sky/security/`                | 员工／演示／微信登录、`LocalUserService` 独立测试账号、会话、角色校验与限流                                                        |
-| `sky-server/src/main/java/com/sky/infra/`、`mapper/`        | 数据访问、配置、种子数据、后台维护与批量查询                                                                                       |
-| `sky-server/src/main/java/com/sky/websocket/`               | 订单通知连接与一次性票据                                                                                                           |
-| `sky-server/src/main/resources/`                            | 应用配置和 `db/migration/` 中的 Flyway 迁移                                                                                        |
-| `sky-server/src/test/`                                      | 集成测试、并发及边界测试，与生产代码分开                                                                                           |
+| `campuseats-common/src/main/java/com/campuseats/common/`                  | 公共异常 `BusinessException`、摘要工具 `Hashes`                                                                                    |
+| `campuseats-api/src/main/java/com/campuseats/api/`                       | 请求 `Commands` 和响应 `Views`                                                                                                     |
+| `campuseats-server/src/main/java/com/campuseats/web/`                     | HTTP 入口；按目录、结算、履约、售后和管理控制器阅读，再看认证与统一异常处理                                                        |
+| `campuseats-server/src/main/java/com/campuseats/platform/`                | 多校区主业务：`PlatformScope` 权限、`StoreCart` 购物车、`CheckoutService` 合单、`FulfillmentService` 履约、`AftersaleService` 售后 |
+| `campuseats-server/src/main/java/com/campuseats/finance/`                 | `LedgerService` 事务内业务流水、`FinanceService` 期初、日结预览、冻结账单及对账；平台账单用于经营核对，商家资金由渠道独立收取      |
+| `campuseats-server/src/main/java/com/campuseats/payment/`                 | 持久支付意图、微信验签解密、查单关单、异步退款、商户快照与渠道账单；模拟与真实交易按渠道区分                                       |
+| `campuseats-server/src/main/java/com/campuseats/storage/`、`integration/` | LOCAL/COS 文件和元数据、身份与短信/订阅适配器及接入状态                                                                            |
+| `campuseats-server/src/main/java/com/campuseats/business/`                | 商品、地址、配额、缓存、支付接口等复用服务，也保留旧接口使用的交易服务                                                             |
+| `campuseats-server/src/main/java/com/campuseats/security/`                | 员工／演示／微信登录、`LocalUserService` 独立测试账号、会话、角色校验与限流                                                        |
+| `campuseats-server/src/main/java/com/campuseats/infra/`、`mapper/`        | 数据访问、配置、种子数据、后台维护与批量查询                                                                                       |
+| `campuseats-server/src/main/java/com/campuseats/websocket/`               | 订单通知连接与一次性票据                                                                                                           |
+| `campuseats-server/src/main/resources/`                            | 应用配置和 `db/migration/` 中的 Flyway 迁移                                                                                        |
+| `campuseats-server/src/test/`                                      | 集成测试、并发及边界测试，与生产代码分开                                                                                           |
 
 平台五类原控制器默认启用：`PlatformController`（目录发现）、`PlatformCheckoutController`、`PlatformFulfillmentController`、`PlatformAftersaleController`、`PlatformManagementController`；另有身份、支付、通知、存储及运维入口。旧交易控制器由 `campus.legacy-api=true` 条件启用，部分集成测试仍覆盖旧交易路径；账务 HTTP 入口与当前平台模式配套启用。`business/` 提供复用服务及旧接口实现，`platform/` 负责多校区流程。数据库变更使用新增 Flyway 迁移；V13—V17为业务能力追加，V18—V19补充余额对账索引，V20—V23增加生产接入及多实例数据，V24补充期间流水汇总覆盖索引。
 
@@ -38,16 +42,16 @@
 
 ## 按业务追踪请求
 
-下表按默认多校区模式列出入口。用户端由 `api.ts` 发请求，员工端由 `platform-api.ts` 发请求，控制器和服务均位于 `sky-server/src/main/java/com/sky/`。
+下表按默认多校区模式列出入口。用户端由 `api.ts` 发请求，员工端由 `platform-api.ts` 发请求，控制器和服务均位于 `campuseats-server/src/main/java/com/campuseats/`。
 
 | 场景                 | 从页面追到服务                                                                                                                                                                                                                                                                                      | 关键操作                                                                                                                                                     |
 | -------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| 购物车增减餐品       | [菜单](../frontend/client/src/pages/menu/index.vue)或[购物车](../frontend/client/src/pages/cart/index.vue) → `POST /api/v1/user/stores/{storeId}/cart/items` → `PlatformCheckoutController` → [StoreCart.change](../sky-server/src/main/java/com/sky/platform/StoreCart.java)                       | `platform.StoreCart` 按用户和店铺锁定购物车、检查版本；加购时调用 `business.CartService.validate` 校验商品与口味。                                           |
-| 合单报价、提交与支付 | [结算页](../frontend/client/src/pages/checkout/index.vue) → `PlatformCheckoutController` → [CheckoutService.preview / submit](../sky-server/src/main/java/com/sky/platform/CheckoutService.java)；[订单页](../frontend/client/src/pages/orders/index.vue) → 同一控制器 → `CheckoutService.pay`      | 报价读取各店购物车，提交时创建子单、调用 `business.QuotaService.reserve` 预占配额并清空对应购物车；支付成功后由 `finance.LedgerService.payment` 逐子单记账。 |
-| 店长接单和自取核销   | [订单履约页](../frontend/admin/src/pages/Orders.vue) → [PlatformFulfillmentController](../sky-server/src/main/java/com/sky/web/PlatformFulfillmentController.java) → [FulfillmentService](../sky-server/src/main/java/com/sky/platform/FulfillmentService.java)                                     | `action` 处理接单，核对店铺权限与订单版本，再调用 `business.QuotaService.transition` 确认配额；自取码核销走单独的 `verify` 方法。                            |
-| 查经营报表           | [经营报表页](../frontend/admin/src/pages/Reports.vue) → [PlatformManagementController](../sky-server/src/main/java/com/sky/web/PlatformManagementController.java) → `DiscoveryService.reportView` → [ReportQueryService.view](../sky-server/src/main/java/com/sky/platform/ReportQueryService.java) | 工作台按店铺或平台范围取数，`platform.ReportQueryService` 负责聚合。旧接口由 `CatalogController` 调用 `business.ReportService`，需开启 `campus.legacy-api`。 |
+| 购物车增减餐品       | [菜单](../frontend/client/src/pages/menu/index.vue)或[购物车](../frontend/client/src/pages/cart/index.vue) → `POST /api/v1/user/stores/{storeId}/cart/items` → `PlatformCheckoutController` → [StoreCart.change](../campuseats-server/src/main/java/com/campuseats/platform/StoreCart.java)                       | `platform.StoreCart` 按用户和店铺锁定购物车、检查版本；加购时调用 `business.CartService.validate` 校验商品与口味。                                           |
+| 合单报价、提交与支付 | [结算页](../frontend/client/src/pages/checkout/index.vue) → `PlatformCheckoutController` → [CheckoutService.preview / submit](../campuseats-server/src/main/java/com/campuseats/platform/CheckoutService.java)；[订单页](../frontend/client/src/pages/orders/index.vue) → 同一控制器 → `CheckoutService.pay`      | 报价读取各店购物车，提交时创建子单、调用 `business.QuotaService.reserve` 预占配额并清空对应购物车；支付成功后由 `finance.LedgerService.payment` 逐子单记账。 |
+| 店长接单和自取核销   | [订单履约页](../frontend/admin/src/pages/Orders.vue) → [PlatformFulfillmentController](../campuseats-server/src/main/java/com/campuseats/web/PlatformFulfillmentController.java) → [FulfillmentService](../campuseats-server/src/main/java/com/campuseats/platform/FulfillmentService.java)                                     | `action` 处理接单，核对店铺权限与订单版本，再调用 `business.QuotaService.transition` 确认配额；自取码核销走单独的 `verify` 方法。                            |
+| 查经营报表           | [经营报表页](../frontend/admin/src/pages/Reports.vue) → [PlatformManagementController](../campuseats-server/src/main/java/com/campuseats/web/PlatformManagementController.java) → `DiscoveryService.reportView` → [ReportQueryService.view](../campuseats-server/src/main/java/com/campuseats/platform/ReportQueryService.java) | 工作台按店铺或平台范围取数，`platform.ReportQueryService` 负责聚合。旧接口由 `CatalogController` 调用 `business.ReportService`，需开启 `campus.legacy-api`。 |
 
-追数据库结构可从 [V5 多校区迁移](../sky-server/src/main/resources/db/migration/V5__multi_campus_platform.sql)开始，按版本往后看。权限范围、合单与售后规则见[平台架构](platform-architecture.md)。
+追数据库结构可从 [V5 多校区迁移](../campuseats-server/src/main/resources/db/migration/V5__multi_campus_platform.sql)开始，按版本往后看。权限范围、合单与售后规则见[平台架构](platform-architecture.md)。
 
 其他能力的源码入口如下。
 
@@ -120,7 +124,7 @@ H5 默认使用同源 API。默认演示使用模拟支付；生产使用独立�
 例如，仅在修改账务和履约运营时选择相关测试类，实际执行仍按改动决定，不默认全量运行：
 
 ```powershell
-mvn -B -ntp -pl sky-server -am '-Dtest=FinanceIntegrationTest,OperationsIntegrationTest' -Dsurefire.failIfNoSpecifiedTests=false test
+mvn -B -ntp -pl campuseats-server -am '-Dtest=FinanceIntegrationTest,OperationsIntegrationTest' -Dsurefire.failIfNoSpecifiedTests=false test
 ```
 
 页面模拟传输测试覆盖乱序响应等组件边界，角色体验通过真实服务与浏览器验证。真实体验使用独立浏览器会话和真实服务；API只准备基础夹具及核对结果，新增或修改的关键业务动作从页面操作，保留脱敏证据。未修改的其它全量流程、恢复和安全门禁交给对应SHA的CI；源码测试、真实页面、制品来源和日常部署核验分别记录。当前进度和已获得的证据见[当前版本验证与维护记录](verification/current.md)。

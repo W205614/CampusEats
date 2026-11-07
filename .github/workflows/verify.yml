@@ -149,7 +149,7 @@ jobs:
           name: validation-results
           overwrite: true
           path: |
-            sky-server/target/surefire-reports
+            campuseats-server/target/surefire-reports
             .local/playwright-results
             .local/playwright-report
             .local/audit-client.json

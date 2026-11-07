@@ -134,7 +134,8 @@ function Export-ImageRuntimeBom([string]$ImageId, [string]$Log) {
     }
     $data = Get-Content -LiteralPath $bom -Raw | ConvertFrom-Json
     $maven = @($data.components | Where-Object { $_.purl -like 'pkg:maven/*' })
-    if ($data.bomFormat -ne 'CycloneDX' -or $data.metadata.component.name -ne 'sky-server' -or $maven.Count -lt 20) {
+    # v1.0.0 images retain their original Maven artifact name when rescanned.
+    if ($data.bomFormat -ne 'CycloneDX' -or $data.metadata.component.name -notin @('campuseats-server', 'sky-server') -or $maven.Count -lt 20) {
       throw 'Runtime BOM lacks the expected Maven application dependency inventory.'
     }
     [ordered]@{imageId = $ImageId; appJarSha256 = $hashes['app.jar']; sbomSha256 = $hashes['sbom.cdx.json']; mavenComponents = $maven.Count; source = 'BOM and JAR extracted from the same non-running image container' } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $outputRoot 'server-runtime-provenance.json') -Encoding utf8

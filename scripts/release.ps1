@@ -13,7 +13,7 @@ Push-Location $root
 try {
   $manifest = Read-VerifiedReleaseBundle -Directory $BundleDirectory -ExpectedSourceSha $ExpectedSourceSha -ExpectedRunId $ExpectedRunId -ExpectedManifestSha256 $ExpectedManifestSha256
   Confirm-ReleaseWorkflow -SourceSha $ExpectedSourceSha -RunId $ExpectedRunId -RunAttempt $manifest.runAttempt
-  $migrationDirectory = Join-Path $root 'sky-server/src/main/resources/db/migration'
+  $migrationDirectory = Join-Path $root 'campuseats-server/src/main/resources/db/migration'
   $current = @(Get-ChildItem -LiteralPath $migrationDirectory -Filter 'V*.sql')
   if ($current.Count -ne @($manifest.migrations).Count) {
     throw 'Checkout migration inventory differs from release.'

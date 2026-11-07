@@ -34,7 +34,7 @@ if($CompareManifest -and ($global:artifactFixtureRunning.web -or $global:artifac
 if($CompareManifest -and $global:artifactFixtureCase -eq 'data-changed'){throw 'Injected original data change.'}
 '{}' | Set-Content -LiteralPath $OutputPath
 '@ | Set-Content -LiteralPath (Join-Path $fixtureScripts 'platform-data-manifest.ps1')
-$migration = New-SecureDirectory -Path (Join-Path $fixture 'sky-server/src/main/resources/db/migration')
+$migration = New-SecureDirectory -Path (Join-Path $fixture 'campuseats-server/src/main/resources/db/migration')
 '-- fixture' | Set-Content -LiteralPath (Join-Path $migration 'V1__fixture.sql')
 $bundle = New-SecureDirectory -Path (Join-Path $fixture '.local/bundle')
 New-SecureDirectory -Path (Join-Path $bundle 'security') | Out-Null

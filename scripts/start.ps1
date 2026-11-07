@@ -91,7 +91,7 @@ try {
     $beforeSchema = Read-ReleaseSchema -ComposeArguments $composeArgs
     $releaseRecord.schemaFingerprintBefore = $beforeSchema.fingerprint
     $releaseRecord.schemaBefore = $schemaBefore
-    $latestVersion = (Get-ChildItem -LiteralPath (Join-Path $taskRoot 'sky-server/src/main/resources/db/migration') -Filter 'V*.sql' | ForEach-Object { if ($_.Name -match '^V(\d+)__') {
+    $latestVersion = (Get-ChildItem -LiteralPath (Join-Path $taskRoot 'campuseats-server/src/main/resources/db/migration') -Filter 'V*.sql' | ForEach-Object { if ($_.Name -match '^V(\d+)__') {
           [int]$Matches[1]
         } } | Measure-Object -Maximum).Maximum
     if ([int]$schemaVersion -gt $latestVersion) {
