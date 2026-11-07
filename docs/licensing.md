@@ -18,6 +18,8 @@
 
 DCloud 的开源部分采用 Apache-2.0，内嵌 Runtime/SDK 的权利仍归其所有；如扩展到原生 App 或使用闭源服务，还需遵守 [uni-app 使用许可](https://dcloud.io/license/uni-app.html)和对应产品条款。当前项目构建目标为 H5 与微信小程序。
 
+Redis 7.4.12 使用 RSALv2 / SSPLv1 双许可，不能视为项目 MIT 的一部分。Redis 镜像保留该版本 `LICENSE.txt` 及 Docker 上游入口脚本的 BSD 版权许可，位于 `/usr/local/share/licenses/redis/`；不将项目镜像公开到 Packages。重新分发或将 Redis 作为服务提供时，须按上游条款核对适用条件。
+
 ## 维护要求
 
 引入依赖或素材时记录来源、版本和授权条件，保留已有版权、许可和 NOTICE。分发前核对生成的前端许可文件和 Java SBOM；不手工编辑生成文件。修改或直接复制第三方源码时，还须遵守该组件的修改说明及适用的源码提供要求。

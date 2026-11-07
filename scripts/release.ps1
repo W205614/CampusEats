@@ -77,7 +77,9 @@ try {
     $identityMap[$image.service] = $image
   }
   $candidateServices = @{server = @{image = $imageMap.server }; web = @{image = $imageMap.web } }
-  if ($imageMap.ContainsKey('mysql')) { $candidateServices.mysql = @{image = $imageMap.mysql } }
+  foreach ($service in @('mysql', 'redis')) {
+    if ($imageMap.ContainsKey($service)) { $candidateServices[$service] = @{image = $imageMap[$service] } }
+  }
   Write-OperationsJson -Path $override -Value @{services = $candidateServices }
   Write-OperationsJson -Path $gateOverride -Value @{services = @{server = @{image = $imageMap.server; environment = @{TASKS_ENABLED = 'false' } } } }
   $record = [ordered]@{project = $ProjectName; sourceSha = $ExpectedSourceSha; ciRun = $ExpectedRunId; manifestSha256 = $ExpectedManifestSha256; images = $imageMap; startedAt = [DateTimeOffset]::UtcNow.ToString('o'); mode = $(if ($Initialize) {

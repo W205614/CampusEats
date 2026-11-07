@@ -1,7 +1,7 @@
 # docker image save on the supported CI engine emits a single-platform OCI layout.
 # Verify the bytes, graph and tag mapping before interpreting either Docker ID form.
 function Read-ReleaseImageGraph {
-  param([Parameter(Mandatory)][string]$Archive, [Parameter(Mandatory)][string]$SourceSha, [ValidateSet('server', 'web', 'mysql')][string[]]$ExpectedServices = @('server', 'web'))
+  param([Parameter(Mandatory)][string]$Archive, [Parameter(Mandatory)][string]$SourceSha, [ValidateSet('server', 'web', 'mysql', 'redis')][string[]]$ExpectedServices = @('server', 'web'))
   if ($SourceSha -notmatch '^[a-f0-9]{40}$') { throw 'Invalid image source revision.' }
   if (!$ExpectedServices.Count -or @($ExpectedServices | Select-Object -Unique).Count -ne $ExpectedServices.Count) {
     throw 'Explicit distinct image services are required.'

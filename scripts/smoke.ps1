@@ -24,7 +24,7 @@ $retired = Invoke-WebRequest "$BaseUrl/api/v1/user/shop" -SkipHttpErrorCheck
 if ($retired.StatusCode -ne 410) { throw 'Legacy unscoped entrypoint is still available' }
 foreach ($entry in @('/admin/THIRD_PARTY_LICENSES.md', '/app/THIRD_PARTY_LICENSES.md')) {
   $notice = Invoke-WebRequest ($BaseUrl.TrimEnd('/') + $entry)
-  if ($notice.Content -notmatch '# Licenses' -or $notice.Content -notmatch '## vue -') {
+  if ($notice.Content -notmatch '# Licenses' -or $notice.Content -notmatch '## pinia -') {
     throw "Bundled dependency license notice unavailable: $entry"
   }
 }

@@ -24,13 +24,15 @@ function Read-VerifiedReleaseBundle {
     throw 'Release manifest hash does not match the trusted CI result.'
   }
   $record = Get-Content -LiteralPath $manifest -Raw | ConvertFrom-Json
-  if ($record.schemaVersion -notin @(1, 2, 3) -or $record.repository -cne 'W205614/CampusEats' -or $record.sourceSha -cne $ExpectedSourceSha -or [string]$record.runId -cne $ExpectedRunId -or $record.runAttempt -lt 1 -or $record.platform -cne 'linux/amd64' -or $record.migrationHashFormat -cne 'utf8-lf-v1') {
+  if ($record.schemaVersion -notin @(1, 2, 3, 4) -or $record.repository -cne 'W205614/CampusEats' -or $record.sourceSha -cne $ExpectedSourceSha -or [string]$record.runId -cne $ExpectedRunId -or $record.runAttempt -lt 1 -or $record.platform -cne 'linux/amd64' -or $record.migrationHashFormat -cne 'utf8-lf-v1') {
     throw 'Release bundle provenance or migration hash format differs from the requested CI run.'
   }
   if ($record.schemaVersion -ge 2 -and $record.imageIdentityFormat -cne 'oci-uncompressed-v1') {
     throw 'Unsupported release image identity format.'
   }
-  $expectedServices = if ($record.schemaVersion -eq 3) {
+  $expectedServices = if ($record.schemaVersion -eq 4) {
+    @('mysql', 'redis', 'server', 'web')
+  } elseif ($record.schemaVersion -eq 3) {
     @('mysql', 'server', 'web')
   } else {
     @('server', 'web')
@@ -66,7 +68,7 @@ function Read-VerifiedReleaseBundle {
     throw 'Required image archive or security evidence is missing.'
   }
   # Version 1 is accepted only by deriving identities from its hash-verified OCI graph.
-  # Versions 2 and 3 must declare exactly the same identities; no revision-only fallback exists.
+  # Versions 2 through 4 must declare exactly the same identities; no revision-only fallback exists.
   $graph = @(Read-ReleaseImageGraph -Archive (Join-Path $directoryPath $record.archive) -SourceSha $ExpectedSourceSha -ExpectedServices $expectedServices)
   $scan = @(Get-Content -LiteralPath (Join-Path $directoryPath 'security/summary.json') -Raw | ConvertFrom-Json)
   $normalized = @()

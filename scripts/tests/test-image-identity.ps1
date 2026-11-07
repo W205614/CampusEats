@@ -55,4 +55,9 @@ foreach ($services in @(@('server', 'web'), @('mysql', 'server', 'server'))) {
   }
   if (!$rejected) { throw 'Unexpected or duplicate services were accepted.' }
 }
-Write-Host 'Image identity: exact two/three-image layouts and config/manifest IDs resolve; substituted services, bytes, layers and source identities fail closed. No Docker used.'
+$four = @('mysql', 'redis', 'server', 'web')
+[void](New-ReleaseOciFixture -Path $archive -SourceSha $sha -Services $four)
+if (@(Read-ReleaseImageGraph -Archive $archive -SourceSha $sha -ExpectedServices $four).Count -ne 4) {
+  throw 'Explicit Redis image was not verified.'
+}
+Write-Host 'Image identity: exact two/three/four-image layouts and config/manifest IDs resolve; substituted services, bytes, layers and source identities fail closed. No Docker used.'

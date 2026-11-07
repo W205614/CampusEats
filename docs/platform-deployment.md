@@ -23,11 +23,11 @@ pwsh -NoProfile -File ./scripts/release.ps1 -BundleDirectory .local/releases/dow
 
 发布清单分别记录源引擎运行ID、配置摘要和平台清单摘要。读取可信OCI归档时逐项验证索引、清单、配置及有序层的内容地址；导入后本机ID必须属于该图中已验证的配置／平台清单身份，文件系统层顺序、平台和源码revision也必须匹配。Compose固定本机已解析的内容ID，容器再次核对实际引用。身份核验以内容图及上述字段为准。
 
-清单格式V3包含Java、Web及已安装安全补丁的MySQL三个镜像；V1／V2仍严格验证原两个应用镜像。MySQL保持8.4.13及原入口、配置和数据目录，安装 Oracle ELSA-2026-92907 的 curl/libcurl 补丁和 [ELSA-2026-79281](https://linux.oracle.com/errata/ELSA-2026-79281.html) 的 glibc、glibc-common、glibc-minimal-langpack 补丁，下载时核对官方SHA-256，安装时校验RPM签名。源构建的 `MYSQL_IMAGE` 默认为 `campuseats-mysql:v1`，已采用制品的日常环境继续固定内容ID。
+清单格式V4包含Java、Web、MySQL和Redis四个已测试、扫描的镜像；读取器仍验证V1／V2的两个应用镜像及V3的三个镜像。MySQL保持8.4.13及原入口、配置和数据目录，安装 Oracle ELSA-2026-92907 的 curl/libcurl 补丁和 [ELSA-2026-95618](https://linux.oracle.com/errata/ELSA-2026-95618.html) 的 glibc、glibc-common、glibc-minimal-langpack 补丁，下载时核对官方SHA-256，安装时校验RPM签名。Redis保留官方7.4.12二进制和入口，基础系统采用固定Alpine 3.24镜像，使用已修复CVE-2026-4738的zlib；不改变Redis持久化格式。源构建的 `MYSQL_IMAGE`、`REDIS_IMAGE` 默认为 `campuseats-mysql:v1`、`campuseats-redis:v1`，已采用制品的日常环境继续固定内容ID。
 
-已有日常库升级MySQL补丁时，先停止Web／Java并独立恢复验证临时备份，保存原表原列及主键记录指纹；从同一已验证V3归档导入MySQL镜像，只替换MySQL容器并复用原数据库卷。健康、MySQL版本及原数据指纹核对通过后，再执行应用发布。`release.ps1` 会拒绝与V3制品身份不符的现有MySQL容器；依赖升级失败时保持停写并保留临时材料。全新隔离初始化会直接选择制品内的MySQL镜像。
+已有日常库升级依赖补丁时，先停止Web／Java并独立恢复验证临时备份，保存原表原列及主键记录指纹，同时记录Redis键数量及持久化状态；从同一已验证V4归档导入依赖镜像，停止并只替换MySQL／Redis容器，复用原命名卷，禁止执行 `down -v`。健康、服务版本、原数据指纹及Redis数据核对通过后，再执行应用发布。`release.ps1` 会拒绝与V4制品身份不符的现有依赖容器；依赖升级失败时保持停写并保留临时材料。全新隔离初始化会直接选择制品内的依赖镜像。
 
-应用发布保持 Web 停止，先备份并在独立恢复容器验证，再仅启动关闭后台任务的候选 Java 执行 Flyway。原表原列、原主键记录及上传卷挂载核对后，生成新 schema 的临时恢复集并独立恢复，比较原上传路径、大小及哈希。全部通过后才恢复正常后台任务并开放 Web。应用发布阶段保留已就绪的MySQL、Redis容器和三个日常数据卷；前述MySQL补丁升级只更换该依赖容器。
+应用发布保持 Web 停止，先备份并在独立恢复容器验证，再仅启动关闭后台任务的候选 Java 执行 Flyway。原表原列、原主键记录及上传卷挂载核对后，生成新 schema 的临时恢复集并独立恢复，比较原上传路径、大小及哈希。全部通过后才恢复正常后台任务并开放 Web。应用发布阶段保留已就绪的MySQL、Redis容器和三个日常数据卷；前述依赖补丁升级只更换对应依赖容器。
 
 发布失败保持停写并保存现场，不自动切旧应用搭配新 schema。成功后将应用引用固定为 CI 标签、依赖固定为原镜像 ID；后续普通 Compose 启动继续使用该版本。`start.ps1` 拒绝在这种环境中源码覆盖构建。
 

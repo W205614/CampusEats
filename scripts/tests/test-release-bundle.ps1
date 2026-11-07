@@ -100,4 +100,20 @@ try {
   $rejected = $true
 }
 if (!$rejected) { throw 'Substituted MySQL identity was accepted.' }
-Write-Host 'Release bundle: exact source/run, two/three-image graphs, MySQL identity and all archive hashes fail closed; no Docker writes were used.'
+$images = @(New-ReleaseOciFixture -Path (Join-Path $fixture 'application-images.tar') -SourceSha $sha -Services @('mysql', 'redis', 'server', 'web'))
+$manifest.schemaVersion = 4
+$manifest.images = $images
+Write-OperationsJson -Path (Join-Path $fixture 'security/summary.json') -Value @($images | ForEach-Object { @{service = $_.service; status = 'passed'; imageId = $_.sourceRuntimeId } })
+$manifest.files = @(Get-ChildItem -LiteralPath $fixture -File -Recurse | Where-Object Name -CNE 'release-manifest.json' | ForEach-Object { @{path = [IO.Path]::GetRelativePath($fixture, $_.FullName).Replace('\', '/'); bytes = $_.Length; sha256 = (Get-FileHash -LiteralPath $_.FullName).Hash } })
+Write-OperationsJson -Path $path -Value $manifest
+if (@((Read-VerifiedReleaseBundle -Directory $fixture -ExpectedSourceSha $sha -ExpectedRunId $run -ExpectedManifestSha256 (Get-FileHash $path).Hash).images).Count -ne 4) {
+  throw 'Version 4 did not verify Redis.'
+}
+$images[1].configDigest = 'sha256:' + ('f' * 64)
+Write-OperationsJson -Path $path -Value $manifest
+$rejected = $false
+try {
+  Read-VerifiedReleaseBundle -Directory $fixture -ExpectedSourceSha $sha -ExpectedRunId $run -ExpectedManifestSha256 (Get-FileHash $path).Hash | Out-Null
+} catch { $rejected = $true }
+if (!$rejected) { throw 'Substituted Redis identity was accepted.' }
+Write-Host 'Release bundle: V1-V4 source/run, two/three/four-image graphs, dependency identity and archive hashes fail closed; no Docker writes were used.'

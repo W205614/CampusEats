@@ -39,7 +39,7 @@ $migration = New-SecureDirectory -Path (Join-Path $fixture 'sky-server/src/main/
 $bundle = New-SecureDirectory -Path (Join-Path $fixture '.local/bundle')
 New-SecureDirectory -Path (Join-Path $bundle 'security') | Out-Null
 $sha = 'a' * 40
-$images = @(New-ReleaseOciFixture -Path (Join-Path $bundle 'application-images.tar') -SourceSha $sha)
+$images = @(New-ReleaseOciFixture -Path (Join-Path $bundle 'application-images.tar') -SourceSha $sha -Services @('mysql', 'redis', 'server', 'web'))
 $global:artifactFixtureImages = @{}
 foreach ($image in $images) {
   $global:artifactFixtureImages[$image.service] = $image
@@ -48,7 +48,7 @@ foreach ($image in $images) {
 '{}' | Set-Content -LiteralPath (Join-Path $bundle 'security/server-runtime-sbom.cdx.json')
 $files = @(Get-ChildItem -LiteralPath $bundle -Recurse -File | ForEach-Object { @{path = [IO.Path]::GetRelativePath($bundle, $_.FullName).Replace('\', '/'); bytes = $_.Length; sha256 = (Get-FileHash -LiteralPath $_.FullName).Hash } })
 $migrationHash = Get-ReleaseMigrationHash -Path (Join-Path $migration 'V1__fixture.sql')
-$manifest = @{schemaVersion = 2; imageIdentityFormat = 'oci-uncompressed-v1'; repository = 'W205614/CampusEats'; sourceSha = $sha; runId = '12345'; runAttempt = 1; platform = 'linux/amd64'; archive = 'application-images.tar'; images = $images; files = $files; migrationHashFormat = 'utf8-lf-v1'; migrations = @(@{name = 'V1__fixture.sql'; version = 1; sha256 = $migrationHash }) }
+$manifest = @{schemaVersion = 4; imageIdentityFormat = 'oci-uncompressed-v1'; repository = 'W205614/CampusEats'; sourceSha = $sha; runId = '12345'; runAttempt = 1; platform = 'linux/amd64'; archive = 'application-images.tar'; images = $images; files = $files; migrationHashFormat = 'utf8-lf-v1'; migrations = @(@{name = 'V1__fixture.sql'; version = 1; sha256 = $migrationHash }) }
 $manifest | ConvertTo-Json -Depth 12 | Set-Content -LiteralPath (Join-Path $bundle 'release-manifest.json')
 $hash = (Get-FileHash -LiteralPath (Join-Path $bundle 'release-manifest.json')).Hash
 function global:docker {
@@ -59,11 +59,8 @@ function global:docker {
     return
   }
   if ($a[0] -eq 'image' -and $a[1] -eq 'inspect') {
-    $kind = if ($a[2] -like 'campuseats-server:*') {
-      'server'
-    } else {
-      'web'
-    }
+    if ($a[2] -notmatch '^campuseats-(mysql|redis|server|web):') { throw 'Unexpected fixture image.' }
+    $kind = $Matches[1]
     $image = $global:artifactFixtureImages[$kind]
     $runtimeId = if ($global:artifactFixtureCase -eq 'init-classic') {
       $image.configDigest
@@ -89,12 +86,12 @@ function global:docker {
       } else {
         $image.platformManifestDigest
       }
-      $containerId = if ($global:artifactFixtureCase -eq 'container-substitution') {
+      $containerId = if (($global:artifactFixtureCase -eq 'container-substitution' -and $service -in @('server', 'web')) -or $global:artifactFixtureCase -eq ($service + '-substitution')) {
         'sha256:' + ('f' * 64)
       } else {
         $runtimeId
       }
-      $configuredId = if ($global:artifactFixtureCase -eq 'container-tag') {
+      $configuredId = if ($global:artifactFixtureCase -eq 'container-tag' -and $service -in @('server', 'web')) {
         $image.reference
       } else {
         $runtimeId
@@ -121,7 +118,9 @@ function global:docker {
       return $global:artifactFixtureRunning[$service].ToString().ToLowerInvariant()
     }
     if ($a[2] -like '*Image*') {
-      return 'sha256:' + (@{server = '1'; web = '2'; mysql = '3'; redis = '4' }[$service] * 64)
+      $image = $global:artifactFixtureImages[$service]
+      if ($global:artifactFixtureCase -eq 'init-classic') { return $image.configDigest }
+      return $image.platformManifestDigest
     }
     throw 'Unexpected fixture inspection.'
   }
@@ -173,7 +172,7 @@ function global:docker {
   throw 'Unexpected Docker mutation in artifact release.'
 }
 try {
-  foreach ($case in @('init-success', 'init-classic', 'volume-exists', 'unlabeled-volume-exists', 'backup-failed', 'data-changed', 'upload-changed', 'mount-changed', 'container-substitution', 'container-tag', 'daily-success')) {
+  foreach ($case in @('init-success', 'init-classic', 'volume-exists', 'unlabeled-volume-exists', 'backup-failed', 'data-changed', 'upload-changed', 'mount-changed', 'container-substitution', 'container-tag', 'mysql-substitution', 'redis-substitution', 'daily-success')) {
     $global:artifactFixtureCase = $case
     $global:artifactFixtureLoads = 0
     $global:artifactFixtureCandidateStarts = 0
@@ -191,11 +190,14 @@ try {
     } catch {
       $failed = $true
     }
-    if ($failed -ne ($case -in @('volume-exists', 'unlabeled-volume-exists', 'backup-failed', 'data-changed', 'upload-changed', 'mount-changed', 'container-substitution', 'container-tag'))) {
+    if ($failed -ne ($case -in @('volume-exists', 'unlabeled-volume-exists', 'backup-failed', 'data-changed', 'upload-changed', 'mount-changed', 'container-substitution', 'container-tag', 'mysql-substitution', 'redis-substitution'))) {
       throw "Unexpected artifact release result: $case"
     }
     if ($case -in @('volume-exists', 'unlabeled-volume-exists') -and ($global:artifactFixtureLoads -or $global:artifactFixtureCandidateStarts)) {
       throw 'Initialization reused old or unlabeled volumes.'
+    }
+    if ($case -in @('mysql-substitution', 'redis-substitution') -and ($global:artifactFixtureCandidateStarts -or !$global:artifactFixtureRunning.server -or !$global:artifactFixtureRunning.web)) {
+      throw 'Dependency substitution changed the existing writer state.'
     }
     if ($case -eq 'backup-failed' -and ($global:artifactFixtureCandidateStarts -or !$global:artifactFixtureRunning.server -or !$global:artifactFixtureRunning.web)) {
       throw 'Backup failure crossed the migration gate or failed to request original writer restoration.'
@@ -205,7 +207,7 @@ try {
     }
     if ($case -eq 'daily-success') {
       $config = [IO.File]::ReadAllText($envPath)
-      if ($config -notmatch ('SERVER_IMAGE=campuseats-server:sha-' + $sha) -or $config -notmatch ('MYSQL_IMAGE=sha256:' + ('3' * 64)) -or !(Test-Path -LiteralPath (Join-Path $fixture '.local/backups/LATEST.json')) -or $global:artifactFixtureCandidateStarts -ne 2 -or !$global:artifactFixtureTasksEnabled) {
+      if ($config -notmatch ('SERVER_IMAGE=campuseats-server:sha-' + $sha) -or !$config.Contains('MYSQL_IMAGE=' + $global:artifactFixtureImages.mysql.platformManifestDigest) -or !$config.Contains('REDIS_IMAGE=' + $global:artifactFixtureImages.redis.platformManifestDigest) -or !(Test-Path -LiteralPath (Join-Path $fixture '.local/backups/LATEST.json')) -or $global:artifactFixtureCandidateStarts -ne 2 -or !$global:artifactFixtureTasksEnabled) {
         throw 'Successful artifact release did not persist image/recovery references and restore tasks.'
       }
     }
