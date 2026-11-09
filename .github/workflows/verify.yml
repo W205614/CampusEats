@@ -53,6 +53,8 @@ jobs:
       - run: mvn -B -ntp clean verify
       - run: npm ci --prefix frontend/admin && npm run test:toolchain --prefix frontend/admin && npm run build --prefix frontend/admin
       - run: npm ci --prefix frontend/client --include=optional && npm run test:toolchain --prefix frontend/client && npm run typecheck --prefix frontend/client && npm run build:h5 --prefix frontend/client && npm run build:mp-weixin --prefix frontend/client
+      - name: Verify demo images on both development servers
+        run: node --test scripts/demo-images.test.mjs
       - name: Check generated API types
         run: node scripts/generate-contracts.mjs && git diff --exit-code -- frontend/contracts/openapi.ts
       - name: Dependency audit
@@ -83,6 +85,9 @@ jobs:
           ./scripts/tests/test-restore-ownership.ps1
           ./scripts/tests/test-docker-context.ps1
           ./scripts/start.ps1 -SkipVerify
+      - name: Verify static resources through the production Nginx template
+        shell: pwsh
+        run: ./scripts/tests/test-production-static.ps1
       - name: Verify real image archive before browser regression
         shell: pwsh
         run: |

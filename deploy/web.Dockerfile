@@ -13,6 +13,7 @@ RUN --mount=type=cache,target=/root/.npm cd frontend/client \
 COPY frontend/contracts frontend/contracts
 COPY frontend/admin frontend/admin
 COPY frontend/client frontend/client
+COPY scripts/vite-demo-image.mts scripts/vite-demo-image.mts
 RUN cd frontend/admin && npm run test:toolchain && npm run build
 RUN cd frontend/client && npm run test:toolchain && npm run typecheck && npm run build:h5 && npm run build:mp-weixin
 

@@ -2,6 +2,12 @@
 
 正式版本使用语义化标签，首个版本为 `v1.0.0`；源码提交 SHA 和同次成功 CI 制品用于精确识别构建。实际运行实例以镜像内容摘要、revision 与发布回执为准，验证入口见[当前版本记录](docs/verification/current.md)。
 
+## v1.0.2 · 开发图片与生产静态资源修复
+
+- 工作台与 H5 的开发服务器直接提供仓库中的演示 SVG，修复 `/demo-images/dish.svg` 返回 404；两端共用同一份素材，不依赖后端提供静态图片。
+- 生产 Nginx 模板开放镜像中已有的演示图片、项目 LICENSE 及两端第三方许可清单，缺失资源仍返回 404，内部监控和接口文档继续禁止公开访问。
+- 新增真实开发服务器 HTTP 回归与隔离 Nginx 容器回归，并纳入 CI；同步联调说明。后端与两端应用版本为 `1.0.2`，小程序版本号为 `102`，没有新增依赖、HTTP 业务契约或数据库迁移。
+
 ## v1.0.1 · 命名统一与维护
 
 - 将后端模块统一为 `campuseats-common`、`campuseats-api` 和 `campuseats-server`，分别承载公共工具、接口类型和应用服务；Java 包名统一为 `com.campuseats`，启动类改为 `CampusEatsApplication`。

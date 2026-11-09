@@ -1,5 +1,7 @@
 # 脚本导航
 
+开发静态图片回归：`node --test scripts/demo-images.test.mjs` 使用独立的 `127.0.0.1:15173/15174` 端口启动两端开发服务器，验证共享 SVG 的 GET、HEAD 与缺失资源行为，不访问后端。生产静态路由回归：`pwsh -NoProfile -File scripts/tests/test-production-static.ps1 -WebImage <已构建的Web镜像>` 使用随机本机端口和临时 Nginx 容器，不挂载业务数据，结束后退出并回收临时配置。
+
 以下脚本从项目根目录执行，PowerShell 脚本使用 `pwsh`。首次体验只需 `start.ps1 -SkipVerify`；其它脚本按需使用。环境配置、凭据、备份与输出保存在受忽略的 `.env`／`.local/`。
 
 | 用途               | 脚本                                                                     | 说明                                                                                                                                                                                                                                           |

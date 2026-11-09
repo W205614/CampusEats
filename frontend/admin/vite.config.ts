@@ -1,8 +1,9 @@
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
+import { demoImage } from '../../scripts/vite-demo-image.mts';
 export default defineConfig({
   base: '/admin/',
-  plugins: [vue()],
+  plugins: [vue(), demoImage()],
   build: { license: { fileName: 'THIRD_PARTY_LICENSES.md' } },
   server: {
     port: 5173,

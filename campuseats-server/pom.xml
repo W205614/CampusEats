@@ -3,7 +3,7 @@
   <parent>
     <groupId>com.campuseats</groupId>
     <artifactId>campus-eats</artifactId>
-    <version>1.0.1</version>
+    <version>1.0.2</version>
   </parent>
   <artifactId>campuseats-server</artifactId>
   <dependencyManagement>
@@ -59,12 +59,12 @@
     <dependency>
       <groupId>com.campuseats</groupId>
       <artifactId>campuseats-common</artifactId>
-      <version>1.0.1</version>
+      <version>1.0.2</version>
     </dependency>
     <dependency>
       <groupId>com.campuseats</groupId>
       <artifactId>campuseats-api</artifactId>
-      <version>1.0.1</version>
+      <version>1.0.2</version>
     </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>

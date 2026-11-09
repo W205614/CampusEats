@@ -2,13 +2,21 @@
 
 本地点餐、合单、履约、售后、权限和账务功能已完成回归，当前进入按需维护阶段。出现可复现问题、依赖升级或新业务需求时再修改；微信与腾讯云接入按专题指南另行安排。
 
-## v1.0.1 版本与运行核对
+## v1.0.2 源码与本地验证
 
-当前版本入口为 [v1.0.1](https://github.com/W205614/CampusEats/releases/tag/v1.0.1)，后端模块为 `campuseats-common`、`campuseats-api` 和 `campuseats-server`，Java 包名为 `com.campuseats`，入口为 `CampusEatsApplication`。后端与两端应用版本统一为 `1.0.1`。本轮整理不增加业务功能，不改变 HTTP 契约或 V1—V24 迁移内容；数据库标识和业务卷保持原样。
+2026-11-09 的维护源码版本为 `1.0.2`：修复两端开发服务器的演示图片 404，以及生产 Nginx 模板未提供演示图片和许可文件的问题。没有业务接口、数据迁移或运行依赖变化。
+
+本地 Node.js 24.19.0 / PowerShell 7 验证：管理端 2 项和用户端 7 项工具链测试、管理端构建、用户端类型检查、H5 与微信小程序构建通过；两端真实开发服务器的 2 项 HTTP 回归通过。隔离 Nginx 容器使用生产模板验证图片及三份许可文件可访问、缺失资源和内部端点返回 404。该容器只使用独立端口与临时配置，不挂载业务卷，测试后自动退出。
+
+上述结果属于提交前的本地验证；最终提交的 CI、Tag、Release 和附件状态应从 [Actions](https://github.com/W205614/CampusEats/actions/workflows/verify.yml) 与 [Releases](https://github.com/W205614/CampusEats/releases) 分别核对。本机本轮收尾入口为 `.local/release-1.0.2-20261109/final-validation.json`。本轮未部署日常环境，运行制品仍按下面的 v1.0.1 部署记录核对；历史业务与容量结果不视为本轮重新执行。
+
+## v1.0.1 发布与日常部署记录
+
+2026-11-07 发布的 [v1.0.1](https://github.com/W205614/CampusEats/releases/tag/v1.0.1) 为当前日常部署版本，后端模块为 `campuseats-common`、`campuseats-api` 和 `campuseats-server`，Java 包名为 `com.campuseats`，入口为 `CampusEatsApplication`。该版本后端与两端应用均为 `1.0.1`，没有改变 HTTP 契约或 V1—V24 迁移内容；数据库标识和业务卷保持原样。
 
 使用 `git rev-parse v1.0.1` 核对发布提交，按该提交的[CI 结果](https://github.com/W205614/CampusEats/actions/workflows/verify.yml)和 Release 附件验证源码与制品。本机完整收尾回执位于 `.local/release-1.0.1-20261107/final-validation.json`，其中记录本地与远端、Tag、Release、四个运行镜像的对应关系，以及数据核验、临时恢复负载回收和最终容器状态；实际部署记录仍保存在 `.local/releases/artifact-*/release.json`。
 
-下文是 2026-11-06 的历史业务基线、容量测量和当时的收尾统计；不将历史容量数字当成本轮重新执行的容量测试。当前发布和运行状态以上述版本回执为准。
+下文是 2026-11-06 的历史业务基线、容量测量和当时的收尾统计；不将历史容量数字当成本轮重新执行的容量测试。各次发布和部署状态以对应版本回执为准。
 
 ## 已完成的业务基线验收
 

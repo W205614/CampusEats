@@ -8,7 +8,7 @@ CampusEats 让学生在多个校区、多个店铺选餐后合并付款，各店
 
 ## 当前状态与维护方式
 
-当前正式版本为 [v1.0.1](https://github.com/W205614/CampusEats/releases/tag/v1.0.1)，后端模块、Java 包和应用入口统一使用 CampusEats 命名；后端与两端应用版本为 `1.0.1`。升级和兼容性说明见[变更记录](CHANGELOG.md)。
+后端与两端应用的源码版本为 `1.0.2`，后端模块、Java 包和应用入口统一使用 CampusEats 命名。正式版本从 [Releases](https://github.com/W205614/CampusEats/releases) 获取；升级和兼容性说明见[变更记录](CHANGELOG.md)，源码与部署版本分别按[验证记录](docs/verification/current.md)核对。
 
 本地点餐、合单、履约、售后、权限和账务流程已完成回归，适合个人开发、学习和演示使用。当前阶段按需维护：遇到可复现问题、需要升级依赖或调整业务时再修改，暂不继续扩展功能。
 

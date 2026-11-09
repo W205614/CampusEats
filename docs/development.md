@@ -96,13 +96,13 @@ npm run dev --prefix frontend/admin
 ```powershell
 # 终端二：用户 H5 http://127.0.0.1:5174/app/
 $env:API_PROXY = 'http://localhost:18083'
-$env:VITE_API_BASE = 'http://localhost:18083'
+Remove-Item Env:VITE_API_BASE -ErrorAction SilentlyContinue
 npm run dev:h5 --prefix frontend/client
 ```
 
-终端二的 `VITE_API_BASE` 让 API 和演示图片指向 Docker 入口，仅用于该开发终端；正式 H5 构建默认保持同源，不把本机地址写进源码。端口调整后同步修改 API 地址、代理与允许的 Origin。开发服务器也会访问该后端的实际数据，写入式验收应先按[独立验收说明](platform-deployment.md#独立验收)准备隔离环境。Compose 不公开 MySQL／Redis 端口，直接在 IDE 启动后端还需自行配置可访问的数据库、Redis 和运行环境。
+终端二清除进程中的 `VITE_API_BASE`，让 H5 的 API、上传与演示图片保持同源；如本机 `.env.local` 另有该配置，也应按本次联调方式调整。API 与上传请求通过 `API_PROXY` 转发，不把本机地址写进源码。端口调整后同步修改代理与允许的 Origin。开发服务器也会访问该后端的实际数据，写入式验收应先按[独立验收说明](platform-deployment.md#独立验收)准备隔离环境。Compose 不公开 MySQL／Redis 端口，直接在 IDE 启动后端还需自行配置可访问的数据库、Redis 和运行环境。
 
-工作台的 Vite 配置没有代理 `/demo-images/`，编辑商品时默认演示图片可能无法在开发端口显示；完整静态资源展示应在 Docker 构建后的工作台检查。
+工作台与 H5 开发服务器直接读取仓库的 `deploy/dish.svg`，提供 `/demo-images/dish.svg`，无需为演示图片启动后端或 Docker。API 与上传文件仍通过 `API_PROXY` 访问所选后端；不要将日常库用于写入式自动测试。
 
 ## 微信小程序
 
