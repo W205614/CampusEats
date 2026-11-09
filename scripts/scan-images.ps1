@@ -7,6 +7,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $taskRoot = Split-Path $PSScriptRoot -Parent
 . (Join-Path $PSScriptRoot 'secure-files.ps1')
+. (Join-Path $PSScriptRoot 'tool-download.ps1')
 $outputRoot = [IO.Path]::GetFullPath($OutputDirectory, $taskRoot)
 [void][IO.Directory]::CreateDirectory($outputRoot)
 $version = '0.76.0'
@@ -34,12 +35,7 @@ if (!$TrivyExecutable) {
   }
   $archive = Join-Path $tools $asset
   # Always verify the pinned archive before extracting, including cached installations.
-  if (!(Test-Path -LiteralPath $archive)) {
-    Invoke-WebRequest -Uri "https://github.com/aquasecurity/trivy/releases/download/v$version/$asset" -OutFile $archive -TimeoutSec 120
-  }
-  if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant() -cne $expected) {
-    throw 'Pinned Trivy archive checksum mismatch.'
-  }
+  Receive-PinnedToolArchive -Uri "https://github.com/aquasecurity/trivy/releases/download/v$version/$asset" -Path $archive -ExpectedSha256 $expected
   if ($IsWindows) {
     Expand-Archive -LiteralPath $archive -DestinationPath $tools -Force
     $TrivyExecutable = Join-Path $tools 'trivy.exe'

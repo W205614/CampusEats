@@ -6,7 +6,7 @@ $root = Split-Path $scriptsDir -Parent
 $fixture = Join-Path $root ('.local/ops-run-test-' + [guid]::NewGuid().ToString('N'))
 $fixtureScripts = Join-Path $fixture 'scripts'
 [void][IO.Directory]::CreateDirectory($fixtureScripts)
-foreach ($script in @('ops-run.ps1', 'operations-support.ps1', 'secure-files.ps1', 'encrypted-backups.ps1', 'operations-lock.ps1', 'ops-check.ps1', 'docker-read.ps1')) {
+foreach ($script in @('ops-run.ps1', 'operations-support.ps1', 'secure-files.ps1', 'encrypted-backups.ps1', 'tool-download.ps1', 'operations-lock.ps1', 'ops-check.ps1', 'docker-read.ps1')) {
   Copy-Item -LiteralPath (Join-Path $scriptsDir $script) -Destination $fixtureScripts
 }
 $pwsh = (Get-Process -Id $PID).Path

@@ -8,6 +8,12 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.19.0'
+      - name: Verify bounded pinned-tool HTTP downloads on Windows
+        shell: pwsh
+        run: ./scripts/tests/test-tool-download.ps1
       - name: Verify real Windows credential ACL and fail-before-write behavior
         shell: pwsh
         run: ./scripts/tests/test-secure-files.ps1
@@ -50,6 +56,9 @@ jobs:
           cache-dependency-path: |
             frontend/admin/package-lock.json
             frontend/client/package-lock.json
+      - name: Verify bounded pinned-tool HTTP downloads
+        shell: pwsh
+        run: ./scripts/tests/test-tool-download.ps1
       - run: mvn -B -ntp clean verify
       - run: npm ci --prefix frontend/admin && npm run test:toolchain --prefix frontend/admin && npm run build --prefix frontend/admin
       - run: npm ci --prefix frontend/client --include=optional && npm run test:toolchain --prefix frontend/client && npm run typecheck --prefix frontend/client && npm run build:h5 --prefix frontend/client && npm run build:mp-weixin --prefix frontend/client

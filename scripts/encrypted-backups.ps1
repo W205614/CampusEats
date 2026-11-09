@@ -1,4 +1,5 @@
 . (Join-Path $PSScriptRoot 'secure-files.ps1')
+. (Join-Path $PSScriptRoot 'tool-download.ps1')
 
 function Get-PinnedAge {
   param([string]$ToolRoot = (Join-Path (Split-Path $PSScriptRoot -Parent) '.local/tools/age'))
@@ -26,12 +27,7 @@ function Get-PinnedAge {
   }
   $directory = New-SecureDirectory -Path (Join-Path $ToolRoot "$version-$platform")
   $archive = Join-Path $directory $asset
-  if (!(Test-Path -LiteralPath $archive)) {
-    Invoke-WebRequest -Uri "https://github.com/FiloSottile/age/releases/download/v$version/$asset" -OutFile $archive -TimeoutSec 120
-  }
-  if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant() -cne $expected) {
-    throw 'Pinned age archive checksum mismatch.'
-  }
+  Receive-PinnedToolArchive -Uri "https://github.com/FiloSottile/age/releases/download/v$version/$asset" -Path $archive -ExpectedSha256 $expected
   if ($IsWindows) {
     Expand-Archive -LiteralPath $archive -DestinationPath $directory -Force
   } else {
