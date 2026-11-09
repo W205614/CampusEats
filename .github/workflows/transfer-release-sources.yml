@@ -1,0 +1,44 @@
+name: Transfer verified v1.0.3 source attachment
+on:
+  push:
+    branches: [codex/release-materials-v103]
+permissions:
+  contents: write
+  actions: read
+jobs:
+  transfer:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-420ead2fdc65d5bc80e1604ac2720519d5840ebc
+          run-id: 42610106020
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: bundle
+      - name: Verify the immutable source and upload the absent draft attachment
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $ErrorActionPreference='Stop'
+          $headers=@{Authorization='Bearer '+$env:GH_TOKEN;Accept='application/vnd.github+json'}
+          $api='https://api.github.com/repos/W205614/CampusEats'
+          $run=Invoke-RestMethod "$api/actions/runs/42610106020" -Headers $headers
+          $tag=Invoke-RestMethod "$api/git/ref/tags/v1.0.3" -Headers $headers
+          $sha='420ead2fdc65d5bc80e1604ac2720519d5840ebc'
+          if($run.head_sha -cne $sha -or $run.status -cne 'completed' -or $run.conclusion -cne 'success' -or $run.head_branch -cne 'master' -or $tag.object.sha -cne $sha){throw 'Exact tested source is required'}
+          if((Get-FileHash bundle/release-manifest.json).Hash -cne 'F8F20C88296566094EB864E0C0F2A16DEFB934B1253B300DDD2D2E92D85A256E'){throw 'Trusted manifest differs'}
+          $manifest=Get-Content bundle/release-manifest.json -Raw|ConvertFrom-Json
+          $entry=@($manifest.files|Where-Object path -CEQ 'runtime-sources.tar.gz')
+          $file=Get-Item bundle/runtime-sources.tar.gz
+          $hash=(Get-FileHash $file.FullName).Hash
+          if($manifest.sourceSha -cne $sha -or [string]$manifest.runId -cne '42610106020' -or $entry.Count -ne 1 -or $entry[0].bytes -ne $file.Length -or $entry[0].sha256 -ine $hash){throw 'Source archive differs'}
+          $release=Invoke-RestMethod "$api/releases/439139507" -Headers $headers
+          if(!$release.draft -or $release.tag_name -cne 'v1.0.3' -or @($release.assets|Where-Object name -CEQ 'runtime-sources.tar.gz').Count){throw 'Expected absent attachment in the existing draft'}
+          gh release upload v1.0.3 bundle/runtime-sources.tar.gz --repo W205614/CampusEats
+          if($LASTEXITCODE -ne 0){throw 'Upload failed; inspect the remote asset before another attempt'}
+          $release=Invoke-RestMethod "$api/releases/439139507" -Headers $headers
+          $asset=@($release.assets|Where-Object name -CEQ 'runtime-sources.tar.gz')
+          if($asset.Count -ne 1 -or $asset[0].state -cne 'uploaded' -or $asset[0].size -ne $file.Length -or $asset[0].digest -ine ('sha256:'+$hash)){throw 'Uploaded source identity differs'}
+          Write-Output ('Verified draft source attachment: '+$asset[0].id+' '+$asset[0].size+' '+$asset[0].digest)
