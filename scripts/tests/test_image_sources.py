@@ -1,10 +1,11 @@
 import hashlib
 import importlib.util
 import json
+import http.client
 from pathlib import Path
 import tempfile
 import unittest
-from unittest.mock import patch
+from unittest.mock import patch, MagicMock
 
 SPEC = importlib.util.spec_from_file_location("image_sources", Path(__file__).parents[1] / "collect-image-sources.py")
 collector = importlib.util.module_from_spec(SPEC)
@@ -61,6 +62,22 @@ class SourceCollectionTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "source identity"):
                 collector.collect_aport(("fixture", "main"), self.output, "v3.24")
             fetch.assert_not_called()
+
+    def test_interrupted_transfer_resumes_only_its_verified_range(self):
+        first = MagicMock()
+        first.__enter__.return_value = first
+        first.status = 200
+        first.headers = {"Content-Length": "6", "ETag": '"source-version"'}
+        first.read.side_effect = http.client.IncompleteRead(b"abc", 3)
+        second = MagicMock()
+        second.__enter__.return_value = second
+        second.status = 206
+        second.headers = {"Content-Range": "bytes 3-5/6"}
+        second.read.return_value = b"def"
+        with patch.object(collector.urllib.request, "urlopen", side_effect=[first, second]) as request, patch.object(collector.time, "sleep"):
+            self.assertEqual(collector.download("https://example.com/source"), b"abcdef")
+        self.assertEqual(request.call_args_list[1].args[0].get_header("Range"), "bytes=3-")
+        self.assertEqual(request.call_args_list[1].args[0].get_header("If-range"), '"source-version"')
 
 
 if __name__ == "__main__":

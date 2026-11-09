@@ -20,14 +20,41 @@ import zipfile
 
 
 def download(url):
-    request = urllib.request.Request(url, headers={"User-Agent": "CampusEats-sources"})
+    data = bytearray()
+    validator = None
+    total = None
     for attempt in range(3):
+        headers = {"User-Agent": "CampusEats-sources"}
+        if data and validator:
+            headers.update({"Range": f"bytes={len(data)}-", "If-Range": validator})
+        else:
+            data.clear()
+        request = urllib.request.Request(url, headers=headers)
         try:
             with urllib.request.urlopen(request, timeout=120) as response:
-                return response.read()
+                if response.status == 206:
+                    content_range = re.fullmatch(r"bytes (\d+)-(\d+)/(\d+)", response.headers.get("Content-Range", ""))
+                    if not data or content_range is None or int(content_range[1]) != len(data) or int(content_range[3]) != total:
+                        raise ValueError(f"Source download range differs from this transfer: {url}")
+                elif response.status == 200:
+                    # A changed validator or a server ignoring Range starts a fresh response.
+                    data.clear()
+                    length = response.headers.get("Content-Length")
+                    total = int(length) if length else None
+                    validator = response.headers.get("ETag") or response.headers.get("Last-Modified")
+                else:
+                    raise ValueError(f"Unexpected source download status: {response.status}")
+                try:
+                    data.extend(response.read())
+                except http.client.IncompleteRead as error:
+                    data.extend(error.partial)
+                    raise
+                if total is not None and len(data) != total:
+                    raise http.client.IncompleteRead(b"", total - len(data))
+                return bytes(data)
         except (http.client.IncompleteRead, http.client.RemoteDisconnected, TimeoutError, urllib.error.HTTPError) as error:
             if attempt == 2 or isinstance(error, urllib.error.HTTPError) and error.code not in (502, 503, 504):
-                raise
+                raise RuntimeError(f"Source transfer failed after bounded attempts: {url}") from error
             time.sleep(2)
 
 
