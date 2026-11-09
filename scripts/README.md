@@ -1,6 +1,6 @@
 # 脚本导航
 
-`tool-download.ps1` 供 Trivy/age 共用：仅对 HTTP 502/503/504 最多请求三次（每次 120 秒超时、间隔 2 秒），验证固定 SHA-256 后才发布工具归档；损坏的既有缓存不覆盖。真实本机 HTTP 回归入口为 `pwsh -NoProfile -File scripts/tests/test-tool-download.ps1`，不访问外部下载站点。
+`tool-download.ps1` 供 Trivy/age 共用，以 HTTP/1.1 访问同一 GitHub 资产的 `?download=1` 入口：仅对 HTTP 502/503/504 最多请求三次（每次 120 秒超时、间隔 2 秒），验证固定 SHA-256 后才发布工具归档；损坏的既有缓存不覆盖。真实本机 HTTP 回归入口为 `pwsh -NoProfile -File scripts/tests/test-tool-download.ps1`，不访问外部下载站点。
 
 开发静态图片回归：`node --test scripts/demo-images.test.mjs` 使用独立的 `127.0.0.1:15173/15174` 端口启动两端开发服务器，验证共享 SVG 的 GET、HEAD 与缺失资源行为，不访问后端。生产静态路由回归：`pwsh -NoProfile -File scripts/tests/test-production-static.ps1 -WebImage <已构建的Web镜像>` 使用随机本机端口和临时 Nginx 容器，不挂载业务数据，结束后退出并回收临时配置。
 

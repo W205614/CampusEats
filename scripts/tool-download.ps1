@@ -12,7 +12,7 @@ function Receive-PinnedToolArchive {
   try {
     for ($attempt = 1; $attempt -le 3; $attempt++) {
       try {
-        Invoke-WebRequest -Uri $Uri -OutFile $temporary -TimeoutSec 120
+        Invoke-WebRequest -Uri $Uri -OutFile $temporary -HttpVersion 1.1 -TimeoutSec 120 -ErrorAction Stop
         break
       } catch {
         $status = [int]$_.Exception.Response.StatusCode

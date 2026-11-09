@@ -35,7 +35,7 @@ if (!$TrivyExecutable) {
   }
   $archive = Join-Path $tools $asset
   # Always verify the pinned archive before extracting, including cached installations.
-  Receive-PinnedToolArchive -Uri "https://github.com/aquasecurity/trivy/releases/download/v$version/$asset" -Path $archive -ExpectedSha256 $expected
+  Receive-PinnedToolArchive -Uri "https://github.com/aquasecurity/trivy/releases/download/v$version/${asset}?download=1" -Path $archive -ExpectedSha256 $expected
   if ($IsWindows) {
     Expand-Archive -LiteralPath $archive -DestinationPath $tools -Force
     $TrivyExecutable = Join-Path $tools 'trivy.exe'

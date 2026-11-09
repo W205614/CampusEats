@@ -27,7 +27,7 @@ function Get-PinnedAge {
   }
   $directory = New-SecureDirectory -Path (Join-Path $ToolRoot "$version-$platform")
   $archive = Join-Path $directory $asset
-  Receive-PinnedToolArchive -Uri "https://github.com/FiloSottile/age/releases/download/v$version/$asset" -Path $archive -ExpectedSha256 $expected
+  Receive-PinnedToolArchive -Uri "https://github.com/FiloSottile/age/releases/download/v$version/${asset}?download=1" -Path $archive -ExpectedSha256 $expected
   if ($IsWindows) {
     Expand-Archive -LiteralPath $archive -DestinationPath $directory -Force
   } else {

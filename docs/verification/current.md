@@ -12,6 +12,8 @@
 
 初始候选 `cf28b36` 的两次 CI 分别因 Trivy 和 age 下载返回 504 失败，不能视作完整通过。追加工具下载修复后，本地真实 HTTP 的重试上限、404/摘要失败、缓存保留回归通过；现有真实 age 加密往返与损坏拒绝、运维 runner 和扫描编排回归通过。最终发布以包含该修复的后续提交及其 CI 为准。
 
+下载传输后续收敛为显式 HTTP/1.1 与同一 GitHub 资产的 `?download=1` 入口，age/Trivy 的完整归档通过原固定摘要核对；不增加宿主依赖或镜像站。持续网络失败仍会明确中断，不能将有限重试当作外部服务可用性保证。
+
 ## v1.0.1 发布与日常部署记录
 
 2026-11-07 发布的 [v1.0.1](https://github.com/W205614/CampusEats/releases/tag/v1.0.1) 为当前日常部署版本，后端模块为 `campuseats-common`、`campuseats-api` 和 `campuseats-server`，Java 包名为 `com.campuseats`，入口为 `CampusEatsApplication`。该版本后端与两端应用均为 `1.0.1`，没有改变 HTTP 契约或 V1—V24 迁移内容；数据库标识和业务卷保持原样。
