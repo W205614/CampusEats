@@ -2,6 +2,7 @@ import hashlib
 import importlib.util
 import json
 import http.client
+import urllib.error
 from pathlib import Path
 import tempfile
 import unittest
@@ -78,6 +79,14 @@ class SourceCollectionTest(unittest.TestCase):
             self.assertEqual(collector.download("https://example.com/source"), b"abcdef")
         self.assertEqual(request.call_args_list[1].args[0].get_header("Range"), "bytes=3-")
         self.assertEqual(request.call_args_list[1].args[0].get_header("If-range"), '"source-version"')
+
+    def test_missing_optional_archive_keeps_http_status_without_retry(self):
+        error = urllib.error.HTTPError("https://example.com/source", 404, "Not found", {}, None)
+        with patch.object(collector.urllib.request, "urlopen", side_effect=error) as request:
+            with self.assertRaises(urllib.error.HTTPError) as caught:
+                collector.download("https://example.com/source")
+        self.assertEqual(caught.exception.code, 404)
+        self.assertEqual(request.call_count, 1)
 
 
 if __name__ == "__main__":

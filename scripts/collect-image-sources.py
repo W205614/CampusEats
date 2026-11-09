@@ -53,7 +53,9 @@ def download(url):
                     raise http.client.IncompleteRead(b"", total - len(data))
                 return bytes(data)
         except (http.client.IncompleteRead, http.client.RemoteDisconnected, TimeoutError, urllib.error.HTTPError) as error:
-            if attempt == 2 or isinstance(error, urllib.error.HTTPError) and error.code not in (502, 503, 504):
+            if isinstance(error, urllib.error.HTTPError) and error.code not in (502, 503, 504):
+                raise
+            if attempt == 2:
                 raise RuntimeError(f"Source transfer failed after bounded attempts: {url}") from error
             time.sleep(2)
 
