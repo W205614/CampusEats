@@ -1,0 +1,57 @@
+name: Publish tested application images
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Exact successful master commit
+        required: true
+      run_id:
+        description: Successful Verify CampusEats master run
+        required: true
+      manifest_sha256:
+        description: Trusted RELEASE_MANIFEST_SHA256 from that run
+        required: true
+      version:
+        description: Published release tag, for example v1.0.3
+        required: true
+permissions:
+  contents: read
+  actions: read
+  packages: write
+concurrency:
+  group: publish-application-images
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      SOURCE_SHA: ${{ inputs.source_sha }}
+      RUN_ID: ${{ inputs.run_id }}
+      MANIFEST_SHA256: ${{ inputs.manifest_sha256 }}
+      RELEASE_VERSION: ${{ inputs.version }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Validate exact promotion inputs
+        shell: pwsh
+        run: |
+          if ($env:SOURCE_SHA -cnotmatch '^[a-f0-9]{40}$' -or $env:RUN_ID -notmatch '^[0-9]+$' -or $env:MANIFEST_SHA256 -notmatch '^[a-fA-F0-9]{64}$' -or $env:RELEASE_VERSION -cnotmatch '^v[0-9]+\.[0-9]+\.[0-9]+$') { throw 'Exact release inputs are required.' }
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.source_sha }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-${{ inputs.source_sha }}
+          run-id: ${{ inputs.run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: .local/promotion-bundle
+      - name: Promote the already tested images without rebuilding
+        shell: pwsh
+        run: ./scripts/publish-images.ps1 -BundleDirectory .local/promotion-bundle -SourceSha $env:SOURCE_SHA -RunId $env:RUN_ID -ManifestSha256 $env:MANIFEST_SHA256 -Version $env:RELEASE_VERSION
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: package-publication-${{ inputs.source_sha }}
+          path: .local/package-publication.json
+          if-no-files-found: ignore
+          retention-days: 7

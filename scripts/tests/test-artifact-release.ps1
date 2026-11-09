@@ -30,6 +30,7 @@ $hash=if($Destination -like '*current-artifact-*' -and $global:artifactFixtureCa
 '@ | Set-Content -LiteralPath (Join-Path $fixtureScripts 'safe-backup.ps1')
 @'
 param($ProjectName,$EnvFile,$OutputPath,$CompareManifest)
+if(!$CompareManifest -and $global:artifactFixtureCase -in @('capture-failed','capture-failed-stopped')){throw 'Injected pre-migration data capture failure.'}
 if($CompareManifest -and ($global:artifactFixtureRunning.web -or $global:artifactFixtureTasksEnabled)){throw 'Historical comparison observed open Web or active jobs.'}
 if($CompareManifest -and $global:artifactFixtureCase -eq 'data-changed'){throw 'Injected original data change.'}
 '{}' | Set-Content -LiteralPath $OutputPath
@@ -172,25 +173,26 @@ function global:docker {
   throw 'Unexpected Docker mutation in artifact release.'
 }
 try {
-  foreach ($case in @('init-success', 'init-classic', 'volume-exists', 'unlabeled-volume-exists', 'backup-failed', 'data-changed', 'upload-changed', 'mount-changed', 'container-substitution', 'container-tag', 'mysql-substitution', 'redis-substitution', 'daily-success')) {
+  foreach ($case in @('init-success', 'init-classic', 'volume-exists', 'unlabeled-volume-exists', 'backup-failed', 'capture-failed', 'capture-failed-stopped', 'data-changed', 'upload-changed', 'mount-changed', 'container-substitution', 'container-tag', 'mysql-substitution', 'redis-substitution', 'daily-success')) {
     $global:artifactFixtureCase = $case
     $global:artifactFixtureLoads = 0
     $global:artifactFixtureCandidateStarts = 0
     $global:artifactFixtureRunning = @{mysql = $true; redis = $true; server = $true; web = $true }
-    if ($case.StartsWith('init')) {
+    if ($case.StartsWith('init') -or $case -eq 'capture-failed-stopped') {
       $global:artifactFixtureRunning.server = $false
       $global:artifactFixtureRunning.web = $false
     }
     $global:artifactFixtureTasksEnabled = $true
     $envPath = Join-Path $fixture '.env'
     Write-SecureTextFile -Path $envPath -Content "MYSQL_PASSWORD=fixture-only`nWEB_PORT=28087`n"
+    $originalConfig = [IO.File]::ReadAllText($envPath)
     $failed = $false
     try {
       & (Join-Path $fixtureScripts 'release.ps1') -BundleDirectory $bundle -ExpectedSourceSha $sha -ExpectedRunId '12345' -ExpectedManifestSha256 $hash -ProjectName 'campuseats-improvement-artifactfixture' -EnvFile $envPath -Initialize:($case.StartsWith('init') -or $case -in @('volume-exists', 'unlabeled-volume-exists'))
     } catch {
       $failed = $true
     }
-    if ($failed -ne ($case -in @('volume-exists', 'unlabeled-volume-exists', 'backup-failed', 'data-changed', 'upload-changed', 'mount-changed', 'container-substitution', 'container-tag', 'mysql-substitution', 'redis-substitution'))) {
+    if ($failed -ne ($case -in @('volume-exists', 'unlabeled-volume-exists', 'backup-failed', 'capture-failed', 'capture-failed-stopped', 'data-changed', 'upload-changed', 'mount-changed', 'container-substitution', 'container-tag', 'mysql-substitution', 'redis-substitution'))) {
       throw "Unexpected artifact release result: $case"
     }
     if ($case -in @('volume-exists', 'unlabeled-volume-exists') -and ($global:artifactFixtureLoads -or $global:artifactFixtureCandidateStarts)) {
@@ -202,6 +204,16 @@ try {
     if ($case -eq 'backup-failed' -and ($global:artifactFixtureCandidateStarts -or !$global:artifactFixtureRunning.server -or !$global:artifactFixtureRunning.web)) {
       throw 'Backup failure crossed the migration gate or failed to request original writer restoration.'
     }
+    if ($case -in @('capture-failed', 'capture-failed-stopped')) {
+      $expectedRunning = $case -eq 'capture-failed'
+      if ($global:artifactFixtureCandidateStarts -or $global:artifactFixtureRunning.server -ne $expectedRunning -or $global:artifactFixtureRunning.web -ne $expectedRunning -or [IO.File]::ReadAllText($envPath) -cne $originalConfig) {
+        throw 'Pre-migration capture failure changed writer state, configuration or started a candidate.'
+      }
+      $records = @(Get-ChildItem -LiteralPath (Join-Path $fixture '.local/releases') -Filter release.json -Recurse | ForEach-Object { Get-Content -LiteralPath $_.FullName -Raw | ConvertFrom-Json } | Where-Object outcome -EQ 'capture_failed')
+      if (!$records.Count -or @($records | Where-Object { !$_.beforeBackup -or !$_.completedAt -or !(Test-Path -LiteralPath (Join-Path $_.beforeBackup 'verified.json')) }).Count) {
+        throw 'Pre-migration capture failure lost its failure receipt or verified recovery reference.'
+      }
+    }
     if ($case -in @('data-changed', 'upload-changed', 'mount-changed', 'container-substitution', 'container-tag') -and ($global:artifactFixtureRunning.server -or $global:artifactFixtureRunning.web -or $global:artifactFixtureCandidateStarts -ne 1)) {
       throw 'Failed post-migration data/upload/mount verification opened traffic.'
     }
@@ -212,7 +224,7 @@ try {
       }
     }
   }
-  Write-Host 'Artifact release orchestration: fresh isolation, existing-volume rejection, backup gate, failed-data pause and persistent immutable references passed.'
+  Write-Host 'Artifact release orchestration: fresh isolation, backup/capture gates, original writer state, failure receipts, failed-data pause and immutable references passed.'
 } finally {
   Remove-Item Function:\docker -ErrorAction SilentlyContinue
   Remove-Variable artifactFixtureCase, artifactFixtureLoads, artifactFixtureCandidateStarts, artifactFixtureRunning, artifactFixtureTasksEnabled, artifactFixtureImages -Scope Global -ErrorAction SilentlyContinue

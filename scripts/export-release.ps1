@@ -40,6 +40,7 @@ foreach ($image in $images) {
   }
 }
 $securityOutput = New-SecureDirectory -Path (Join-Path $output 'security')
+Copy-Item -LiteralPath (Join-Path $root '.local/runtime-sources.tar.gz') -Destination (Join-Path $output 'runtime-sources.tar.gz') -ErrorAction Stop
 # Explicit whitelist: no logs, .env, credentials, source backup or extracted JAR enters the artifact.
 foreach ($name in @('summary.json', 'server-runtime-sbom.cdx.json', 'server-runtime-manifest.sha256', 'server-runtime-provenance.json', 'server-os-sbom.cdx.json', 'web-os-sbom.cdx.json', 'mysql-os-sbom.cdx.json', 'redis-os-sbom.cdx.json', 'server-os-gate.json', 'web-os-gate.json', 'mysql-os-gate.json', 'redis-os-gate.json', 'server-java-gate.json', 'server-os-vulnerabilities.json', 'web-os-vulnerabilities.json', 'mysql-os-vulnerabilities.json', 'redis-os-vulnerabilities.json', 'server-java-vulnerabilities.json')) {
   Copy-Item -LiteralPath (Join-Path $security $name) -Destination $securityOutput -ErrorAction Stop

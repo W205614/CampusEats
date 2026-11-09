@@ -26,6 +26,8 @@ RUN test -n "$RUNTIME_REFRESH" && for attempt in 1 2 3; do \
     done
 ARG SOURCE_REVISION=unknown
 LABEL org.opencontainers.image.revision=$SOURCE_REVISION
+LABEL org.opencontainers.image.source="https://github.com/W205614/CampusEats"
+LABEL org.opencontainers.image.licenses="MIT"
 COPY --from=build /workspace/frontend/admin/dist /usr/share/nginx/html/admin
 COPY --from=build /workspace/frontend/client/dist/build/h5 /usr/share/nginx/html/app
 COPY deploy/nginx.conf /etc/nginx/conf.d/default.conf

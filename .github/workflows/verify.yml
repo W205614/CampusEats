@@ -75,6 +75,8 @@ jobs:
           node --test scripts/check-client-audit.test.mjs
       - name: Verify isolated performance fixture boundaries
         run: node --test scripts/prepare-performance.test.mjs scripts/measure-performance.test.mjs
+      - name: Verify matching source inventory and checksum gates
+        run: python3 -m unittest discover -s scripts/tests -p test_image_sources.py
       - name: Start source-built demo
         shell: pwsh
         run: |
@@ -91,6 +93,7 @@ jobs:
           ./scripts/tests/test-platform-data-manifest.ps1
           ./scripts/tests/test-migration-hash.ps1
           ./scripts/tests/test-artifact-release.ps1
+          ./scripts/tests/test-publish-images.ps1
           ./scripts/tests/test-restore-ownership.ps1
           ./scripts/tests/test-docker-context.ps1
           ./scripts/start.ps1 -SkipVerify
@@ -144,6 +147,11 @@ jobs:
           $redis=(& docker inspect --format '{{.Image}}' (& docker compose ps -q redis)) -join ''
           if($LASTEXITCODE -ne 0 -or !$redis){throw 'Cannot resolve the tested Redis image.'}
           ./scripts/scan-images.ps1 -ServerImage campuseats-server:v1 -WebImage campuseats-web:v1 -MySqlImage $mysql -RedisImage $redis -OutputDirectory '.local/security'
+      - name: Collect matching application runtime sources and notices
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        run: |
+          python3 scripts/collect-image-sources.py --server campuseats-server:v1 --web campuseats-web:v1 --output .local/runtime-sources
+          tar -czf .local/runtime-sources.tar.gz -C .local/runtime-sources .
       - name: Export the same tested and scanned application images
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         shell: pwsh

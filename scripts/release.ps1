@@ -44,7 +44,6 @@ try {
       if ($LASTEXITCODE -ne 0) { throw 'Configuration resolution failed.' }
       $configuration = $configurationText | ConvertFrom-Json -ErrorAction Stop
       $resolvedVolumeNames = @($configuration.volumes.PSObject.Properties | ForEach-Object { [string]$_.Value.name } | Sort-Object -Unique)
-      $publishedHostPorts = @($configuration.services.PSObject.Properties | ForEach-Object { $_.Value.ports } | Where-Object { $null -ne $_.published } | ForEach-Object { [string]$_.published } | Sort-Object -Unique)
       if (!$resolvedVolumeNames.Count -or @($resolvedVolumeNames | Where-Object { $_ -notmatch '^[a-zA-Z0-9][a-zA-Z0-9_.-]*$' }).Count) {
         throw 'Invalid resolved volume inventory.'
       }
@@ -118,17 +117,19 @@ try {
     }
     & docker @compose stop web server
     if ($LASTEXITCODE -ne 0) { throw 'Cannot pause application writers before recovery capture.' }
+    $record.outcome = 'backup_failed'
     try {
       & (Join-Path $PSScriptRoot 'safe-backup.ps1') -ProjectName $ProjectName -EnvFile $envPath -Destination $before -OperationToken $lease.Token
+      $record.beforeBackup = $before
+      $record.outcome = 'capture_failed'
+      # The nested backup leaves writers stopped; a failed baseline capture is still before migration.
+      & (Join-Path $PSScriptRoot 'platform-data-manifest.ps1') -ProjectName $ProjectName -EnvFile $envPath -OutputPath (Join-Path $releaseRoot 'historical-before.json')
     } catch {
       if ($writers.Count) { & docker @compose start @writers | Out-Null }
-      $record.outcome = 'backup_failed'
+      $record.completedAt = [DateTimeOffset]::UtcNow.ToString('o')
       Write-OperationsJson -Path (Join-Path $releaseRoot 'release.json') -Value $record
-      throw 'Pre-release recovery verification failed; original writer state was requested and no migration was started.'
+      throw 'Pre-release recovery verification or baseline capture failed; original writer state was requested and no migration was started. Preserve the release record and recovery files.'
     }
-    $record.beforeBackup = $before
-    # The nested backup observed stopped writers and leaves them stopped until candidate startup.
-    & (Join-Path $PSScriptRoot 'platform-data-manifest.ps1') -ProjectName $ProjectName -EnvFile $envPath -OutputPath (Join-Path $releaseRoot 'historical-before.json')
   } else {
     & docker @compose -f compose.yaml -f $override up -d --no-build --wait --wait-timeout 180 mysql redis
     if ($LASTEXITCODE -ne 0) { throw 'Isolated database initialization failed.' }

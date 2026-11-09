@@ -8,7 +8,9 @@ CampusEats 让学生在多个校区、多个店铺选餐后合并付款，各店
 
 ## 当前状态与维护方式
 
-后端与两端应用的源码版本为 `1.0.2`，后端模块、Java 包和应用入口统一使用 CampusEats 命名。正式版本从 [Releases](https://github.com/W205614/CampusEats/releases) 获取；升级和兼容性说明见[变更记录](CHANGELOG.md)，源码与部署版本分别按[验证记录](docs/verification/current.md)核对。
+后端与两端应用的源码版本为 `1.0.3`，后端模块、Java 包和应用入口统一使用 CampusEats 命名。正式版本从 [Releases](https://github.com/W205614/CampusEats/releases) 获取；升级和兼容性说明见[变更记录](CHANGELOG.md)，源码与部署版本分别按[验证记录](docs/verification/current.md)核对。
+
+Java、Web 应用的 GHCR 分发入口为 `ghcr.io/w205614/campuseats-server:v1.0.3` 与 `ghcr.io/w205614/campuseats-web:v1.0.3`，实际发布状态以 [Packages](https://github.com/W205614/CampusEats/packages) 为准。两者需要配套 MySQL、Redis 和运行配置，不能单独替代完整部署。对应源码与许可材料随相应 Release 的 `runtime-sources.tar.gz` 提供，详见[许可说明](docs/licensing.md#应用镜像与对应源码)。已有 CI 制品部署继续按[升级流程](docs/platform-deployment.md)执行。
 
 本地点餐、合单、履约、售后、权限和账务流程已完成回归，适合个人开发、学习和演示使用。当前阶段按需维护：遇到可复现问题、需要升级依赖或调整业务时再修改，暂不继续扩展功能。
 

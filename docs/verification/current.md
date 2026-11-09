@@ -2,6 +2,12 @@
 
 本地点餐、合单、履约、售后、权限和账务功能已完成回归，当前进入按需维护阶段。出现可复现问题、依赖升级或新业务需求时再修改；微信与腾讯云接入按专题指南另行安排。
 
+## v1.0.3 发布准备修复
+
+2026-11-09 的维护源码版本为 `1.0.3`。修复 `release.ps1` 在升级前数据指纹采集失败时未恢复原应用状态、未保存失败回执的问题；此阶段没有启动候选或迁移。运行中的应用会请求恢复，已停止的应用继续停止，已验证备份及 `capture_failed` 回执保留。迁移后失败仍保持停写。
+
+本地故障注入已先复现旧行为，再验证运行中与已停止两种应用状态、配置不变、候选未启动、恢复引用和失败时间记录；现有发布编排回归通过。没有新增依赖、业务接口或 V1—V24 迁移。最终 CI、发布物获取、四服务镜像及日常升级结果在 `.local/release-1.0.3-20261109/final-validation.json` 中分别记录，未完成步骤不视为通过。远端入口为 [Actions](https://github.com/W205614/CampusEats/actions/workflows/verify.yml) 与 [Releases](https://github.com/W205614/CampusEats/releases)。
+
 ## v1.0.2 源码与本地验证
 
 2026-11-09 的维护源码版本为 `1.0.2`：修复两端开发服务器的演示图片 404、生产 Nginx 模板未提供演示图片和许可文件，以及固定工具下载连续遇到 HTTP 504 而中断 CI 的问题。没有业务接口、数据迁移或运行依赖变化。Trivy/age 保持原版本、来源和固定摘要；仅对 502/503/504 最多请求三次，每次 120 秒超时、间隔 2 秒，摘要验证后才写入最终缓存；其他错误及重试耗尽直接失败。
@@ -16,7 +22,7 @@
 
 ## v1.0.1 发布与日常部署记录
 
-2026-11-07 发布的 [v1.0.1](https://github.com/W205614/CampusEats/releases/tag/v1.0.1) 为当前日常部署版本，后端模块为 `campuseats-common`、`campuseats-api` 和 `campuseats-server`，Java 包名为 `com.campuseats`，入口为 `CampusEatsApplication`。该版本后端与两端应用均为 `1.0.1`，没有改变 HTTP 契约或 V1—V24 迁移内容；数据库标识和业务卷保持原样。
+2026-11-07 发布的 [v1.0.1](https://github.com/W205614/CampusEats/releases/tag/v1.0.1) 为当时日常部署版本，后端模块为 `campuseats-common`、`campuseats-api` 和 `campuseats-server`，Java 包名为 `com.campuseats`，入口为 `CampusEatsApplication`。该版本后端与两端应用均为 `1.0.1`，没有改变 HTTP 契约或 V1—V24 迁移内容；数据库标识和业务卷保持原样。
 
 使用 `git rev-parse v1.0.1` 核对发布提交，按该提交的[CI 结果](https://github.com/W205614/CampusEats/actions/workflows/verify.yml)和 Release 附件验证源码与制品。本机完整收尾回执位于 `.local/release-1.0.1-20261107/final-validation.json`，其中记录本地与远端、Tag、Release、四个运行镜像的对应关系，以及数据核验、临时恢复负载回收和最终容器状态；实际部署记录仍保存在 `.local/releases/artifact-*/release.json`。
 

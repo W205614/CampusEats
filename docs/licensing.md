@@ -18,7 +18,15 @@
 
 DCloud 的开源部分采用 Apache-2.0，内嵌 Runtime/SDK 的权利仍归其所有；如扩展到原生 App 或使用闭源服务，还需遵守 [uni-app 使用许可](https://dcloud.io/license/uni-app.html)和对应产品条款。当前项目构建目标为 H5 与微信小程序。
 
-Redis 7.4.12 使用 RSALv2 / SSPLv1 双许可，不能视为项目 MIT 的一部分。Redis 镜像保留该版本 `LICENSE.txt` 及 Docker 上游入口脚本的 BSD 版权许可，位于 `/usr/local/share/licenses/redis/`；不将项目镜像公开到 Packages。重新分发或将 Redis 作为服务提供时，须按上游条款核对适用条件。
+Redis 7.4.12 使用 RSALv2 / SSPLv1 双许可，不能视为项目 MIT 的一部分。Redis 镜像保留该版本 `LICENSE.txt` 及 Docker 上游入口脚本的 BSD 版权许可，位于 `/usr/local/share/licenses/redis/`。公开 Packages 仅分发 Java、Web 应用镜像，不向 GHCR 重新发布 MySQL、Redis 镜像。重新分发或将 Redis 作为服务提供时，须按上游条款核对适用条件。
+
+## 应用镜像与对应源码
+
+从 v1.0.3 开始，Java、Web 应用镜像可由独立的手动推广工作流发布至 `ghcr.io/w205614/campuseats-server` 与 `ghcr.io/w205614/campuseats-web`。推广读取成功 master CI 的同一制品，只重新标记和推送，不重建镜像；`v<版本>` 和 `sha-<完整提交>` 为版本入口，精确身份使用 registry digest。公开可见性及实际拉取结果按发布回执核对。
+
+公开镜像包含基础系统及第三方运行组件。CI 根据实际 APK 数据库中的 origin、版本、aports commit，采集该提交的 APKBUILD、补丁、安装脚本和 SHA-512 验证的源文件；不使用当前 aports 分支代替。另采集匹配 Temurin 版本的源码和构建脚本、JRE legal/NOTICE、Nginx 源码、Java 运行依赖的 sources JAR/POM 和嵌套 JAR 中的许可证/NOTICE。源码采集需要 Python 3.11+ 和上游网络，仅用于制品交付，不增加应用运行依赖。
+
+这些材料归档为 `runtime-sources.tar.gz`，随 CI 制品保存并由 release-manifest 绑定摘要；发布 GHCR 前须将同一归档附在相应 GitHub Release，供接收者获取对应源码、补丁、构建说明及原始许可。项目的应用源码和镜像 Dockerfile 使用同一 Release 标签。归档内 `inventory.json` 记录实际包与来源，许可证仍分别适用；MIT 的 OCI 标签仅描述项目自有应用，不重新许可基础组件。LGPL 库保持动态链接，使用者可以替换它们。
 
 ## 维护要求
 
