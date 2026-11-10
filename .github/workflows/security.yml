@@ -1,0 +1,65 @@
+name: Security and quality
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  codeql:
+    name: CodeQL (${{ matrix.language }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - language: java-kotlin
+            build-mode: manual
+          - language: javascript-typescript
+            build-mode: none
+          - language: python
+            build-mode: none
+          - language: actions
+            build-mode: none
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        if: matrix.language == 'java-kotlin'
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+      - uses: github/codeql-action/init@v4
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: ${{ matrix.build-mode }}
+          queries: security-and-quality
+      - name: Compile the Java application for analysis
+        if: matrix.language == 'java-kotlin'
+        run: mvn -B -ntp -DskipTests clean package
+      - uses: github/codeql-action/analyze@v4
+        with:
+          category: /language:${{ matrix.language }}
+          output: .local/codeql-results
+      - name: Require zero security and quality findings
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          reports = list(Path('.local/codeql-results').glob('*.sarif'))
+          if not reports:
+              raise SystemExit('CodeQL did not produce a SARIF report.')
+          count = sum(len(run.get('results', [])) for path in reports
+                      for run in json.loads(path.read_text())['runs'])
+          print(f'CodeQL findings across all severities: {count}')
+          if count:
+              raise SystemExit('Fix the reported findings before delivery.')
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: codeql-${{ matrix.language }}-${{ github.sha }}
+          path: .local/codeql-results/
+          if-no-files-found: error
+          retention-days: 7
