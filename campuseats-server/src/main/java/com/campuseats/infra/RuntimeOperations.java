@@ -116,7 +116,7 @@ public class RuntimeOperations implements HealthIndicator {
           state.running = false;
         }
       } else {
-        if (round.lease != null) {
+        if (cluster != null && round.lease != null) {
           try {
             if (!cluster.complete(round.lease, round.error)) round.error = "LEASE_LOST";
           } catch (Exception ex) {

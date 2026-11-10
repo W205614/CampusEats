@@ -1,5 +1,6 @@
 package com.campuseats.platform;
 
+import static com.campuseats.TestIds.requireId;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.campuseats.common.BusinessException;
@@ -59,14 +60,17 @@ class OperationsIntegrationTest {
     final AtomicReference<Instant> value =
         new AtomicReference<>(Instant.parse("2026-10-26T04:00:00Z"));
 
+    @Override
     public ZoneId getZone() {
       return ZoneId.of("Asia/Shanghai");
     }
 
+    @Override
     public Clock withZone(ZoneId z) {
       return this;
     }
 
+    @Override
     public Instant instant() {
       return value.get();
     }
@@ -183,7 +187,7 @@ class OperationsIntegrationTest {
     operations.detect(order);
     assertEquals(1, db.count("SELECT COUNT(*) FROM order_exception WHERE order_id=?", order));
     var e = operations.exceptions(store, null, 50, "OPEN").records().getFirst();
-    operations.acknowledge(Long.parseLong(e.id()), new OperationsService.Acknowledge(0, "已联系商家"));
+    operations.acknowledge(requireId(e.id()), new OperationsService.Acknowledge(0, "已联系商家"));
     db.update("UPDATE orders SET status=3 WHERE id=?", order);
     event("ORDER_ACCEPT");
     var history = operations.exceptions(store, null, 50, "RESOLVED").records().getFirst();
@@ -202,14 +206,14 @@ class OperationsIntegrationTest {
     act(customer());
     assertEquals(1, inbox.unread());
     var message = inbox.list(null, 50, null).records().getFirst();
-    inbox.read(Long.parseLong(message.id()));
-    inbox.read(Long.parseLong(message.id()));
+    inbox.read(requireId(message.id()));
+    inbox.read(requireId(message.id()));
     assertEquals(0, inbox.unread());
     act(new Actor(user + 100000, "USER", "USER", "", false));
     assertTrue(inbox.list(null, 50, null).records().isEmpty());
     assertEquals(
         404,
-        assertThrows(BusinessException.class, () -> inbox.read(Long.parseLong(message.id())))
+        assertThrows(BusinessException.class, () -> inbox.read(requireId(message.id())))
             .status());
   }
 

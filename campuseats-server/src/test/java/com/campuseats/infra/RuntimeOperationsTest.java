@@ -11,14 +11,17 @@ class RuntimeOperationsTest {
   static class MutableClock extends Clock {
     Instant value = Instant.parse("2026-10-19T12:00:00Z");
 
+    @Override
     public ZoneId getZone() {
       return ZoneOffset.UTC;
     }
 
+    @Override
     public Clock withZone(ZoneId zone) {
       return this;
     }
 
+    @Override
     public Instant instant() {
       return value;
     }

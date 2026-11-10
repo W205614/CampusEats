@@ -122,26 +122,23 @@ public class OperationsService {
                 + filter
                 + " AND e.id<? ORDER BY e.id DESC LIMIT ?",
             args.toArray());
-    var views =
-        rows.stream()
-            .map(
-                r ->
-                    new ExceptionView(
-                        r.get("id").toString(),
-                        r.get("order_id").toString(),
-                        r.get("number").toString(),
-                        r.get("store_id").toString(),
-                        r.get("campus_id").toString(),
-                        r.get("kind").toString(),
-                        r.get("stage").toString(),
-                        r.get("state").toString(),
-                        (String) r.get("reason"),
-                        r.get("version").toString(),
-                        Db.time(r.get("created_at")),
-                        r.get("deadline_at") == null ? null : Db.time(r.get("deadline_at")),
-                        Db.bool(r, "migrated")))
-            .toList();
-    return pages.finish(views, size, range, r -> Long.parseLong(r.id()));
+    return pages.finish(rows, size, range)
+        .map(
+            r ->
+                new ExceptionView(
+                    r.get("id").toString(),
+                    r.get("order_id").toString(),
+                    r.get("number").toString(),
+                    r.get("store_id").toString(),
+                    r.get("campus_id").toString(),
+                    r.get("kind").toString(),
+                    r.get("stage").toString(),
+                    r.get("state").toString(),
+                    (String) r.get("reason"),
+                    r.get("version").toString(),
+                    Db.time(r.get("created_at")),
+                    r.get("deadline_at") == null ? null : Db.time(r.get("deadline_at")),
+                    Db.bool(r, "migrated")));
   }
 
   @Transactional

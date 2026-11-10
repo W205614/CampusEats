@@ -405,7 +405,7 @@ test('browser cross-campus mixed fulfillment preserves coupon cents, repeated pa
       ).toBeVisible();
     }
     await customer.goto('/app/pages/cart/index');
-    for (const [index, store] of stores.entries()) {
+    for (const index of stores.keys()) {
       const cart = customer.locator('uni-view.card').filter({
         has: customer.getByText(
           index ? names.campusB + ' · ' + names.storeB : names.campusA + ' · ' + names.storeA,

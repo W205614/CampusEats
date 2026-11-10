@@ -40,6 +40,8 @@ npm run build:mp-weixin --prefix frontend/client
 
 完整自动检查由 [GitHub Actions 工作流](.github/workflows/verify.yml)执行，包括 Maven 验证、前端构建、依赖审计、脚本测试、契约比对、浏览器回归、双实例验证、独立恢复及镜像安全检查。提交后等待对应 CI 完成并检查结果。涉及外部服务时，另行记录真实账号与设备上的验收结果。
 
+[Security and quality](.github/workflows/security.yml) 另对四种实际语言/工作流运行 CodeQL 安全与质量分析，保留原始 SARIF，并在所有配置处理完成后要求当前 ref 的活动未解决告警为零。经维护者认可的协议、兼容与上下文审阅结论单列在[审阅说明](docs/security-review.md)，不能用关闭告警代替真实代码修复，也不能把原始发现改写成零。
+
 master 制品导出另需 Python 3.11+ 采集实际运行组件的对应源码与许可材料。GHCR 使用独立的手动[推广工作流](.github/workflows/publish-images.yml)，须先完成匹配的稳定 Release 与源码归档附件，按[许可说明](docs/licensing.md)核对。普通 push、Tag 和 PR 不触发镜像推送，不将发布令牌用于构建过程。
 
 ## 接口与数据变更

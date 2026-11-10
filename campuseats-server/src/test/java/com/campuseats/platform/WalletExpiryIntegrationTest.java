@@ -1,5 +1,6 @@
 package com.campuseats.platform;
 
+import static com.campuseats.TestIds.requireId;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.campuseats.common.BusinessException;
@@ -56,14 +57,17 @@ class WalletExpiryIntegrationTest {
   static class MutableClock extends Clock {
     final AtomicReference<Instant> at = new AtomicReference<>();
 
+    @Override
     public ZoneId getZone() {
       return ZoneId.of("Asia/Shanghai");
     }
 
+    @Override
     public Clock withZone(ZoneId zone) {
       return this;
     }
 
+    @Override
     public Instant instant() {
       return at.get();
     }
@@ -134,7 +138,7 @@ class WalletExpiryIntegrationTest {
     long used = coupon("USED", at.minusHours(1), true);
     var all = page(null, null).records();
     var actual = new HashMap<Long, String>();
-    all.forEach(r -> actual.put(Long.valueOf(r.id()), r.state()));
+    all.forEach(r -> actual.put(requireId(r.id()), r.state()));
     assertEquals(
         Map.of(
             expired,

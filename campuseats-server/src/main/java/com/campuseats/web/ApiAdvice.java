@@ -62,12 +62,12 @@ public class ApiAdvice implements ResponseBodyAdvice<Object> {
     org.springframework.web.bind.ServletRequestBindingException.class,
     org.springframework.web.multipart.MultipartException.class
   })
-  ResponseEntity<?> bad(Exception e) {
+  ResponseEntity<?> bad() {
     return error(400, "INVALID_INPUT", "请求参数不正确");
   }
 
   @ExceptionHandler(DuplicateKeyException.class)
-  ResponseEntity<?> duplicate(Exception e) {
+  ResponseEntity<?> duplicate() {
     return error(409, "DUPLICATE", "数据冲突，请刷新后重试");
   }
 
@@ -84,7 +84,7 @@ public class ApiAdvice implements ResponseBodyAdvice<Object> {
   }
 
   @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
-  ResponseEntity<?> upload(Exception e) {
+  ResponseEntity<?> upload() {
     return error(400, "UPLOAD_TOO_LARGE", "图片不能超过5MB");
   }
 

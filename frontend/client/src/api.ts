@@ -14,12 +14,9 @@ export function image(path: string) {
   const url = base() + path;
   // uni-h5 prefixes root-relative image sources with its /app/ router base.
   // Server uploads and demo images belong to the API origin instead.
-  // #ifdef H5
-  return new URL(url, window.location.origin).href;
-  // #endif
-  // #ifndef H5
-  return url;
-  // #endif
+  return process.env.UNI_PLATFORM === 'h5'
+    ? new URL(url, window.location.origin).href
+    : url;
 }
 export function api<T>(
   path: string,

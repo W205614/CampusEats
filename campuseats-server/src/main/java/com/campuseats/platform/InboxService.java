@@ -71,22 +71,17 @@ public class InboxService {
                 + filter
                 + " AND m.id<? ORDER BY m.id DESC LIMIT ?",
             args.toArray());
-    return pages.finish(
-        rows.stream()
-            .map(
-                r ->
-                    new Message(
-                        r.get("id").toString(),
-                        r.get("order_id").toString(),
-                        r.get("store_id").toString(),
-                        r.get("event_type").toString(),
-                        r.get("summary").toString(),
-                        Db.time(r.get("created_at")),
-                        r.get("read_at") == null ? null : Db.time(r.get("read_at"))))
-            .toList(),
-        size,
-        scope,
-        r -> Long.parseLong(r.id()));
+    return pages.finish(rows, size, scope)
+        .map(
+            r ->
+                new Message(
+                    r.get("id").toString(),
+                    r.get("order_id").toString(),
+                    r.get("store_id").toString(),
+                    r.get("event_type").toString(),
+                    r.get("summary").toString(),
+                    Db.time(r.get("created_at")),
+                    r.get("read_at") == null ? null : Db.time(r.get("read_at"))));
   }
 
   public long unread() {

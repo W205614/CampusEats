@@ -23,7 +23,8 @@ def download(url):
     data = bytearray()
     validator = None
     total = None
-    for attempt in range(3):
+    attempt = 0
+    while True:
         headers = {"User-Agent": "CampusEats-sources"}
         if data and validator:
             headers.update({"Range": f"bytes={len(data)}-", "If-Range": validator})
@@ -55,7 +56,8 @@ def download(url):
         except (http.client.IncompleteRead, http.client.RemoteDisconnected, TimeoutError, urllib.error.HTTPError) as error:
             if isinstance(error, urllib.error.HTTPError) and error.code not in (502, 503, 504):
                 raise
-            if attempt == 2:
+            attempt += 1
+            if attempt == 3:
                 raise RuntimeError(f"Source transfer failed after bounded attempts: {url}") from error
             time.sleep(2)
 

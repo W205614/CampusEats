@@ -88,6 +88,15 @@ class SourceCollectionTest(unittest.TestCase):
         self.assertEqual(caught.exception.code, 404)
         self.assertEqual(request.call_count, 1)
 
+    def test_transient_failure_stops_after_three_attempts(self):
+        error = urllib.error.HTTPError("https://example.com/source", 503, "Unavailable", {}, None)
+        with patch.object(collector.urllib.request, "urlopen", side_effect=error) as request, patch.object(collector.time, "sleep") as sleep:
+            with self.assertRaisesRegex(RuntimeError, "failed after bounded attempts") as caught:
+                collector.download("https://example.com/source")
+        self.assertIs(caught.exception.__cause__, error)
+        self.assertEqual(request.call_count, 3)
+        self.assertEqual(sleep.call_count, 2)
+
 
 if __name__ == "__main__":
     unittest.main()

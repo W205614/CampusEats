@@ -82,7 +82,7 @@ public class ReportQueryService {
 
   @Transactional(readOnly = true, isolation = Isolation.REPEATABLE_READ)
   public Map<String, Object> snapshot(Long campus, Long store, LocalDate begin, LocalDate end) {
-    Actor a = Actor.employee();
+    Actor.employee();
     if (store != null) scope.merchant(store, true);
     else scope.platform();
     require(

@@ -186,7 +186,14 @@ public class MenuCache {
     if (TransactionSynchronizationManager.isSynchronizationActive()) {
       if (sharedVersions) advanceShared(key);
       LocalDateTime now = LocalDateTime.now(clock);
-      Long storeId = key.matches("store:[0-9]+:catalog") ? Long.parseLong(key.split(":")[1]) : null;
+      Long storeId = null;
+      if (key.matches("store:[0-9]+:catalog")) {
+        try {
+          storeId = Long.parseLong(key.split(":")[1]);
+        } catch (NumberFormatException ex) {
+          throw new IllegalArgumentException("Catalog cache key has an out-of-range store ID", ex);
+        }
+      }
       db.update(
           "INSERT INTO"
               + " outbox_event(event_type,aggregate_id,payload,next_attempt_at,created_at,store_id,campus_id)"

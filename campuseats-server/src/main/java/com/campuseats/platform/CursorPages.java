@@ -12,7 +12,11 @@ import org.springframework.stereotype.Component;
 @Component
 public class CursorPages {
   @io.swagger.v3.oas.annotations.media.Schema(requiredProperties = {"records", "hasMore"})
-  public record Page<T>(List<T> records, String nextCursor, boolean hasMore) {}
+  public record Page<T>(List<T> records, String nextCursor, boolean hasMore) {
+    public <R> Page<R> map(java.util.function.Function<T, R> projection) {
+      return new Page<>(records.stream().map(projection).toList(), nextCursor, hasMore);
+    }
+  }
 
   public record Request(String cursor, Integer limit, String state, String query) {
     public int size() {

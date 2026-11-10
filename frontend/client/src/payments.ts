@@ -12,14 +12,13 @@ export type PaymentView = {
     | 'closeRequested']-?: NonNullable<PaymentIntent[Key]>;
 } & Pick<PaymentIntent, 'lastError'> & { action: Record<string, string> };
 export async function startPayment(id: string, version: string): Promise<PaymentView> {
-  let channel = 'MINI_PROGRAM';
-  // #ifdef H5
-  channel = /MicroMessenger/i.test(navigator.userAgent)
-    ? 'JSAPI'
-    : /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent)
-      ? 'H5'
-      : 'NATIVE';
-  // #endif
+  const channel = process.env.UNI_PLATFORM === 'h5'
+    ? /MicroMessenger/i.test(navigator.userAgent)
+      ? 'JSAPI'
+      : /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent)
+        ? 'H5'
+        : 'NATIVE'
+    : 'MINI_PROGRAM';
   let payment: PaymentView;
   try {
     payment = await api<PaymentView>('/checkouts/' + id + '/payment');
@@ -82,11 +81,7 @@ export async function startPayment(id: string, version: string): Promise<Payment
 }
 
 export async function paymentQr(value: string): Promise<string> {
-  // #ifdef H5
+  if (process.env.UNI_PLATFORM !== 'h5') return '';
   const QRCode = await import('qrcode');
   return QRCode.toDataURL(value, { width: 280, margin: 2 });
-  // #endif
-  // #ifndef H5
-  return '';
-  // #endif
 }

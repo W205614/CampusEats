@@ -105,7 +105,13 @@ public class OrderSocket extends TextWebSocketHandler {
     var matcher =
         java.util.regex.Pattern.compile("\\\"orderId\\\"\\s*:\\s*\\\"?(\\d+)").matcher(payload);
     if (!matcher.find()) return null;
-    var order = db.one("SELECT store_id FROM orders WHERE id=?", Long.parseLong(matcher.group(1)));
+    long orderId;
+    try {
+      orderId = Long.parseLong(matcher.group(1));
+    } catch (NumberFormatException ex) {
+      throw new IllegalArgumentException("Order event has an out-of-range order ID", ex);
+    }
+    var order = db.one("SELECT store_id FROM orders WHERE id=?", orderId);
     return order == null ? null : Db.id(order, "store_id");
   }
 

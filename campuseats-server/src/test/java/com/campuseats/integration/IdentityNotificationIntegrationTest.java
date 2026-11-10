@@ -1,5 +1,6 @@
 package com.campuseats.integration;
 
+import static com.campuseats.TestIds.requireId;
 import static org.junit.jupiter.api.Assertions.*;
 
 import com.campuseats.common.BusinessException;
@@ -117,11 +118,12 @@ class IdentityNotificationIntegrationTest {
                 return;
               }
               String sentPhone =
-                  new tools.jackson.databind.ObjectMapper()
+                  tools.jackson.databind.json.JsonMapper.builder()
+                      .build()
                       .readTree(body)
                       .get("PhoneNumberSet")
                       .get(0)
-                      .asText();
+                      .asString();
               response =
                   "{\"Response\":{\"SendStatusSet\":[{\"Code\":\""
                       + smsCode
@@ -278,7 +280,7 @@ class IdentityNotificationIntegrationTest {
 
   private long login(String phone) {
     challenges.send(phone, "LOGIN", 0, "fixture-ip");
-    return Long.parseLong(identities.phoneLogin(phone, sentCode(), "test-v1").get("id").toString());
+    return requireId(identities.phoneLogin(phone, sentCode(), "test-v1").get("id").toString());
   }
 
   private long order(long user, int status) {
@@ -360,7 +362,7 @@ class IdentityNotificationIntegrationTest {
                 BusinessException.class, () -> identities.phoneLogin(phone, code, "old-policy"))
             .code());
     var result = identities.phoneLogin(phone, code, "test-v1");
-    long owner = Long.parseLong(result.get("id").toString());
+    long owner = requireId(result.get("id").toString());
     assertEquals(
         owner, Db.id(db.one("SELECT user_id FROM verified_phone WHERE phone=?", phone), "user_id"));
     long other =
@@ -382,7 +384,7 @@ class IdentityNotificationIntegrationTest {
   @Test
   void exactAppIdentityAndOauthStateAreEnforced() {
     nextOpenid = "mini-" + UUID.randomUUID();
-    long user = Long.parseLong(identities.miniLogin("mini-code").get("id").toString());
+    long user = requireId(identities.miniLogin("mini-code").get("id").toString());
     assertEquals(nextOpenid, identities.openid(user, "mini-app"));
     assertThrows(BusinessException.class, () -> identities.openid(user, "official-app"));
     var session = auth.issue("USER", user);
@@ -401,9 +403,9 @@ class IdentityNotificationIntegrationTest {
   void externallyIssuedSubjectsRemainCaseSensitive() {
     String suffix = UUID.randomUUID().toString();
     nextOpenid = "A" + suffix;
-    long upper = Long.parseLong(identities.miniLogin("code-A").get("id").toString());
+    long upper = requireId(identities.miniLogin("code-A").get("id").toString());
     nextOpenid = "a" + suffix;
-    long lower = Long.parseLong(identities.miniLogin("code-a").get("id").toString());
+    long lower = requireId(identities.miniLogin("code-a").get("id").toString());
     assertNotEquals(upper, lower);
     assertNotEquals(identities.openid(upper, "mini-app"), identities.openid(lower, "mini-app"));
   }
@@ -608,7 +610,7 @@ class IdentityNotificationIntegrationTest {
   @Test
   void notificationsAreDurableDeduplicatedAndRequireProviderAuthorization() {
     nextOpenid = "notify-" + UUID.randomUUID();
-    long user = Long.parseLong(identities.miniLogin("notify").get("id").toString());
+    long user = requireId(identities.miniLogin("notify").get("id").toString());
     actor(user);
     long order = order(user, 3);
     long event =
@@ -768,7 +770,7 @@ class IdentityNotificationIntegrationTest {
 
   private long subscriptionTask() {
     nextOpenid = "token-contention-" + UUID.randomUUID();
-    long user = Long.parseLong(identities.miniLogin("token-contention-code").get("id").toString());
+    long user = requireId(identities.miniLogin("token-contention-code").get("id").toString());
     actor(user);
     notifications.authorize("ready-template", true);
     long order = order(user, 3);

@@ -1,5 +1,6 @@
 package com.campuseats;
 
+import static com.campuseats.TestIds.requireId;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -63,10 +64,12 @@ class PlatformIntegrationTest {
   static class TestClock extends Clock {
     AtomicReference<Instant> value = new AtomicReference<>(Instant.parse("2026-10-15T04:00:00Z"));
 
+    @Override
     public ZoneId getZone() {
       return ZoneId.of("Asia/Shanghai");
     }
 
+    @Override
     public Clock withZone(ZoneId z) {
       return this;
     }
@@ -74,6 +77,7 @@ class PlatformIntegrationTest {
     // Scheduled metrics share this clock; only the arming test thread advances midnight.
     final ThreadLocal<Instant> advanceAfterRead = new ThreadLocal<>();
 
+    @Override
     public Instant instant() {
       Instant current = value.get();
       Instant next = advanceAfterRead.get();
@@ -185,7 +189,7 @@ class PlatformIntegrationTest {
     db.update("UPDATE campus SET enabled=true");
     db.update("UPDATE dish SET status=1,default_quota=100");
     db.update("UPDATE category SET status=1");
-    user = Long.parseLong(auth.demo(new Commands.DemoLogin(1)).get("id").toString());
+    user = requireId(auth.demo(new Commands.DemoLogin(1)).get("id").toString());
     dish3 = db.count("SELECT MIN(id) FROM dish WHERE store_id=3");
     act(user(user));
     gateway.failNextPayments(0);
@@ -966,7 +970,7 @@ class PlatformIntegrationTest {
 
   @Test
   void concurrentLastQuotaCannotOversell() throws Exception {
-    long second = Long.parseLong(auth.demo(new Commands.DemoLogin(2)).get("id").toString());
+    long second = requireId(auth.demo(new Commands.DemoLogin(2)).get("id").toString());
     db.update("UPDATE dish SET default_quota=1 WHERE id=2");
     add(1, 2, 1);
     var first = quoted(oneInput(1));
@@ -985,7 +989,7 @@ class PlatformIntegrationTest {
 
   @Test
   void concurrentCouponClaimCannotExceedIssuance() throws Exception {
-    long second = Long.parseLong(auth.demo(new Commands.DemoLogin(2)).get("id").toString());
+    long second = requireId(auth.demo(new Commands.DemoLogin(2)).get("id").toString());
     act(platform);
     long id =
         marketing.coupon(
@@ -1199,7 +1203,7 @@ class PlatformIntegrationTest {
       read.transferTo(result);
       assertTrue(result.size() > 0);
     }
-    long other = Long.parseLong(auth.demo(new Commands.DemoLogin(2)).get("id").toString());
+    long other = requireId(auth.demo(new Commands.DemoLogin(2)).get("id").toString());
     act(user(other));
     assertThrows(BusinessException.class, () -> evidence.open(image));
     act(staff("manager3"));
@@ -1389,7 +1393,7 @@ class PlatformIntegrationTest {
     assertCursorPages(orders, cursor -> fulfillment.orders(null, cursor));
     act(staff("courier2"));
     assertTrue(fulfillment.orders(null, orders.get(99)).isEmpty());
-    long other = Long.parseLong(auth.demo(new Commands.DemoLogin(2)).get("id").toString());
+    long other = requireId(auth.demo(new Commands.DemoLogin(2)).get("id").toString());
     act(user(other));
     assertTrue(checkout.list(checkouts.get(99)).isEmpty());
     assertTrue(fulfillment.orders(null, orders.get(99)).isEmpty());
@@ -1683,7 +1687,7 @@ class PlatformIntegrationTest {
     act(new Actor(courier.id(), "ADMIN", "DELIVERER", "", false, null, 2L));
     assertTrue(fulfillment.orders(null, null, 1000).isEmpty());
     var otherUser = auth.demo(new Commands.DemoLogin(2));
-    act(user(Long.parseLong(otherUser.get("id").toString())));
+    act(user(requireId(otherUser.get("id").toString())));
     assertTrue(checkout.list(null, 1000).isEmpty());
     assertTrue(fulfillment.orders(null, null, 1000).isEmpty());
     assertTrue(
@@ -1858,7 +1862,7 @@ class PlatformIntegrationTest {
     assertTrue(aftersale.list(3L, false, HistoryQuery.EMPTY).isEmpty());
     act(staff("manager1"));
     assertThrows(BusinessException.class, () -> jobs.refunds(3L, HistoryQuery.EMPTY));
-    long otherUser = Long.parseLong(auth.demo(new Commands.DemoLogin(2)).get("id").toString());
+    long otherUser = requireId(auth.demo(new Commands.DemoLogin(2)).get("id").toString());
     act(user(otherUser));
     assertTrue(aftersale.list(null, false).isEmpty());
     String token =

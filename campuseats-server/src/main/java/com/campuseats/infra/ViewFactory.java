@@ -8,7 +8,12 @@ public final class ViewFactory {
   private ViewFactory() {}
 
   private static Long id(Map<String, Object> r, String k) {
-    return r.get(k) == null ? null : Long.valueOf(r.get(k).toString());
+    if (r.get(k) == null) return null;
+    try {
+      return Long.valueOf(r.get(k).toString());
+    } catch (NumberFormatException ex) {
+      throw new IllegalStateException("Invalid numeric ID in view field: " + k, ex);
+    }
   }
 
   private static Integer number(Map<String, Object> r, String k) {

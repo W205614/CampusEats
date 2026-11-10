@@ -110,11 +110,10 @@ async function bindWechat() {
   // #endif
 }
 async function subscribe() {
-  // #ifdef H5
-  toast(new Error('请在小程序中授权订阅消息；浏览器可使用站内消息'));
-  return;
-  // #endif
-  // #ifndef H5
+  if (process.env.UNI_PLATFORM === 'h5') {
+    toast(new Error('请在小程序中授权订阅消息；浏览器可使用站内消息'));
+    return;
+  }
   const ids = [...new Set(templates.value.map((t) => t.templateId))].slice(0, 3);
   if (!ids.length) return;
   await run(async () => {
@@ -131,7 +130,6 @@ async function subscribe() {
         accepted: result[id] === 'accept',
       });
   });
-  // #endif
 }
 function state(value: string) {
   return (

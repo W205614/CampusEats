@@ -203,7 +203,9 @@ public class StoredImages {
           "COS存储桶必须启用版本控制");
       try {
         var digest = MessageDigest.getInstance("SHA-256");
-        content.transferTo(new DigestOutputStream(OutputStream.nullOutputStream(), digest));
+        try (var output = new DigestOutputStream(OutputStream.nullOutputStream(), digest)) {
+          content.transferTo(output);
+        }
         require(
             HexFormat.of().formatHex(digest.digest()).equals(image.get("sha256")),
             409,

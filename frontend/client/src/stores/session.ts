@@ -3,12 +3,9 @@ import { ref } from 'vue';
 import type { Session } from '../../../contracts/models';
 function read(): Session | null {
   try {
-    // #ifdef H5
-    return JSON.parse(sessionStorage.getItem('campus-user') || 'null');
-    // #endif
-    // #ifndef H5
+    if (process.env.UNI_PLATFORM === 'h5')
+      return JSON.parse(sessionStorage.getItem('campus-user') || 'null');
     return uni.getStorageSync('campus-user') || null;
-    // #endif
   } catch {
     return null;
   }

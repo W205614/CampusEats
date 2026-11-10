@@ -40,10 +40,10 @@ final class CosHttpFixture implements AutoCloseable {
   }
 
   private static void serve(Socket socket, Handler handler) {
-    try (socket) {
+    try (socket;
+        var input = new BufferedInputStream(socket.getInputStream());
+        var output = socket.getOutputStream()) {
       socket.setSoTimeout(5000);
-      var input = new BufferedInputStream(socket.getInputStream());
-      var output = socket.getOutputStream();
       String requestLine = line(input);
       if (requestLine == null) return;
       String[] parts = requestLine.split(" ", 3);

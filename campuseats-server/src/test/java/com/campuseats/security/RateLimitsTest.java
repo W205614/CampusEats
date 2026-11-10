@@ -18,14 +18,17 @@ class RateLimitsTest {
   static class MutableClock extends Clock {
     final AtomicLong now = new AtomicLong(Instant.parse("2026-10-07T04:00:00Z").toEpochMilli());
 
+    @Override
     public ZoneId getZone() {
       return ZoneOffset.UTC;
     }
 
+    @Override
     public Clock withZone(ZoneId zone) {
       return this;
     }
 
+    @Override
     public Instant instant() {
       return Instant.ofEpochMilli(now.get());
     }

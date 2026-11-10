@@ -1,5 +1,6 @@
 package com.campuseats;
 
+import static com.campuseats.TestIds.requireId;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.doAnswer;
 
@@ -63,14 +64,17 @@ class PlatformConcurrencyTest {
     final AtomicReference<Instant> value =
         new AtomicReference<>(Instant.parse("2026-10-15T04:00:00Z"));
 
+    @Override
     public ZoneId getZone() {
       return ZoneId.of("Asia/Shanghai");
     }
 
+    @Override
     public Clock withZone(ZoneId zone) {
       return this;
     }
 
+    @Override
     public Instant instant() {
       return value.get();
     }
@@ -136,7 +140,7 @@ class PlatformConcurrencyTest {
     db.update("UPDATE campus SET enabled=true");
     db.update("UPDATE dish SET status=1,default_quota=100");
     db.update("UPDATE category SET status=1");
-    long id = Long.parseLong(auth.demo(new Commands.DemoLogin(1)).get("id").toString());
+    long id = requireId(auth.demo(new Commands.DemoLogin(1)).get("id").toString());
     user = new Actor(id, "USER", "USER", "", false);
     gateway.failNextPayments(0);
     gateway.failNextRefunds(0);

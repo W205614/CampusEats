@@ -3,7 +3,7 @@
   <parent>
     <groupId>com.campuseats</groupId>
     <artifactId>campus-eats</artifactId>
-    <version>1.0.3</version>
+    <version>1.0.4</version>
   </parent>
   <artifactId>campuseats-common</artifactId>
 </project>

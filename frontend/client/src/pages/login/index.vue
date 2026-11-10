@@ -167,18 +167,17 @@ async function demo(account: number) {
   }
 }
 async function wechat() {
-  // #ifdef H5
-  uni.showToast({
-    title:
-      capabilities.value.mode === 'PRODUCTION'
-        ? '浏览器请使用手机验证码登录；微信内付款时可绑定公众号身份。'
-        : '微信登录请使用已配置微信应用的小程序；浏览器可选择演示账户。',
-    icon: 'none',
-    duration: 4000,
-  });
-  return;
-  // #endif
-  // #ifndef H5
+  if (process.env.UNI_PLATFORM === 'h5') {
+    uni.showToast({
+      title:
+        capabilities.value.mode === 'PRODUCTION'
+          ? '浏览器请使用手机验证码登录；微信内付款时可绑定公众号身份。'
+          : '微信登录请使用已配置微信应用的小程序；浏览器可选择演示账户。',
+      icon: 'none',
+      duration: 4000,
+    });
+    return;
+  }
   if (busy.value) return;
   if (capabilities.value.mode === 'PRODUCTION' && !consent.value) {
     toast(new Error('请先阅读并同意隐私政策和用户协议'));
@@ -201,7 +200,6 @@ async function wechat() {
   } finally {
     busy.value = false;
   }
-  // #endif
 }
 async function logout() {
   if (busy.value) return;

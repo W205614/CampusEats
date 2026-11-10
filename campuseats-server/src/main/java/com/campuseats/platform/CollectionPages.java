@@ -123,24 +123,19 @@ public class CollectionPages {
                 + filter
                 + " AND id<? ORDER BY id DESC LIMIT ?",
             args.toArray());
-    return pages.finish(
-        rows.stream()
-            .map(
-                r ->
-                    new Staff(
-                        s(r, "id"),
-                        s(r, "username"),
-                        s(r, "name"),
-                        s(r, "role"),
-                        s(r, "store_id"),
-                        s(r, "campus_id"),
-                        Db.integer(r, "status"),
-                        Db.bool(r, "must_change_password"),
-                        Db.bool(r, "accepting_tasks")))
-            .toList(),
-        size,
-        range,
-        r -> Long.parseLong(r.id()));
+    return pages.finish(rows, size, range)
+        .map(
+            r ->
+                new Staff(
+                    s(r, "id"),
+                    s(r, "username"),
+                    s(r, "name"),
+                    s(r, "role"),
+                    s(r, "store_id"),
+                    s(r, "campus_id"),
+                    Db.integer(r, "status"),
+                    Db.bool(r, "must_change_password"),
+                    Db.bool(r, "accepting_tasks")));
   }
 
   public CursorPages.Page<Coupon> coupons(Long store, boolean admin, CursorPages.Request q) {
@@ -174,28 +169,23 @@ public class CollectionPages {
     var rows =
         db.rows(
             "SELECT * FROM coupon" + filter + " AND id<? ORDER BY id DESC LIMIT ?", args.toArray());
-    return pages.finish(
-        rows.stream()
-            .map(
-                r ->
-                    new Coupon(
-                        s(r, "id"),
-                        s(r, "store_id"),
-                        s(r, "name"),
-                        s(r, "kind"),
-                        s(r, "threshold_cents"),
-                        s(r, "value"),
-                        s(r, "cap_cents"),
-                        Db.integer(r, "total"),
-                        Db.integer(r, "claimed"),
-                        Db.integer(r, "per_user"),
-                        Db.time(r.get("starts_at")),
-                        Db.time(r.get("ends_at")),
-                        Db.bool(r, "enabled")))
-            .toList(),
-        size,
-        range,
-        r -> Long.parseLong(r.id()));
+    return pages.finish(rows, size, range)
+        .map(
+            r ->
+                new Coupon(
+                    s(r, "id"),
+                    s(r, "store_id"),
+                    s(r, "name"),
+                    s(r, "kind"),
+                    s(r, "threshold_cents"),
+                    s(r, "value"),
+                    s(r, "cap_cents"),
+                    Db.integer(r, "total"),
+                    Db.integer(r, "claimed"),
+                    Db.integer(r, "per_user"),
+                    Db.time(r.get("starts_at")),
+                    Db.time(r.get("ends_at")),
+                    Db.bool(r, "enabled")));
   }
 
   public CursorPages.Page<Wallet> wallet(CursorPages.Request q) {
@@ -232,27 +222,22 @@ public class CollectionPages {
                 + filter
                 + " AND u.id<? ORDER BY u.id DESC LIMIT ?",
             args.toArray());
-    return pages.finish(
-        rows.stream()
-            .map(
-                r ->
-                    new Wallet(
-                        s(r, "id"),
-                        WalletState.display(s(r, "state"), Db.time(r.get("ends_at")), at),
-                        s(r, "checkout_id"),
-                        s(r, "coupon_template_id"),
-                        s(r, "store_id"),
-                        s(r, "name"),
-                        s(r, "kind"),
-                        s(r, "threshold_cents"),
-                        s(r, "value"),
-                        s(r, "cap_cents"),
-                        Db.time(r.get("starts_at")),
-                        Db.time(r.get("ends_at"))))
-            .toList(),
-        size,
-        range,
-        r -> Long.parseLong(r.id()));
+    return pages.finish(rows, size, range)
+        .map(
+            r ->
+                new Wallet(
+                    s(r, "id"),
+                    WalletState.display(s(r, "state"), Db.time(r.get("ends_at")), at),
+                    s(r, "checkout_id"),
+                    s(r, "coupon_template_id"),
+                    s(r, "store_id"),
+                    s(r, "name"),
+                    s(r, "kind"),
+                    s(r, "threshold_cents"),
+                    s(r, "value"),
+                    s(r, "cap_cents"),
+                    Db.time(r.get("starts_at")),
+                    Db.time(r.get("ends_at"))));
   }
 
   public CursorPages.Page<Promotion> promotions(long store, CursorPages.Request q) {
@@ -284,23 +269,18 @@ public class CollectionPages {
         db.rows(
             "SELECT * FROM promotion" + filter + " AND id<? ORDER BY id DESC LIMIT ?",
             args.toArray());
-    return pages.finish(
-        rows.stream()
-            .map(
-                r ->
-                    new Promotion(
-                        s(r, "id"),
-                        s(r, "store_id"),
-                        s(r, "item_type"),
-                        s(r, "item_id"),
-                        s(r, "price_cents"),
-                        Db.time(r.get("starts_at")),
-                        Db.time(r.get("ends_at")),
-                        Db.bool(r, "enabled")))
-            .toList(),
-        size,
-        range,
-        r -> Long.parseLong(r.id()));
+    return pages.finish(rows, size, range)
+        .map(
+            r ->
+                new Promotion(
+                    s(r, "id"),
+                    s(r, "store_id"),
+                    s(r, "item_type"),
+                    s(r, "item_id"),
+                    s(r, "price_cents"),
+                    Db.time(r.get("starts_at")),
+                    Db.time(r.get("ends_at")),
+                    Db.bool(r, "enabled")));
   }
 
   public CursorPages.Page<Favorite> favorites(CursorPages.Request q) {

@@ -257,7 +257,7 @@ async function initialize() {
   await load();
   if (!mounted || owner !== initialization) return;
   const current = sequence;
-  if (mounted && session.session && !courier.value)
+  if (session.session && !courier.value)
     try {
       const result = await request<{ ticket: string }>('/admin/ws-ticket', 'POST');
       if (!mounted || current !== sequence) return;

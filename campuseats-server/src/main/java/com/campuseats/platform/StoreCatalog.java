@@ -283,13 +283,11 @@ public class StoreCatalog {
     for (var source : rows) {
       var row = normalized(source);
       if (!admin
-          && (Integer.parseInt(row.get("status").toString()) != 1
-              || Integer.parseInt(row.get("category_status").toString()) != 1)) continue;
+          && (Db.integer(row, "status") != 1 || Db.integer(row, "category_status") != 1)) continue;
       if (query != null && !row.get("name").toString().contains(query.strip())) continue;
-      if (category != null && Long.parseLong(row.get("category_id").toString()) != category)
-        continue;
+      if (category != null && Db.id(row, "category_id") != category) continue;
       String type = row.get("item_type").toString();
-      long id = Long.parseLong(row.get("id").toString());
+      long id = Db.id(row, "id");
       int left = stock.getOrDefault(id, 0);
       if (type.equals("SETMEAL")) {
         var parts = components.getOrDefault(id, List.of());

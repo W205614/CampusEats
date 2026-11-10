@@ -290,9 +290,9 @@ public class PaymentService {
       org.slf4j.LoggerFactory.getLogger(PaymentService.class)
           .warn(
               "Channel attempt unresolved; intentId={} type={} code={}",
-              id,
+              id.replaceAll("[\\r\\n]", "_"),
               ex.getClass().getSimpleName(),
-              error);
+              String.valueOf(error).replaceAll("[\\r\\n]", "_"));
       db.update(
           "UPDATE payment_intent SET state=CASE WHEN attempts>=4 THEN 'REVIEW' ELSE 'UNKNOWN'"
               + " END,attempts=attempts+1,last_error=?,next_check_at=?,updated_at=? WHERE id=? AND"

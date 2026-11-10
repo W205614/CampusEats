@@ -16,12 +16,12 @@ public class ProductionManagementSecurity {
   SecurityFilterChain privateManagement(
       HttpSecurity http, @Value("${management.server.port:9090}") int port) throws Exception {
     return http.securityMatcher(request -> request.getLocalPort() == port)
-        .csrf(csrf -> csrf.disable())
         .sessionManagement(
             session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
         .authorizeHttpRequests(
             auth ->
                 auth.requestMatchers(
+                        org.springframework.http.HttpMethod.GET,
                         "/actuator/health",
                         "/actuator/health/readiness",
                         "/actuator/health/liveness",

@@ -5,6 +5,7 @@ import static com.campuseats.common.BusinessException.require;
 import com.campuseats.infra.Db;
 import com.campuseats.security.Actor;
 import java.io.*;
+import java.math.BigDecimal;
 import java.time.*;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -60,7 +61,8 @@ public class ReportService {
       var row =
           new LinkedHashMap<String, Object>(
               byDate.getOrDefault(
-                  d.toString(), Map.of("orders", 0, "completed", 0, "turnover", "0.00")));
+                  d.toString(),
+                  Map.of("orders", 0, "completed", 0, "turnover", BigDecimal.ZERO.setScale(2))));
       row.put("date", d.toString());
       row.put("new_users", newUsers.getOrDefault(d.toString(), 0));
       result.add(row);
@@ -106,10 +108,10 @@ public class ReportService {
       for (var item : daily) {
         var row = sheet.createRow(n++);
         row.createCell(0).setCellValue(item.get("date").toString());
-        row.createCell(1).setCellValue(Double.parseDouble(item.get("orders").toString()));
-        row.createCell(2).setCellValue(Double.parseDouble(item.get("completed").toString()));
-        row.createCell(3).setCellValue(Double.parseDouble(item.get("turnover").toString()));
-        row.createCell(4).setCellValue(Double.parseDouble(item.get("new_users").toString()));
+        row.createCell(1).setCellValue(((Number) item.get("orders")).doubleValue());
+        row.createCell(2).setCellValue(((Number) item.get("completed")).doubleValue());
+        row.createCell(3).setCellValue(((Number) item.get("turnover")).doubleValue());
+        row.createCell(4).setCellValue(((Number) item.get("new_users")).doubleValue());
       }
       for (int i = 0; i < cols.length; i++) sheet.setColumnWidth(i, 5000);
       workbook.write(out);

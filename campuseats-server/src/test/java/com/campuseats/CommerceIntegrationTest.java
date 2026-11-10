@@ -74,14 +74,17 @@ class CommerceIntegrationTest {
     final AtomicReference<Instant> value =
         new AtomicReference<>(Instant.parse("2026-10-07T04:00:00Z"));
 
+    @Override
     public ZoneId getZone() {
       return ZoneId.of("Asia/Shanghai");
     }
 
+    @Override
     public Clock withZone(ZoneId z) {
       return this;
     }
 
+    @Override
     public Instant instant() {
       return value.get();
     }

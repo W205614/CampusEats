@@ -83,10 +83,12 @@ class CosBlobStoreTest {
     config.setSocketTimeout(2000);
     config.setEndpointBuilder(
         new EndpointBuilder() {
+          @Override
           public String buildGeneralApiEndpoint(String bucket) {
             return "127.0.0.1:" + port;
           }
 
+          @Override
           public String buildGetServiceApiEndpoint() {
             return "127.0.0.1:" + port;
           }

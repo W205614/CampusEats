@@ -44,7 +44,8 @@ public final class Money {
           int c = remainders[b].compareTo(remainders[a]);
           return c == 0 ? Integer.compare(a, b) : c;
         });
-    for (int i = 0; i < amount - assigned; i++) result[indices.get(i)]++;
+    int remaining = Math.toIntExact(amount - assigned);
+    for (int i = 0; i < remaining; i++) result[indices.get(i)]++;
     return result;
   }
 

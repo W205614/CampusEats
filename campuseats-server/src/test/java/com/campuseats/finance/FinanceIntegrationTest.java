@@ -65,14 +65,17 @@ class FinanceIntegrationTest {
     final AtomicReference<Instant> value =
         new AtomicReference<>(Instant.parse("2026-10-28T04:00:00Z"));
 
+    @Override
     public ZoneId getZone() {
       return ZoneId.of("Asia/Shanghai");
     }
 
+    @Override
     public Clock withZone(ZoneId zone) {
       return this;
     }
 
+    @Override
     public Instant instant() {
       return value.get();
     }

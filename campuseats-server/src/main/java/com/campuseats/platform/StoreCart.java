@@ -59,11 +59,13 @@ public class StoreCart {
     return rows;
   }
 
-  @Transactional
+  @Transactional(readOnly = true)
   public Map<String, Object> view(long store) {
     long user = Actor.user().id();
     scope.store(store, false);
-    long version = lock(user, store);
+    var state =
+        db.one("SELECT version FROM store_cart_state WHERE user_id=? AND store_id=?", user, store);
+    long version = state == null ? 0 : Db.id(state, "version");
     return Map.of("storeId", store, "cartVersion", version, "items", items(user, store));
   }
 
