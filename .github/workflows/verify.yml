@@ -7,8 +7,8 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-node@v7.1.0
         with:
           node-version: '24.19.0'
       - name: Verify bounded pinned-tool HTTP downloads on Windows
@@ -38,18 +38,18 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7.0.1
       - name: Verify supported Docker image store
         shell: pwsh
         run: |
           $driver=(& docker info --format '{{.Driver}}') -join ''
           if($LASTEXITCODE -ne 0 -or $driver -cne 'overlay2'){throw 'CI image-store format changed; verify archive compatibility before testing or publishing.'}
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6.2.0
         with:
           distribution: temurin
           java-version: '21'
           cache: maven
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7.1.0
         with:
           node-version: '24.19.0'
           cache: npm
@@ -94,6 +94,7 @@ jobs:
           ./scripts/tests/test-migration-hash.ps1
           ./scripts/tests/test-artifact-release.ps1
           ./scripts/tests/test-publish-images.ps1
+          ./scripts/tests/test-release-materials.ps1
           ./scripts/tests/test-restore-ownership.ps1
           ./scripts/tests/test-docker-context.ps1
           ./scripts/start.ps1 -SkipVerify
@@ -158,14 +159,14 @@ jobs:
         run: ./scripts/export-release.ps1
       - name: Upload immutable deployment bundle
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: release-${{ github.sha }}
           overwrite: true
           path: .local/release-bundle/
           if-no-files-found: error
           retention-days: 7
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7.0.2
         if: always()
         with:
           name: validation-results

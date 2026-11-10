@@ -147,7 +147,7 @@ async function saveAvailability() {
 }
 async function perform(o: Order, operation: () => Promise<void>): Promise<boolean> {
   if (!mounted || busy.value || needsRefresh.value) return false;
-  // A background read can start before Vue disables an already clicked button.
+  // Background reads must not disable action buttons mid-click or replace the write's result.
   // Supersede that read; the write still validates the captured order version.
   const current = sequence;
   readSequence++;
@@ -375,14 +375,14 @@ onUnmounted(() => {
           <el-button
             v-if="selected.status === 2"
             type="primary"
-            :disabled="busy || loading || needsRefresh"
+            :disabled="busy || needsRefresh"
             @click="action(selected, 'accept')"
             >接单备餐</el-button
           >
           <el-button
             v-if="selected.status === 3 && !selected.ready"
             type="primary"
-            :disabled="busy || loading || needsRefresh"
+            :disabled="busy || needsRefresh"
             @click="action(selected, 'ready')"
             >备餐完成</el-button
           >
@@ -393,7 +393,7 @@ onUnmounted(() => {
               selected.fulfillment === 'DELIVERY' &&
               !selected.courierId
             "
-            :disabled="busy || loading || needsRefresh"
+            :disabled="busy || needsRefresh"
             @click="action(selected, 'publish')"
             >发布抢单任务</el-button
           >
@@ -402,14 +402,14 @@ onUnmounted(() => {
           <el-button
             v-if="selected.status === 3"
             type="primary"
-            :disabled="busy || loading || needsRefresh"
+            :disabled="busy || needsRefresh"
             @click="action(selected, 'pickup')"
             >确认取餐</el-button
           >
           <el-button
             v-if="selected.status === 4"
             type="primary"
-            :disabled="busy || loading || needsRefresh"
+            :disabled="busy || needsRefresh"
             @click="action(selected, 'complete')"
             >确认送达</el-button
           >
@@ -430,7 +430,7 @@ onUnmounted(() => {
             <el-option v-for="c in couriers" :key="c.id" :value="c.id" :label="c.name" />
           </el-select>
           <el-button
-            :disabled="!courierId || busy || loading || needsRefresh"
+            :disabled="!courierId || busy || needsRefresh"
             @click="action(selected, 'assign')"
             >指派配送</el-button
           >
@@ -445,14 +445,14 @@ onUnmounted(() => {
         <div class="toolbar">
           <el-input v-model="code" maxlength="8" placeholder="输入用户出示的8位核销码" />
           <el-button
-            :disabled="!code || busy || loading || needsRefresh"
+            :disabled="!code || busy || needsRefresh"
             @click="action(selected, 'verify')"
             >核销</el-button
           >
           <el-button
             v-if="session.session?.role === 'PLATFORM_ADMIN'"
             text
-            :disabled="busy || loading || needsRefresh"
+            :disabled="busy || needsRefresh"
             @click="reset(selected)"
             >重置核销码</el-button
           >
@@ -465,7 +465,7 @@ onUnmounted(() => {
         <el-input v-model="reason" placeholder="拒单或取消原因" maxlength="200" />
         <el-button
           type="danger"
-          :disabled="!reason.trim() || busy || loading || needsRefresh"
+          :disabled="!reason.trim() || busy || needsRefresh"
           @click="action(selected, selected.status === 2 ? 'reject' : 'cancel')"
           >{{ selected.status === 2 ? '拒单并退款' : '取消并退款' }}</el-button
         >
@@ -474,7 +474,7 @@ onUnmounted(() => {
         v-if="
           session.session?.role === 'PLATFORM_ADMIN' && selected.status === 3 && selected.courierId
         "
-        :disabled="busy || loading || needsRefresh"
+        :disabled="busy || needsRefresh"
         @click="unassign(selected)"
         >撤回配送分配</el-button
       >

@@ -57,7 +57,7 @@ test('an order action racing a background read sends once and retains its refres
       await new Promise<void>((resolve) => {
         releaseWrite = resolve;
       });
-      order = { ...order, version: '6' };
+      order = { ...order, version: String(Number(order.version) + 1) };
       return ok(order);
     }
     return route.fulfill({
@@ -98,4 +98,30 @@ test('an order action racing a background read sends once and retains its refres
   expect(writes[1]).toEqual({ version: '6', courierId: null, code: null });
   releaseWrite!();
   await expect(publish).toBeEnabled();
+
+  releaseRead = undefined;
+  const button = await publish.boundingBox();
+  expect(button).not.toBeNull();
+  await page.mouse.move(button!.x + button!.width / 2, button!.y + button!.height / 2);
+  await page.mouse.down();
+  // A background refresh can also start after the native pointerdown has been accepted.
+  await page.evaluate(() => {
+    Array.from(document.querySelectorAll('button'))
+      .find((button) => button.textContent?.trim() === '刷新')!
+      .click();
+  });
+  await expect.poll(() => !!releaseRead).toBe(true);
+  await page.mouse.up();
+  await expect.poll(() => writes.length).toBe(3);
+  expect(writes[2]).toEqual({ version: '7', courierId: null, code: null });
+  await expect(publish).toBeDisabled();
+  await publish.dispatchEvent('click');
+  expect(writes).toHaveLength(3);
+  releaseWrite!();
+  await expect(publish).toBeEnabled();
+  const interruptedRead = page.waitForResponse(
+    (response) => new URL(response.url()).pathname === '/api/v1/merchant/stores/1/orders',
+  );
+  releaseRead!();
+  await interruptedRead;
 });
