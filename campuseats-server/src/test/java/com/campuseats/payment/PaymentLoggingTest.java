@@ -11,15 +11,17 @@ import com.campuseats.common.BusinessException;
 import com.campuseats.infra.Db;
 import java.time.*;
 import java.util.Map;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.slf4j.LoggerFactory;
 
 class PaymentLoggingTest {
-  @Test
-  void channelFailureCannotInjectLogLinesAndKeepsTheStoredDiagnostic() {
+  @ParameterizedTest
+  @ValueSource(strings = {"\r", "\n", "\r\n", "\u000b", "\f", "\u0085", "\u2028", "\u2029"})
+  void channelFailureCannotInjectLogLinesAndKeepsTheStoredDiagnostic(String lineBreak) {
     Db db = mock(Db.class);
     WechatPayChannel channel = mock(WechatPayChannel.class);
-    String id = "intent\r\nforged", code = "CHANNEL\r\nforged";
+    String id = "intent" + lineBreak + "forged", code = "CHANNEL" + lineBreak + "forged";
     Clock clock = Clock.fixed(Instant.parse("2026-11-10T00:00:00Z"), ZoneOffset.UTC);
     when(db.update(anyString(), any(Object[].class))).thenReturn(1);
     when(db.one("SELECT * FROM payment_intent WHERE id=?", id))
@@ -44,10 +46,9 @@ class PaymentLoggingTest {
       payments.drive(id);
       assertEquals(1, output.list.size());
       String message = output.list.getFirst().getFormattedMessage();
-      assertFalse(message.contains("\r"));
-      assertFalse(message.contains("\n"));
-      assertTrue(message.contains("intentId=intent__forged"));
-      assertTrue(message.contains("code=CHANNEL__forged"));
+      assertEquals(
+          "Channel attempt unresolved; intentId=intent_forged type=BusinessException code=CHANNEL_forged",
+          message);
       verify(db)
           .update(
               startsWith("UPDATE payment_intent SET state=CASE"),

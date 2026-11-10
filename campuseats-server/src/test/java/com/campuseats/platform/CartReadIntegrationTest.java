@@ -114,10 +114,10 @@ class CartReadIntegrationTest {
 
   @Test
   void hundredsOfHistoricalEmptyStoresDoNotAddQueriesOrResetVersions() {
-    carts.view(store);
+    db.update("INSERT INTO store_cart_state(user_id,store_id) VALUES(?,?)", user, store);
     for (int i = 0; i < 205; i++) {
       long empty = db.insert("INSERT INTO store(campus_id,name) VALUES(?,?)", campus, "空店" + i);
-      carts.view(empty);
+      db.update("INSERT INTO store_cart_state(user_id,store_id) VALUES(?,?)", user, empty);
     }
     item("DISH", dish, "{\"辣度\":\"微辣\"}");
     item("SETMEAL", meal, "{}");
@@ -150,7 +150,7 @@ class CartReadIntegrationTest {
 
   @Test
   void batchReadStillRejectsMissingProductsAndDoesNotMixOtherUsers() {
-    carts.view(store);
+    db.update("INSERT INTO store_cart_state(user_id,store_id) VALUES(?,?)", user, store);
     item("DISH", dish, "{}");
     long other = db.insert("INSERT INTO user(openid) VALUES(?)", UUID.randomUUID().toString());
     db.update("INSERT INTO store_cart_state(user_id,store_id) VALUES(?,?)", other, store);
