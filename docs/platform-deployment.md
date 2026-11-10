@@ -1,20 +1,56 @@
 # 多校区版本部署与恢复
 
-首次部署见[项目首页](../README.md)，前端开发和微信小程序配置见[开发指南](development.md)。本文用于已有数据环境。
+本文包含首次镜像部署与已有数据环境的升级、恢复。启动路线见[项目首页](../README.md)，前端开发和微信小程序配置见[开发指南](development.md)。以下新增指南随 master 维护，所用 Compose、Dockerfile 和安全配置工具均包含在 v1.0.4 Tag 中。
+
+<a id="ghcr-start"></a>
+
+## 从 GHCR 首次部署
+
+适用于全新独立演示，不用于覆盖现有日常实例。先按首页取得 `v1.0.4` 源码，在项目根目录的 PowerShell 7 中执行一次配置生成：
+
+```powershell
+. ./scripts/secure-files.ps1
+$demoDirectory = New-SecureDirectory -Path (Join-Path $PWD '.local/ghcr-demo')
+$demoEnvironment = Join-Path $demoDirectory 'demo.env'
+if (Test-Path -LiteralPath $demoEnvironment) { throw '配置已存在；保留原凭据，直接使用原配置启动。' }
+$demoConfiguration = Get-Content .env.example -Raw
+foreach ($purpose in @('root-password','app-password','redis-password','admin-signing-key','demo-password')) {
+  $random = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
+  $demoConfiguration = $demoConfiguration.Replace("replace-with-random-$purpose", $random)
+}
+$demoConfiguration = $demoConfiguration.Replace('WEB_PORT=18083', 'WEB_PORT=28104')
+$demoConfiguration = $demoConfiguration.Replace('http://localhost:18083,http://127.0.0.1:18083', 'http://localhost:28104,http://127.0.0.1:28104')
+$demoConfiguration = $demoConfiguration.Replace('MYSQL_IMAGE=campuseats-mysql:v1', 'MYSQL_IMAGE=campuseats-mysql:v1.0.4-local-demo')
+$demoConfiguration = $demoConfiguration.Replace('REDIS_IMAGE=campuseats-redis:v1', 'REDIS_IMAGE=campuseats-redis:v1.0.4-local-demo')
+$demoConfiguration += "`nSERVER_IMAGE=ghcr.io/w205614/campuseats-server@sha256:872a8deb7c8512397c8a3d348365af37f7149d4c9c953ddd5d0391e47bfe5e89`nWEB_IMAGE=ghcr.io/w205614/campuseats-web@sha256:ef694b984718c5820a9116c4ac0e938f0610833abebf0d69affce5ae9d255633`n"
+Write-SecureTextFile -Path $demoEnvironment -Content $demoConfiguration
+$demoConfiguration = $null
+$random = $null
+```
+
+然后执行首页[拉取预构建应用镜像](../README.md#拉取预构建应用镜像)的依赖构建、应用拉取及四服务启动命令。不要对这个镜像环境调用会重新构建应用的 `start.ps1`。MySQL/Redis 的本地镜像标签与默认源码环境分开；它们需要按当前 Dockerfile 下载固定基础镜像与安全补丁，不能用任意同名第三方镜像替代。
+
+本版本两个应用镜像均公开、支持 `linux/amd64`，上述摘要与 [Release 验证附件](https://github.com/W205614/CampusEats/releases/download/v1.0.4/campuseats-v1.0.4-verification.json)一致。拉取/运行在 Windows Docker Desktop 上实际验收；源码四服务构建及运行由 Ubuntu 24.04 CI 验证。首次演示需要网络获取依赖，宿主不需要 Maven、Java 或 Node.js；macOS、ARM64 未在本轮验证。
+
+四服务健康后访问 `http://127.0.0.1:28104/` 和 `/admin/`。平台账号为 `admin`，初始口令在受保护配置的 `DEMO_ADMIN_PASSWORD` 中；本路线不生成 `demo-credentials.txt`，不要将环境文件或凭据截图提交。重启继续使用原配置，不重新生成数据库口令。其他 demo 员工的首次密码与改密要求见[演示账号](operations.md#演示账号)。
+
+端口冲突时先更改这个独立配置的 `WEB_PORT`，并同步 `ALLOWED_ORIGINS`；不要停止其他项目。健康检查、日志和停止命令集中在首页。停止保留三个持久卷；删除卷可能丢失数据。
 
 ## 本机保留策略
 
-本机继续采用单机、单实例演示部署。完整数据备份与离线镜像恢复包已按用户要求停用，`.local/backups/LATEST.json`、`LATEST.txt` 为 `DISABLED_BY_USER` 禁用标记，不提供恢复能力；历史恢复记录只证明当时校验通过。当前镜像、业务卷、上传文件及必要配置继续保留。
+维护者本机采用单机、单实例演示部署，自动备份保持停用，`.local/backups/LATEST.json`、`LATEST.txt` 使用 `DISABLED_BY_USER` 标记。该标记不是可用恢复包；发布期间的临时人工恢复资料是否保留，以对应维护回执为准。历史校验元数据不能代替完整负载，当前镜像、业务卷、上传文件及必要配置继续保留。这是维护者本机的保留约定，其他部署应自行制定并验证备份策略。
 
 下述备份、恢复和回退工具在人工发布或恢复时执行，定时备份保持停用。发布期间仍执行临时备份与独立恢复校验；`release.ps1` 会生成材料并更新LATEST，不会自动回收或重新禁用指针。维护者须在成功验证后按明确清单将临时恢复材料移入Windows回收站，并将LATEST恢复为禁用标记，才能完成当前本机保留策略。发布失败时保留现场和处理该次失败所需材料。
 
 ## 已采用 CI 制品的日常环境
 
-CI 在同一镜像上完成浏览器回归、独立恢复和安全扫描，成功的 master push 生成 `release-<完整提交SHA>` 制品。下载时指定成功 run、来源 SHA 和 CI 日志中的 `RELEASE_MANIFEST_SHA256`，不选择名称相似的包、不沿用失败 attempt。
+CI 在同一镜像上完成浏览器回归、独立恢复和安全扫描，成功的 master push 生成 `release-<完整提交SHA>` 制品。下载时指定成功 run、来源 SHA 和 CI 日志中的 `RELEASE_MANIFEST_SHA256`，不选择名称相似的包、不沿用失败 attempt。下面是参数模板，执行前替换所有尖括号内容；制品仅保留 7 天，先确认实际可获取，不能沿用过期记录。
+
+`release.ps1` 的应用发布阶段要求现有 MySQL/Redis 内容身份已匹配该制品。依赖镜像变化时，先按本节后续的原数据指纹、独立恢复和依赖替换流程处理；不能用 `-Initialize` 绕过已有数据库的升级要求。
 
 ```powershell
-pwsh -NoProfile -File ./scripts/download-release.ps1 -RunId <成功run> -SourceSha <完整SHA> -ManifestSha256 <清单摘要> -Destination .local/releases/download-<SHA>
-pwsh -NoProfile -File ./scripts/release.ps1 -BundleDirectory .local/releases/download-<SHA> -ExpectedSourceSha <完整SHA> -ExpectedRunId <成功run> -ExpectedManifestSha256 <清单摘要>
+pwsh -NoProfile -File ./scripts/download-release.ps1 -RunId '<成功run>' -SourceSha '<完整SHA>' -ManifestSha256 '<清单摘要>' -Destination '.local/releases/download-<SHA>'
+pwsh -NoProfile -File ./scripts/release.ps1 -BundleDirectory '.local/releases/download-<SHA>' -ExpectedSourceSha '<完整SHA>' -ExpectedRunId '<成功run>' -ExpectedManifestSha256 '<清单摘要>'
 ```
 
 下载使用当前 GitHub 凭据或进程内 `CAMPUS_GITHUB_TOKEN` 的 Actions 读取权限，不把令牌写入参数、文件或日志。制品校验包括归档与扫描报告哈希、镜像 ID／架构／revision、成功 run 及 attempt；迁移内容使用明确的 `utf8-lf-v1` 规范化摘要，避免 Windows 与 Linux 的换行差异。未知格式、来源不匹配或过期制品均停止发布。

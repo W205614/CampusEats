@@ -69,9 +69,75 @@ Java 包名为 `com.campuseats`，应用入口为 `CampusEatsApplication`。模�
 
 ## 本地构建与前端开发
 
-首次体验只需 Docker，不需要安装本机开发工具。修改源码时，后端本机验证需 Java 21、Maven；前端使用与 [CI](../.github/workflows/verify.yml) 一致的 Node 版本，使用 lockfile 安装依赖。
+首次 Docker 体验需要 Git、PowerShell 7、Docker 与 Compose，无需宿主 Java/Node。宿主开发按组件安装 Java 21、Maven 3.9.9 或 Node.js 24.19.0，使用 lockfile 安装前端依赖。本轮宿主 Java 的实际验证环境是 Windows、Java 21、PowerShell 7.6.9；Linux 宿主 Java、macOS 和其他架构未逐项验证。
 
-以下命令在项目根目录的 PowerShell 7 执行：
+<a id="host-source"></a>
+
+### 宿主 Java 与独立数据库
+
+下面使用独立项目 `campuseats-source-dev`、MySQL `13384`、Redis `16384`、Java `18084`。先确认端口可用，只操作本节的新环境，不复用日常业务卷。Compose 原文件不公开数据库端口，因此需要本节的回环映射。
+
+在根目录的 PowerShell 7 执行一次准备；环境文件已存在时保留它，后续从“启动依赖”继续：
+
+```powershell
+. ./scripts/secure-files.ps1
+$devDirectory = New-SecureDirectory -Path (Join-Path $PWD '.local/source-dev')
+$devEnvironment = Join-Path $devDirectory 'dev.env'
+if (Test-Path -LiteralPath $devEnvironment) { throw '保留已有开发配置，不重新生成数据库口令。' }
+$devConfiguration = Get-Content .env.example -Raw
+foreach ($purpose in @('root-password','app-password','redis-password','admin-signing-key','demo-password')) {
+  $random = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
+  $devConfiguration = $devConfiguration.Replace("replace-with-random-$purpose", $random)
+}
+$devConfiguration = $devConfiguration.Replace('MYSQL_IMAGE=campuseats-mysql:v1', 'MYSQL_IMAGE=campuseats-mysql:v1.0.4-source-dev')
+$devConfiguration = $devConfiguration.Replace('REDIS_IMAGE=campuseats-redis:v1', 'REDIS_IMAGE=campuseats-redis:v1.0.4-source-dev')
+Write-SecureTextFile -Path $devEnvironment -Content $devConfiguration
+Write-SecureTextFile -Path (Join-Path $devDirectory 'ports.yaml') -Content "services:`n  mysql:`n    ports: ['127.0.0.1:13384:3306']`n  redis:`n    ports: ['127.0.0.1:16384:6379']`n"
+$devConfiguration = $null
+$random = $null
+```
+
+启动依赖，只启动 MySQL/Redis 两个服务，不启动容器中的 Java/Web：
+
+```powershell
+$devCompose = @('compose', '--env-file', '.local/source-dev/dev.env', '-p', 'campuseats-source-dev', '-f', 'compose.yaml', '-f', '.local/source-dev/ports.yaml')
+docker @devCompose build --pull mysql redis
+docker @devCompose up -d --no-build --wait --wait-timeout 180 mysql redis
+```
+
+`.env` 不会自动加载到宿主 Java。在启动 Java 的同一终端显式设置：
+
+```powershell
+$devValues = ConvertFrom-StringData (Get-Content .local/source-dev/dev.env -Raw)
+$env:SPRING_PROFILES_ACTIVE = 'demo'
+$env:SERVER_ADDRESS = '127.0.0.1'
+$env:SERVER_PORT = '18084'
+$env:DB_URL = 'jdbc:mysql://127.0.0.1:13384/sky_take_out?serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true&useSSL=false'
+$env:DB_USER = 'campus'
+$env:MYSQL_PASSWORD = $devValues.MYSQL_PASSWORD
+$env:REDIS_HOST = '127.0.0.1'
+$env:REDIS_PORT = '16384'
+$env:REDIS_PASSWORD = $devValues.REDIS_PASSWORD
+$env:JWT_ADMIN_SECRET = $devValues.JWT_ADMIN_SECRET
+$env:DEMO_ADMIN_PASSWORD = $devValues.DEMO_ADMIN_PASSWORD
+$env:UPLOADS_PATH = Join-Path $PWD '.local/source-dev/uploads'
+$env:ALLOWED_ORIGINS = 'http://127.0.0.1:18084,http://127.0.0.1:5173,http://127.0.0.1:5174'
+$devValues = $null
+mvn -B -ntp -DskipTests install
+mvn -B -ntp -f campuseats-server/pom.xml spring-boot:run
+```
+
+`install` 只在本机 Maven 仓库解析源码模块依赖，不向远端发布应用包；此处跳过测试，完整检查另见贡献指南。首次 Java 启动执行 Flyway V1—V24，演示种子仅在相应模式初始化。数据库名 `sky_take_out` 是保留标识，不重命名现有数据库。
+
+在另一终端检查 `http://127.0.0.1:18084/actuator/health/readiness` 与 `/api/v1/user/auth/capabilities`，应分别为 `UP`、`DEMO` / `MOCK`。本轮实际执行了安装、源码启动、健康、管理员与演示用户登录及菜单读取，确认 V24 与 69 张表；复用了同配方的既有精确依赖镜像，没有宣称本次在 Windows 重新构建这两个依赖镜像。
+
+本地 JDBC 示例的非 TLS 连接仅适用于此回环隔离开发环境。Java 在前台运行，以 Ctrl+C 停止；IDE 可导入根 POM、配置同组环境变量并从 `CampusEatsApplication` 调试。IDE 调试器本轮未单独验收。数据库暂停使用 `docker @devCompose stop --timeout 60`，保留开发数据卷；清理或重置另行决定，不删除日常卷。
+
+<a id="frontend-dev"></a>
+
+### 前端热更新
+
+如需一次完成双端安装、兼容层/类型检查和所有目标构建，可在根目录的 PowerShell 7 选用以下检查入口。日常热更新直接从后文 `npm ci` 开始，不必先全量构建：
 
 ```powershell
 # 安装两端依赖，检查兼容层及类型，构建管理端、H5 和小程序
@@ -85,22 +151,29 @@ node ./scripts/generate-contracts.mjs
 
 公开能力接口 `/api/v1/user/auth/capabilities` 控制登录入口。`.env` 的 `APP_MODE=demo` 保留演示身份；`trial` 禁用共享演示登录，仍然使用模拟资金。`demo` 和 `trial` 互斥；微信身份配置与验收见[身份接入](identity-notifications.md)。
 
-前端开发服务器代理到已启动的 Docker 后端。先在本机 `.env` 的 `ALLOWED_ORIGINS` 里保留原地址并加入 `http://127.0.0.1:5173,http://127.0.0.1:5174`，再运行 `docker compose up -d server` 使配置生效。在两个终端分别执行：
+前端可以代理到上述宿主 Java，或已经准备好的独立 Docker 后端。先使用锁文件安装依赖：
+
+```powershell
+npm ci --prefix frontend/admin
+npm ci --prefix frontend/client --include=optional
+```
+
+以下默认代理到本节 Java 的 `18084`，其允许 Origin 已配置。在两个终端分别执行：
 
 ```powershell
 # 终端一：员工工作台 http://127.0.0.1:5173/admin/
-$env:API_PROXY = 'http://localhost:18083'
+$env:API_PROXY = 'http://127.0.0.1:18084'
 npm run dev --prefix frontend/admin
 ```
 
 ```powershell
 # 终端二：用户 H5 http://127.0.0.1:5174/app/
-$env:API_PROXY = 'http://localhost:18083'
+$env:API_PROXY = 'http://127.0.0.1:18084'
 Remove-Item Env:VITE_API_BASE -ErrorAction SilentlyContinue
 npm run dev:h5 --prefix frontend/client
 ```
 
-终端二清除进程中的 `VITE_API_BASE`，让 H5 的 API、上传与演示图片保持同源；如本机 `.env.local` 另有该配置，也应按本次联调方式调整。API 与上传请求通过 `API_PROXY` 转发，不把本机地址写进源码。端口调整后同步修改代理与允许的 Origin。开发服务器也会访问该后端的实际数据，写入式验收应先按[独立验收说明](platform-deployment.md#独立验收)准备隔离环境。Compose 不公开 MySQL／Redis 端口，直接在 IDE 启动后端还需自行配置可访问的数据库、Redis 和运行环境。
+终端二清除进程中的 `VITE_API_BASE`，让 H5 的 API、上传与演示图片保持同源；如本机 `.env.local` 另有该配置，也应相应调整。API 与上传通过 `API_PROXY` 转发。若选择独立 GHCR 后端，将代理改为 `http://127.0.0.1:28104`，仅在该项目的 `.local/ghcr-demo/demo.env` 中为 `ALLOWED_ORIGINS` 加入前端地址，再以相同环境文件和 `campuseats-ghcr-demo` 项目名执行 `up -d --no-build server`。不要修改日常 `.env` 或用日常库做写入式自动测试，见[独立验收](platform-deployment.md#独立验收)。
 
 工作台与 H5 开发服务器直接读取仓库的 `deploy/dish.svg`，提供 `/demo-images/dish.svg`，无需为演示图片启动后端或 Docker。API 与上传文件仍通过 `API_PROXY` 访问所选后端；不要将日常库用于写入式自动测试。
 
