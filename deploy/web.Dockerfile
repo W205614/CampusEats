@@ -17,7 +17,7 @@ COPY scripts/vite-demo-image.mts scripts/vite-demo-image.mts
 RUN cd frontend/admin && npm run test:toolchain && npm run build
 RUN cd frontend/client && npm run test:toolchain && npm run typecheck && npm run build:h5 && npm run build:mp-weixin
 
-FROM nginx:1.30.6-alpine3.24-slim@sha256:dede8895648b461178c3bc604f7eed4423efe5220b2c4d839f5eb3d34ac3f8f7 AS runtime
+FROM nginx:1.30.7-alpine3.24-slim@sha256:8c950211a641ec5b23f265450517001f6bcca533666120ebe36cb4cff3d00a55 AS runtime
 ARG RUNTIME_REFRESH=initial
 RUN test -n "$RUNTIME_REFRESH" && for attempt in 1 2 3; do \
       apk upgrade --no-cache && exit 0; \

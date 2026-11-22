@@ -5,8 +5,8 @@
 | 文件                               | 用途                                                                                                                                                                    |
 | ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `web.Dockerfile`                   | 构建工作台、用户H5与Nginx镜像                                                                                                                                           |
-| `mysql.Dockerfile`                 | 在固定MySQL 8.4.13镜像上安装经官方SHA-256核对的curl/libcurl 和 glibc 安全补丁                                                                                           |
-| `redis.Dockerfile`                 | 保留官方 Redis 7.4.12 二进制与入口，使用固定 Alpine 3.24 基础镜像和修复后的 zlib，并保留上游许可                                                                        |
+| `mysql.Dockerfile`                 | 固定 MySQL 8.4.13，安装经 SHA-256 和 RPM 签名校验的 Oracle Linux BaseOS 更新 |
+| `redis.Dockerfile`                 | 保留官方 Redis 7.4.12 二进制、入口及许可，在固定 Alpine 3.24 基础镜像上安装修复后的 zlib 与 OpenSSL 库 |
 | `nginx.conf`、`proxy-headers.conf` | 页面路由、API代理与可信代理头                                                                                                                                           |
 | `maven-settings.xml`               | 后端源码镜像的Maven镜像源配置                                                                                                                                           |
 | `dish.svg`                         | 默认演示餐品图片                                                                                                                                                        |

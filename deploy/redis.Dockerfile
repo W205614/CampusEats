@@ -3,7 +3,7 @@ FROM redis:7.4.12-alpine@sha256:ec1c2d3603c3d7d65b153bedda0248b641aa3bd768450340
 FROM alpine:3.24.4@sha256:0f49f331d9212aff11b932863be4eb01cdf962969aa86dab7d1ee21ac6f5f52b
 ARG RUNTIME_REFRESH=initial
 # Alpine 3.21 has no fixed zlib package yet. Keep the official Redis binaries on a patched runtime.
-RUN test -n "$RUNTIME_REFRESH" && apk add --no-cache tzdata setpriv libssl3 libcrypto3 'zlib>=1.4-r0' \
+RUN test -n "$RUNTIME_REFRESH" && apk add --no-cache tzdata setpriv 'libssl3>=3.5.9-r1' 'libcrypto3>=3.5.9-r1' 'zlib>=1.4-r0' \
     && addgroup -S -g 1000 redis && adduser -S -G redis -u 999 redis \
     && mkdir /data && chown redis:redis /data
 COPY --from=upstream /usr/local/bin/ /usr/local/bin/

@@ -62,7 +62,7 @@ pwsh -NoProfile -File ./scripts/release.ps1 -BundleDirectory '.local/releases/do
 
 发布清单分别记录源引擎运行ID、配置摘要和平台清单摘要。读取可信OCI归档时逐项验证索引、清单、配置及有序层的内容地址；导入后本机ID必须属于该图中已验证的配置／平台清单身份，文件系统层顺序、平台和源码revision也必须匹配。Compose固定本机已解析的内容ID，容器再次核对实际引用。身份核验以内容图及上述字段为准。
 
-清单格式V4包含Java、Web、MySQL和Redis四个已测试、扫描的镜像；读取器仍验证V1／V2的两个应用镜像及V3的三个镜像。MySQL保持8.4.13及原入口、配置和数据目录，安装 Oracle ELSA-2026-92907 的 curl/libcurl 补丁和 [ELSA-2026-95618](https://linux.oracle.com/errata/ELSA-2026-95618.html) 的 glibc、glibc-common、glibc-minimal-langpack 补丁，下载时核对官方SHA-256，安装时校验RPM签名。Redis保留官方7.4.12二进制和入口，基础系统采用固定Alpine 3.24镜像，使用已修复CVE-2026-4738的zlib；不改变Redis持久化格式。源构建的 `MYSQL_IMAGE`、`REDIS_IMAGE` 默认为 `campuseats-mysql:v1`、`campuseats-redis:v1`，已采用制品的日常环境继续固定内容ID。
+清单格式 V4 包含 Java、Web、MySQL 和 Redis 四个已测试、扫描的镜像，读取器仍支持 V1–V3。MySQL 保持 8.4.13 及原入口、配置和数据目录，安装经 SHA-256 和 RPM 签名校验的 Oracle Linux BaseOS 更新。Redis 保留官方 7.4.12 二进制和入口，在固定 Alpine 3.24 基础上安装修复后的 zlib 与 OpenSSL 库，持久化格式保持一致。源构建的 `MYSQL_IMAGE`、`REDIS_IMAGE` 默认为 `campuseats-mysql:v1`、`campuseats-redis:v1`。日常部署以已验证制品的内容 ID 为准。
 
 已有日常库升级依赖补丁时，先停止Web／Java并独立恢复验证临时备份，保存原表原列及主键记录指纹，同时记录Redis键数量及持久化状态；从同一已验证V4归档导入依赖镜像，停止并只替换MySQL／Redis容器，复用原命名卷，禁止执行 `down -v`。健康、服务版本、原数据指纹及Redis数据核对通过后，再执行应用发布。`release.ps1` 会拒绝与V4制品身份不符的现有依赖容器；依赖升级失败时保持停写并保留临时材料。全新隔离初始化会直接选择制品内的依赖镜像。
 
