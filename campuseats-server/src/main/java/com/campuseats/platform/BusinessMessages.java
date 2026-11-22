@@ -32,6 +32,10 @@ public class BusinessMessages {
   }
 
   public void publish(long event, long order, String type) {
+    publish(event, order, type, null);
+  }
+
+  public void publish(long event, long order, String type, Long refundId) {
     var o = db.one("SELECT user_id,store_id,courier_id FROM orders WHERE id=?", order);
     if (o == null) return;
     String summary =
@@ -51,20 +55,21 @@ public class BusinessMessages {
     var at = LocalDateTime.now(clock);
     String insert =
         "INSERT IGNORE INTO"
-            + " inbox_message(event_id,recipient_type,recipient_id,order_id,store_id,event_type,summary,created_at)"
+            + " inbox_message(event_id,recipient_type,recipient_id,order_id,store_id,event_type,summary,created_at,refund_id)"
             + " ";
     db.update(
-        insert + "VALUES(?,'USER',?,?,?,?,?,?)",
+        insert + "VALUES(?,'USER',?,?,?,?,?,?,?)",
         event,
         o.get("user_id"),
         order,
         o.get("store_id"),
         type,
         summary,
-        at);
+        at,
+        refundId);
     db.update(
         insert
-            + "SELECT ?,'ADMIN',id,?,?,?,?,? FROM employee WHERE status=1 AND ((store_id=? AND role"
+            + "SELECT ?,'ADMIN',id,?,?,?,?,?,NULL FROM employee WHERE status=1 AND ((store_id=? AND role"
             + " IN('SHOP_MANAGER','OPERATOR')) OR id=?"
             + ("ORDER_EXCEPTION".equals(type) ? " OR role='PLATFORM_ADMIN'" : "")
             + ")",

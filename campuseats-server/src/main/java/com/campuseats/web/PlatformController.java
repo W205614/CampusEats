@@ -82,10 +82,13 @@ public class PlatformController {
       @RequestParam(required = false) String query,
       @RequestParam(required = false) Long categoryId,
       @RequestParam(required = false) Boolean open,
+      @RequestParam(required = false) Boolean inStock,
+      @RequestParam(required = false) Long maxPriceCents,
       @RequestParam(required = false) String cursor,
       @RequestParam(required = false) Integer limit) {
     return PlatformViewFactory.search(
-        discoveryPages.search(campusId, query, categoryId, open, cursor, limit));
+        discoveryPages.search(campusId, query, categoryId, open, cursor, limit,
+            Boolean.TRUE.equals(inStock), maxPriceCents));
   }
 
   @GetMapping("/merchant/stores")

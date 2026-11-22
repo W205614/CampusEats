@@ -21,6 +21,8 @@ const session = useSession(),
   categories = ref<{ id: string; name: string }[]>([]),
   category = ref(''),
   openFilter = ref(0),
+  stockOnly = ref(false),
+  maxPrice = ref(''),
   campusSearch = ref(false),
   matchedStores = ref<Store[]>([]),
   query = ref(''),
@@ -284,17 +286,23 @@ async function favorite(type: string, id: string, storeId = store.value?.id) {
     toast(e);
   }
 }
-function searchParams() {
+function searchParams(products = true) {
   return (
     'campusId=' +
     encodeURIComponent(campus.value) +
     '&query=' +
     encodeURIComponent(query.value.trim()) +
     '&limit=50' +
-    (openFilter.value ? '&open=' + String(openFilter.value === 1) : '')
+    (openFilter.value ? '&open=' + String(openFilter.value === 1) : '') +
+    (products && stockOnly.value ? '&inStock=true' : '') +
+    (products && maxPrice.value.trim() ? '&maxPriceCents=' + Math.round(Number(maxPrice.value) * 100) : '')
   );
 }
 async function searchCampus() {
+  if (maxPrice.value.trim() && !/^\d{1,8}(\.\d{1,2})?$/.test(maxPrice.value.trim())) {
+    toast(new Error('请输入有效的餐品价格上限，最多两位小数'));
+    return;
+  }
   menuSequence++;
   const sequence = ++searchSequence,
     token = currentSession(),
@@ -312,7 +320,7 @@ async function searchCampus() {
   try {
     const [results, shops] = await Promise.all([
       api<CursorPage<Product & { storeName?: string }>>('/search/page?' + scope),
-      api<CursorPage<Store>>('/stores/page?' + scope),
+      api<CursorPage<Store>>('/stores/page?' + searchParams(false)),
     ]);
     if (
       active &&
@@ -354,7 +362,7 @@ async function moreSearch(shops = false) {
   loading.value = true;
   try {
     const path =
-      (shops ? '/stores/page?' : '/search/page?') + scope + '&cursor=' + encodeURIComponent(cursor);
+      (shops ? '/stores/page?' + searchParams(false) : '/search/page?' + scope) + '&cursor=' + encodeURIComponent(cursor);
     if (shops) {
       const page = await api<CursorPage<Store>>(path);
       if (
@@ -568,13 +576,36 @@ onHide(() => {
         <button class="secondary small-button" @click="menu">搜本店</button>
         <button class="secondary small-button" @click="searchCampus">搜本校区</button>
       </view>
-    </view>
-    <view v-if="store" class="row" style="margin-bottom: 24rpx">
-      <view>
-        <text class="tag">{{ store.accepting ? '营业中' : '休息中' }}</text>
-        <text class="muted"> {{ store.hours?.join(' / ') }}</text>
+      <view class="row discovery-filters">
+        <button
+          class="secondary small-button"
+          :aria-pressed="stockOnly"
+          @click="stockOnly = !stockOnly; searchCampus()"
+        >{{ stockOnly ? '仅有货 ✓' : '仅有货' }}</button>
+        <input
+          class="search-input"
+          v-model="maxPrice"
+          type="digit"
+          maxlength="11"
+          aria-label="餐品价格上限（元）"
+          placeholder="餐品价格上限（元）"
+          confirm-type="search"
+          @confirm="searchCampus"
+        />
       </view>
-      <text class="tap" @click="favorite('STORE', store.id)">收藏店铺</text>
+    </view>
+    <view v-if="store" class="store-summary">
+      <view class="row">
+        <view>
+          <text class="tag">{{ store.accepting ? '营业中' : '休息中' }}</text>
+          <text class="muted"> {{ store.hours?.join(' / ') }}</text>
+        </view>
+        <text class="tap" @click="favorite('STORE', store.id)">收藏店铺</text>
+      </view>
+      <view class="muted">
+        每单配送费 ¥{{ store.deliveryFee }} · 每件包装费 ¥{{ store.packagingFee }}
+      </view>
+      <view class="muted">取餐点：{{ store.pickupPoint || '取餐点未配置' }}</view>
     </view>
     <view class="row" v-if="store" style="margin-bottom: 24rpx">
       <text class="tap" @click="nav('/pages/account/index')">领券与我的收藏</text>
@@ -616,7 +647,7 @@ onHide(() => {
           }}</view>
           <view class="muted">{{ p.description || '现做校园餐' }} · 剩余{{ p.remaining }}份</view>
           <view class="row" style="margin-top: 16rpx">
-            <text class="price">¥{{ p.promotion ? cents(p.promotion.priceCents) : p.price }}</text>
+            <text class="price">¥{{ p.promotion && Number(p.promotion.priceCents) < Number(p.price) * 100 ? cents(p.promotion.priceCents) : p.price }}</text>
             <text v-if="p.promotion" class="muted" style="text-decoration: line-through"
               >¥{{ p.price }}</text
             >
@@ -693,6 +724,19 @@ onHide(() => {
 </template>
 
 <style scoped>
+.store-summary {
+  display: grid;
+  gap: 12rpx;
+  margin-bottom: 24rpx;
+}
+.discovery-filters {
+  gap: 16rpx;
+  margin-top: 16rpx;
+}
+.search-input {
+  flex: 1;
+  min-width: 0;
+}
 .menu-nav {
   flex-wrap: wrap;
   margin-bottom: 24rpx;

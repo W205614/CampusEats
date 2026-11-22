@@ -51,7 +51,7 @@ public class ApiAdvice implements ResponseBodyAdvice<Object> {
 
   @ExceptionHandler(BusinessException.class)
   ResponseEntity<?> business(BusinessException e) {
-    return error(e.status(), e.code(), e.getMessage());
+    return error(e.status(), e.code(), e.getMessage(), wire(e.data()));
   }
 
   @ExceptionHandler({
@@ -116,6 +116,10 @@ public class ApiAdvice implements ResponseBodyAdvice<Object> {
   }
 
   private ResponseEntity<?> error(int status, String code, String message) {
+    return error(status, code, message, null);
+  }
+
+  private ResponseEntity<?> error(int status, String code, String message, Object data) {
     return ResponseEntity.status(status)
         .headers(
             headers -> {
@@ -123,7 +127,7 @@ public class ApiAdvice implements ResponseBodyAdvice<Object> {
             })
         .body(
             new ApiResponse<>(
-                code, message, null, String.valueOf(request.getAttribute("requestId"))));
+                code, message, data, String.valueOf(request.getAttribute("requestId"))));
   }
 
   public static Object wire(Object value) {

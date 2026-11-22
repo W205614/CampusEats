@@ -38,7 +38,9 @@ public class QuotaService {
             product.get("default_quota"));
         changed = reserveExisting(date, dish, qty);
       }
-      require(changed == 1, 409, "SOLD_OUT", "剩余份数不足，请调整购物车");
+      if (changed != 1)
+        throw new com.campuseats.common.BusinessException(
+            409, "SOLD_OUT", "剩余份数不足，请调整购物车", Long.toString(dish));
       db.update(
           "INSERT INTO order_reservation(order_id,dish_id,business_date,quantity,state)"
               + " VALUES(?,?,?,?,'RESERVED')",

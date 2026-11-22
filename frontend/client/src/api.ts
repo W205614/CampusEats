@@ -93,6 +93,7 @@ export function api<T>(
                 result.message || '服务暂不可用',
                 result.requestId || '',
                 response.statusCode,
+                result.data,
               ),
             );
           }

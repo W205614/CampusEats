@@ -97,10 +97,20 @@ public class DiscoveryPages {
 
   public Page search(
       long campus, String query, Long category, Boolean open, String cursor, Integer limit) {
+    return search(campus, query, category, open, cursor, limit, false, null);
+  }
+
+  public Page search(
+      long campus, String query, Long category, Boolean open, String cursor, Integer limit,
+      boolean inStock, Long maxPriceCents) {
     int size = limit(limit);
     query = query(query);
     require(campus > 0 && (category == null || category > 0), 400, "INVALID_QUERY", "搜索范围不正确");
-    String scope = scope("search", campus, query, category, open);
+    require(maxPriceCents == null || (maxPriceCents >= 0 && maxPriceCents <= 9999999999L),
+        400, "INVALID_QUERY", "餐品价格上限不正确");
+    String scope = inStock || maxPriceCents != null
+        ? scope("search", campus, query, category, open, inStock, maxPriceCents)
+        : scope("search", campus, query, category, open);
     var position = cursors.decode(cursor, scope);
     var at = now();
     var params = parameters(query, open, at);
@@ -110,6 +120,8 @@ public class DiscoveryPages {
     params.put("afterId", position.id());
     params.put("fetchLimit", size + 1);
     if (category != null) params.put("category", category);
+    if (inStock) params.put("date", at.toLocalDate());
+    if (maxPriceCents != null) params.put("maxPrice", maxPriceCents);
     var branches = new ArrayList<String>();
     for (int rank = 0; rank < 2; rank++) {
       String type = rank == 0 ? "DISH" : "SETMEAL";
@@ -141,6 +153,12 @@ public class DiscoveryPages {
               + " AND (LOCATE(CAST(:query AS BINARY),CAST(p.name AS BINARY))>0"
               + " OR LOCATE(CAST(:query AS BINARY),CAST(s.name AS BINARY))>0)"
               + openFilter(open)
+              + (inStock ? stockFilter(rank == 0) : "")
+              + (maxPriceCents == null ? "" :
+                  " AND LEAST(p.price*100,COALESCE((SELECT a.price_cents FROM promotion a"
+                      + " WHERE a.store_id=p.store_id AND a.item_type='" + type + "' AND a.item_id=p.id"
+                      + " AND a.enabled=true AND a.starts_at<=:at AND a.ends_at>:at ORDER BY a.id LIMIT 1),"
+                      + " p.price*100))<=:maxPrice")
               + " ORDER BY p.store_id,p.id LIMIT :fetchLimit)");
     }
     var rows =
@@ -161,6 +179,18 @@ public class DiscoveryPages {
                   Db.id(last, "store_id"), Db.integer(last, "item_rank"), Db.id(last, "id")));
     }
     return new Page(catalog.searchDetails(selected, at), next, more);
+  }
+
+  private static String stockFilter(boolean dish) {
+    if (dish)
+      return " AND COALESCE((SELECT q.total-q.reserved-q.consumed FROM daily_quota q"
+          + " WHERE q.dish_id=p.id AND q.business_date=:date),p.default_quota)>0";
+    return " AND EXISTS(SELECT 1 FROM setmeal_dish sd WHERE sd.setmeal_id=p.id)"
+        + " AND NOT EXISTS(SELECT 1 FROM setmeal_dish sd"
+        + " LEFT JOIN dish d ON d.id=sd.dish_id"
+        + " LEFT JOIN daily_quota q ON q.dish_id=d.id AND q.business_date=:date"
+        + " WHERE sd.setmeal_id=p.id AND (d.id IS NULL OR d.status<>1 OR"
+        + " COALESCE(q.total,d.default_quota)-COALESCE(q.reserved,0)-COALESCE(q.consumed,0)<sd.copies))";
   }
 
   private void decorateStores(List<Map<String, Object>> rows, LocalDateTime at) {

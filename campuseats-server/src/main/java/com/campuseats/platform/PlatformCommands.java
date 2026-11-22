@@ -25,7 +25,8 @@ public final class PlatformCommands {
                           "([01][0-9]|2[0-3]):[0-5][0-9]-(?:([01][0-9]|2[0-3]):[0-5][0-9]|24:00)")
                   String>
               hours,
-      @Size(max = 20) String phone) {}
+      @Size(max = 20) String phone,
+      @Size(max = 160) String pickupPoint) {}
 
   public record Staff(
       @NotBlank @Size(max = 32) String username,

@@ -4,6 +4,7 @@ export class ApiError extends Error {
     message: string,
     public requestId: string,
     public status: number,
+    public data?: unknown,
   ) {
     super(message);
   }

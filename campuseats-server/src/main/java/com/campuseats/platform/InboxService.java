@@ -16,6 +16,7 @@ public class InboxService {
       String orderId,
       String storeId,
       String eventType,
+      String refundId,
       String summary,
       LocalDateTime createdAt,
       LocalDateTime readAt) {}
@@ -79,6 +80,7 @@ public class InboxService {
                     r.get("order_id").toString(),
                     r.get("store_id").toString(),
                     r.get("event_type").toString(),
+                    Objects.toString(r.get("refund_id"), null),
                     r.get("summary").toString(),
                     Db.time(r.get("created_at")),
                     r.get("read_at") == null ? null : Db.time(r.get("read_at"))));

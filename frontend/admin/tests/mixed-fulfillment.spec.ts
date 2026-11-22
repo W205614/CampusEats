@@ -40,6 +40,7 @@ test('browser cross-campus mixed fulfillment preserves coupon cents, repeated pa
     mainA: '尾差活动餐-' + suffix,
     sideA: '尾差配菜-' + suffix,
     mainB: '南校自取餐-' + suffix,
+    pickupPoint: '南校食堂 2 楼 6 号窗口',
     shopA: '北店301分券-' + suffix,
     shopB: '南店113分券-' + suffix,
     platform: '平台778分券-' + suffix,
@@ -184,10 +185,11 @@ test('browser cross-campus mixed fulfillment preserves coupon cents, repeated pa
           name: index ? names.storeB : names.storeA,
           enabled: true,
           open: true,
-          deliveryFeeCents: index ? 999 : 601,
+          deliveryFeeCents: index ? 999 : 501,
           packagingFeeCents: index ? 41 : 37,
           hours: ['00:00-24:00'],
           phone: '13800000000',
+          pickupPoint: index ? names.pickupPoint : '',
         }),
       );
     }
@@ -329,6 +331,24 @@ test('browser cross-campus mixed fulfillment preserves coupon cents, repeated pa
       await expect(
         customer.getByText((index ? names.storeB : names.storeA) + ' ▾', { exact: true }),
       ).toBeVisible();
+      if (!index) {
+        await expect(customer.getByText('每单配送费 ¥5.01', { exact: false })).toBeVisible();
+        await choose(
+          customer,
+          customer.getByText('校区筛选：本校区全部店铺 ▾', { exact: true }),
+          '仅营业中',
+        );
+        await customer.locator('.discovery-filters input').fill('10');
+        const filtered = customer.waitForResponse((response) =>
+          response.url().includes('/user/search/page?') &&
+          response.url().includes('inStock=true') &&
+          response.url().includes('maxPriceCents=1000'),
+        );
+        await customer.getByText('仅有货', { exact: true }).click();
+        const result = await (await filtered).json();
+        expect(result.data.records.map((p: { name: string }) => p.name)).toContain(names.mainA);
+        await customer.getByText('进入店铺', { exact: true }).click();
+      }
       for (const product of products.filter((p) => p.storeId === stores[index].id)) {
         const meal = customer
           .locator('uni-view.card')
@@ -427,9 +447,30 @@ test('browser cross-campus mixed fulfillment preserves coupon cents, repeated pa
     await choose(customer, delivery.getByText('店铺优惠券：', { exact: false }), names.shopA);
     await choose(customer, pickup.getByText('店铺优惠券：', { exact: false }), names.shopB);
     await choose(customer, customer.getByText('平台优惠券：', { exact: false }), names.platform);
-    const quote = await postUI<Quote>(customer, '/user/checkouts/preview', () =>
+    const originalQuote = await postUI<Quote>(customer, '/user/checkouts/preview', () =>
       customer.getByText('计算报价', { exact: true }).click(),
     );
+    expect(originalQuote.totalCents).toBe('5653');
+    await expect(customer.getByText('取餐点：' + names.pickupPoint, { exact: true })).toBeVisible();
+    await call(request, '/merchant/stores/' + storeA.id, token, 'PUT', {
+      campusId: campuses[0].id, name: names.storeA, enabled: true, open: true,
+      deliveryFeeCents: 601, packagingFeeCents: 37, hours: ['00:00-24:00'], phone: '13800000000',
+    });
+    const quoteChanged = customer.waitForResponse((r) =>
+      new URL(r.url()).pathname === '/api/v1/user/checkouts' && r.status() === 409,
+    );
+    const quote = await postUI<Quote>(customer, '/user/checkouts/preview', () =>
+      customer.getByText('提交订单，随后付款', { exact: true }).click(),
+    );
+    expect((await (await quoteChanged).json()).code).toBe('QUOTE_CHANGED');
+    const changes = customer.locator('.quote-changes');
+    await expect(changes.getByText('原合计 ¥56.53，现合计 ¥57.53', { exact: true })).toBeVisible();
+    const changedStore = changes.locator('.quote-store-change');
+    await expect(changedStore).toHaveCount(1);
+    await expect(changedStore.getByText(names.storeA, { exact: true })).toBeVisible();
+    await expect(changedStore.getByText('多付 ¥1.00', { exact: true })).toBeVisible();
+    await expect(delivery.getByText(names.building + ' MIXED-401 合单验收用户 ▾', { exact: true })).toBeVisible();
+    await expect(pickup.getByText('到店自取 ▾', { exact: true })).toBeVisible();
     // Independently calculated literal cents: A shop 301 -> line discounts 244/57;
     // platform 778 * [2753,646,2301] / 5700 -> floors [375,88,314], largest remainder gives A main +1.
     expect(quote.totalCents).toBe('5753');
@@ -472,9 +513,18 @@ test('browser cross-campus mixed fulfillment preserves coupon cents, repeated pa
       name: 'three lines, two shop coupons, platform largest remainder allocation',
       quote,
     });
-    const checkout = await postUI<Checkout>(customer, '/user/checkouts', () =>
-      customer.getByText('提交订单，随后付款', { exact: true }).click(),
-    );
+    let createdCheckout: Checkout | undefined;
+    await customer.route('**/api/v1/user/checkouts', async (route) => {
+      const committed = await route.fetch();
+      const result = await committed.json();
+      if (committed.ok()) createdCheckout = result.data as Checkout;
+      await route.abort('failed');
+    }, { times: 1 });
+    await customer.getByText('提交订单，随后付款', { exact: true }).click();
+    await expect(customer.getByText('上次提交结果尚未确认，请先恢复查询。')).toBeVisible();
+    await expect.poll(() => createdCheckout?.id).toBeTruthy();
+    const checkout = createdCheckout!;
+    await customer.getByText('查询并恢复原请求', { exact: true }).click();
     const payment = customer
       .locator('uni-view.card')
       .filter({ has: customer.getByText('待支付结算单 ' + checkout.id, { exact: true }) });
@@ -494,6 +544,13 @@ test('browser cross-campus mixed fulfillment preserves coupon cents, repeated pa
     expect(bOrder.paidCents).toBe('2069');
     expect(aOrder.details.map((d) => d.lineTotalCents)).toEqual(['2377', '558']);
     expect(bOrder.details[0].lineTotalCents).toBe('1987');
+    expect(bOrder.pickupPoint).toBe(names.pickupPoint);
+    await call(request, '/merchant/stores/' + storeB.id, token, 'PUT', {
+      campusId: campuses[1].id, name: names.storeB, enabled: true, open: true,
+      deliveryFeeCents: 999, packagingFeeCents: 41, hours: ['00:00-24:00'],
+      phone: '13800000000', pickupPoint: '南校食堂 1 楼新窗口',
+    });
+    await denied(customer, userSession, '/user/orders/' + bId, 404);
     for (const store of stores)
       expect(
         (await call<Cart>(request, '/user/stores/' + store.id + '/cart', u)).items,
@@ -523,6 +580,17 @@ test('browser cross-campus mixed fulfillment preserves coupon cents, repeated pa
           manager.page.getByRole('button', { name: label, exact: true }).click(),
         );
     }
+    await customer.goto('/app/pages/orders/index');
+    const group = customer.locator('.order-group').filter({ hasText: '合并订单 · ' + checkout.id });
+    await expect(group.locator('.order-store')).toHaveCount(2);
+    await expect(group.getByText('待安排配送', { exact: true })).toBeVisible();
+    await expect(group.getByText('可取餐', { exact: true })).toBeVisible();
+    await customer.getByText('站内消息', { exact: true }).click();
+    await customer.locator('.message-card')
+      .filter({ has: customer.getByText('订单 ID：' + bId, { exact: true }) })
+      .filter({ hasText: '餐品已备好' }).getByText('查看订单', { exact: true }).click();
+    await expect(customer.getByText('取餐点：' + names.pickupPoint, { exact: true })).toBeVisible();
+    await expect(customer.getByText('取餐码：', { exact: false })).toBeVisible();
     await denied(managerA.page, managerA.session, '/merchant/orders/' + bId, 403);
     await denied(managerB.page, managerB.session, '/merchant/orders/' + aId, 403);
     await denied(managerA.page, managerA.session, '/merchant/stores/' + storeB.id + '/orders', 403);
@@ -721,6 +789,19 @@ test('browser cross-campus mixed fulfillment preserves coupon cents, repeated pa
     await expect.poll(async () => (await getA()).refundedCents, { timeout: 20000 }).toBe('3684');
     const finalA = await getA();
     const finalB = await getB();
+    await customer.goto('/app/pages/messages/index');
+    const refundMessages = customer.locator('.message-card')
+      .filter({ has: customer.getByText('订单 ID：' + aId, { exact: true }) })
+      .filter({ hasText: '退款已完成' });
+    await expect(refundMessages).toHaveCount(3);
+    for (const [index, amount] of [[2, '7.93'], [1, '7.92']] as const) {
+      await refundMessages.nth(index).getByText('查看退款', { exact: true }).click();
+      await expect(customer.getByText('本次退款', { exact: true })).toBeVisible();
+      await expect(customer.getByText('退款 ¥' + amount, { exact: false })).toBeVisible();
+      await expect(customer.getByText(names.mainA + ' × 1', { exact: true })).toBeVisible();
+      await expect(customer.locator('.refund')).toHaveCount(1);
+      await customer.goto('/app/pages/messages/index');
+    }
     expect(finalA.status).toBe(5);
     expect(
       finalA.details.map((d) => [d.lineTotalCents, d.refundedQuantity, d.reservedQuantity]),
@@ -762,7 +843,7 @@ test('browser cross-campus mixed fulfillment preserves coupon cents, repeated pa
       isolationChecks: isolation.length,
     });
     expect(pageErrors).toEqual([]);
-    expect(httpErrors).toEqual([]);
+    expect(httpErrors).toEqual([{ path: '/api/v1/user/checkouts', status: 409 }]);
   } catch (error) {
     for (let index = 0; index < contexts.length; index++) {
       const page = contexts[index].pages()[0];

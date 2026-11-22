@@ -4,14 +4,13 @@ import { onShow, onHide, onUnload } from '@dcloudio/uni-app';
 import { api, toast, loggedIn } from '../../api';
 import { useSession } from '../../stores/session';
 import { usePagedList } from '../../paged-list';
-interface Message {
-  id: string;
-  orderId: string;
-  storeId: string;
-  eventType: string;
-  summary: string;
-  createdAt: string;
-  readAt?: string | null;
+import type { components } from '../../../../contracts/openapi';
+type Message = Required<Pick<components['schemas']['Message'], 'id' | 'orderId' | 'eventType' | 'summary' | 'createdAt'>> &
+  Pick<components['schemas']['Message'], 'readAt' | 'refundId'>;
+function target(row: Message) {
+  if (row.eventType === 'ORDER_REFUNDED') return 'refund';
+  if (row.eventType === 'ORDER_READY') return 'pickup';
+  return 'order';
 }
 const session = useSession(),
   unreadOnly = ref(false),
@@ -56,9 +55,12 @@ async function mark(row: Message, open = false) {
     if (!active || token !== session.session?.token) return;
     row.readAt = row.readAt || new Date().toISOString();
     await count();
-    if (open && active && token === session.session?.token)
-      uni.switchTab({ url: '/pages/orders/index' });
-    else if (unreadOnly.value) await list.load();
+    if (open && active && token === session.session?.token) {
+      uni.navigateTo({
+        url: '/pages/order-detail/index?id=' + encodeURIComponent(row.orderId) +
+          '&target=' + target(row) + (row.refundId ? '&refundId=' + encodeURIComponent(row.refundId) : ''),
+      });
+    } else if (unreadOnly.value) await list.load();
   } catch (e) {
     if (active && token === session.session?.token) toast(e);
   } finally {
@@ -124,7 +126,7 @@ onUnload(hide);
           >标记已读</button
         >
         <button class="primary small-button" :disabled="busy" @click="mark(row, true)"
-          >前往我的订单</button
+          >{{ target(row) === 'refund' ? '查看退款' : '查看订单' }}</button
         >
       </view>
     </view>

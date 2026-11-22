@@ -104,6 +104,7 @@ public class DirectoryService {
   public long store(Long id, PlatformCommands.Store input) {
     if (id == null) scope.platform();
     else scope.merchant(id, true);
+    String pickupPoint = input.pickupPoint() == null ? null : input.pickupPoint().strip();
     boolean platform = Actor.current().role().equals("PLATFORM_ADMIN");
     var campus = db.one("SELECT * FROM campus WHERE id=? FOR SHARE", input.campusId());
     require(campus != null, 400, "INVALID_CAMPUS", "校区不存在");
@@ -122,8 +123,8 @@ public class DirectoryService {
         id == null
             ? db.insert(
                 "INSERT INTO"
-                    + " store(campus_id,name,enabled,open,delivery_fee,packaging_fee,hours,phone)"
-                    + " VALUES(?,?,?,?,?,?,?,?)",
+                    + " store(campus_id,name,enabled,open,delivery_fee,packaging_fee,hours,phone,pickup_point)"
+                    + " VALUES(?,?,?,?,?,?,?,?,?)",
                 input.campusId(),
                 input.name(),
                 input.enabled(),
@@ -131,12 +132,13 @@ public class DirectoryService {
                 Money.decimal(input.deliveryFeeCents()),
                 Money.decimal(input.packagingFeeCents()),
                 json.write(input.hours()),
-                input.phone() == null ? "" : input.phone())
+                input.phone() == null ? "" : input.phone(),
+                pickupPoint)
             : id;
     if (id != null && platform)
       db.update(
           "UPDATE store SET"
-              + " name=?,enabled=?,open=?,delivery_fee=?,packaging_fee=?,hours=?,phone=?,version=version+1"
+              + " name=?,enabled=?,open=?,delivery_fee=?,packaging_fee=?,hours=?,phone=?,pickup_point=COALESCE(?,pickup_point),version=version+1"
               + " WHERE id=?",
           input.name(),
           input.enabled(),
@@ -145,12 +147,13 @@ public class DirectoryService {
           Money.decimal(input.packagingFeeCents()),
           json.write(input.hours()),
           input.phone() == null ? "" : input.phone(),
+          pickupPoint,
           id);
     else if (id != null)
       // A merchant never writes platform-owned availability, even from a stale settings form.
       db.update(
           "UPDATE store SET"
-              + " name=?,open=?,delivery_fee=?,packaging_fee=?,hours=?,phone=?,version=version+1"
+              + " name=?,open=?,delivery_fee=?,packaging_fee=?,hours=?,phone=?,pickup_point=COALESCE(?,pickup_point),version=version+1"
               + " WHERE id=?",
           input.name(),
           input.open(),
@@ -158,6 +161,7 @@ public class DirectoryService {
           Money.decimal(input.packagingFeeCents()),
           json.write(input.hours()),
           input.phone() == null ? "" : input.phone(),
+          pickupPoint,
           id);
     scope.audit("STORE_SAVE", target, target, "更新店铺及营业规则");
     return target;

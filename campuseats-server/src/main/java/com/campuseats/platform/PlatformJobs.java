@@ -195,7 +195,7 @@ public class PlatformJobs {
                     + " WHERE id=?",
                 now(),
                 current.get("id"));
-            scope.event(Db.id(order, "id"), "ORDER_REFUNDED");
+            scope.event(Db.id(order, "id"), "ORDER_REFUNDED", Db.id(current, "id"));
             ledger.refund(Db.id(current, "id"));
             db.update(
                 "INSERT INTO"

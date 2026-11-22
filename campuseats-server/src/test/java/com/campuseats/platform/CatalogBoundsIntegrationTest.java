@@ -109,6 +109,37 @@ class CatalogBoundsIntegrationTest {
   }
 
   @Test
+  void affordableInStockSearchFiltersBeforePagingAndBindsFiltersToCursor() {
+    long sold = db.insert(
+        "INSERT INTO dish(store_id,category_id,name,price,status,default_quota) VALUES(?,?,'售罄餐',5,1,0)",
+        store, dishes);
+    long discounted = db.insert(
+        "INSERT INTO dish(store_id,category_id,name,price,status,default_quota) VALUES(?,?,'活动餐',25,1,3)",
+        store, dishes);
+    db.update(
+        "INSERT INTO promotion(store_id,item_type,item_id,price_cents,starts_at,ends_at)"
+            + " VALUES(?,'DISH',?,1800,'2000-01-01','2099-01-01')",
+        store, discounted);
+    long soldMeal = db.insert(
+        "INSERT INTO setmeal(store_id,category_id,name,price,status) VALUES(?,?,'缺货套餐',15,1)",
+        store, setmeals);
+    long availableMeal = db.insert(
+        "INSERT INTO setmeal(store_id,category_id,name,price,status) VALUES(?,?,'有货套餐',20,1)",
+        store, setmeals);
+    db.update("INSERT INTO setmeal_dish(setmeal_id,dish_id,copies) VALUES(?,?,1)", soldMeal, sold);
+    db.update("INSERT INTO setmeal_dish(setmeal_id,dish_id,copies) VALUES(?,?,2)", availableMeal, discounted);
+
+    var first = pages.search(campus, "", null, true, null, 1, true, 2000L);
+    assertEquals(List.of("活动餐"), first.records().stream().map(r -> r.get("name")).toList());
+    assertTrue(first.hasMore());
+    var next = pages.search(campus, "", null, true, first.nextCursor(), 1, true, 2000L);
+    assertEquals(List.of("有货套餐"), next.records().stream().map(r -> r.get("name")).toList());
+    assertFalse(next.hasMore());
+    assertThrows(BusinessException.class,
+        () -> pages.search(campus, "", null, true, first.nextCursor(), 1, true, 1800L));
+  }
+
+  @Test
   void concurrentDishAndSetmealCreationShareTheLastSlotIncludingDisabledItems() throws Exception {
     seed("dish", dishes, 498, i -> "原菜品" + i);
     seed("setmeal", setmeals, 1, i -> "原套餐");

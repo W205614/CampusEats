@@ -104,6 +104,10 @@ public class PlatformScope {
   }
 
   public void event(long order, String type) {
+    event(order, type, null);
+  }
+
+  public void event(long order, String type, Long refundId) {
     var ownership = db.one("SELECT store_id,campus_id FROM orders WHERE id=?", order);
     long event =
         db.insert(
@@ -116,7 +120,7 @@ public class PlatformScope {
             ownership.get("store_id"),
             ownership.get("campus_id"));
     if (stages != null) stages.sync(order);
-    if (messages != null) messages.publish(event, order, type);
+    if (messages != null) messages.publish(event, order, type, refundId);
   }
 
   public static String table(String type) {

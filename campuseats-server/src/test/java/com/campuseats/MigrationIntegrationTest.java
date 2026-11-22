@@ -90,14 +90,18 @@ class MigrationIntegrationTest {
     var originalColumns = businessColumns(url);
     var originalRows = originalRows(url, originalColumns);
     var flyway = Flyway.configure().dataSource(url, "root", "test").load();
-    assertEquals(12, flyway.migrate().migrationsExecuted);
-    assertEquals("24", flyway.info().current().getVersion().toString());
+    assertEquals(13, flyway.migrate().migrationsExecuted);
+    assertEquals("25", flyway.info().current().getVersion().toString());
     assertEquals(
         originalRows,
         originalRows(url, originalColumns),
         "Every original business field and row is preserved");
     try (var c = DriverManager.getConnection(url, "root", "test");
         var s = c.createStatement()) {
+      try (var rows = s.executeQuery("SELECT pickup_point FROM orders WHERE id=31")) {
+        assertTrue(rows.next());
+        assertNull(rows.getString(1));
+      }
       try (var rows = s.executeQuery("SELECT COUNT(*) FROM finance_opening")) {
         rows.next();
         assertEquals(3, rows.getLong(1));

@@ -2019,6 +2019,16 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "结算条件变化",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutError"
+                }
+              }
+            }
           }
         },
         "security": [
@@ -2285,6 +2295,16 @@
                     "message",
                     "requestId"
                   ]
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "结算条件变化",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckoutError"
                 }
               }
             }
@@ -6272,6 +6292,23 @@
             "required": false,
             "schema": {
               "type": "boolean"
+            }
+          },
+          {
+            "name": "inStock",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean"
+            }
+          },
+          {
+            "name": "maxPriceCents",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "pattern": "^[0-9]+$"
             }
           },
           {
@@ -11928,6 +11965,11 @@
             "type": "string",
             "maxLength": 20,
             "minLength": 0
+          },
+          "pickupPoint": {
+            "type": "string",
+            "maxLength": 160,
+            "minLength": 0
           }
         },
         "required": [
@@ -12369,6 +12411,40 @@
           "fulfillment"
         ]
       },
+      "CheckoutError": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "data": {
+            "$ref": "#/components/schemas/CheckoutIssue"
+          },
+          "requestId": {
+            "type": "string"
+          }
+        }
+      },
+      "CheckoutIssue": {
+        "type": "object",
+        "properties": {
+          "storeId": {
+            "type": "string"
+          },
+          "cartItemIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "couponId": {
+            "type": "string"
+          }
+        }
+      },
       "Create": {
         "type": "object",
         "properties": {
@@ -12480,6 +12556,9 @@
             "pattern": "^[0-9]+$"
           },
           "fulfillment": {
+            "type": "string"
+          },
+          "pickupPoint": {
             "type": "string"
           },
           "addressId": {
@@ -13267,6 +13346,9 @@
           },
           "accepting": {
             "type": "boolean"
+          },
+          "pickupPoint": {
+            "type": "string"
           }
         }
       },
@@ -13738,6 +13820,18 @@
           "pickupCode": {
             "type": "string"
           },
+          "pickupPoint": {
+            "type": "string"
+          },
+          "stage": {
+            "type": "string"
+          },
+          "stageDeadlineAt": {
+            "type": "string"
+          },
+          "stageOverdue": {
+            "type": "boolean"
+          },
           "pickupAttempts": {
             "type": "integer",
             "format": "int32"
@@ -13771,6 +13865,18 @@
           },
           "reviewed": {
             "type": "boolean"
+          }
+        }
+      },
+      "RefundItemResponse": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "quantity": {
+            "type": "integer",
+            "format": "int32"
           }
         }
       },
@@ -13816,6 +13922,12 @@
           },
           "successTimeSource": {
             "type": "string"
+          },
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RefundItemResponse"
+            }
           }
         }
       },
@@ -13857,6 +13969,9 @@
             "type": "string"
           },
           "eventType": {
+            "type": "string"
+          },
+          "refundId": {
             "type": "string"
           },
           "summary": {

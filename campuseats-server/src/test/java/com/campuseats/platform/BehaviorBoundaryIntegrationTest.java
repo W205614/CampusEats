@@ -103,7 +103,7 @@ class BehaviorBoundaryIntegrationTest {
 
   private PlatformCommands.Store settings(boolean enabled, String name) {
     return new PlatformCommands.Store(
-        campus, name, enabled, true, 600, 100, List.of("00:00-24:00"), "");
+        campus, name, enabled, true, 600, 100, List.of("00:00-24:00"), "", null);
   }
 
   @Test

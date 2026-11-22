@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue';
+import { computed, ref, watch } from 'vue';
 import { onShow, onHide, onUnload } from '@dcloudio/uni-app';
 import { api, toast, loggedIn, confirm, base, ApiError } from '../../api';
 import { useSession } from '../../stores/session';
@@ -9,6 +9,7 @@ import {
   cents,
   states,
   orderStatus,
+  fulfillmentStageLabels,
   type Order,
   type Checkout,
   type Aftersale,
@@ -30,7 +31,22 @@ const session = useSession(),
   images = ref<string[]>([]),
   busy = ref(false),
   loading = ref(false),
-  hasMore = ref(false);
+  hasMore = ref(false),
+  sessionError = ref('');
+const orderGroups = computed(() => {
+  const groups = new Map<string, { key: string; checkoutId?: string; orders: Order[] }>();
+  for (const order of orders.value) {
+    const checkoutId = order.checkoutId || undefined;
+    const key = checkoutId ? 'checkout-' + checkoutId : 'order-' + order.id;
+    let group = groups.get(key);
+    if (!group) {
+      group = { key, checkoutId, orders: [] };
+      groups.set(key, group);
+    }
+    group.orders.push(order);
+  }
+  return [...groups.values()];
+});
 const paymentMode = ref(''),
   activePayment = ref<PaymentView>(),
   qrImage = ref('');
@@ -61,6 +77,7 @@ watch(
     sessionVersion++;
     loadSequence++;
     orders.value = [];
+    sessionError.value = '';
     activePayment.value = undefined;
     qrImage.value = '';
     checkouts.value = [];
@@ -124,12 +141,11 @@ async function load(pages = loadedPages, afterAction = false) {
     loadedPages = pages;
     if (chosen.value) chosen.value = orders.value.find((o) => o.id === chosen.value?.id);
   } catch (e) {
-    if (
-      visible &&
-      ((owner === sessionVersion && sequence === loadSequence) ||
-        (!session.session && e instanceof ApiError && e.status === 401))
-    )
+    if (visible && !session.session && e instanceof ApiError && e.status === 401) {
+      sessionError.value = e.message;
+    } else if (visible && owner === sessionVersion && sequence === loadSequence) {
       toast(e);
+    }
   } finally {
     if (owner === sessionVersion && sequence === loadSequence) loading.value = false;
   }
@@ -174,6 +190,9 @@ async function searchRequests(clear = false) {
 }
 const loadMore = () => load(loadedPages + 1);
 const refresh = () => load(1);
+function openMessages() {
+  if (loggedIn()) uni.navigateTo({ url: '/pages/messages/index' });
+}
 async function pay(c: Checkout) {
   if (!visible || busy.value || loading.value || requestsLoading.value || !paymentMode.value)
     return;
@@ -415,7 +434,10 @@ onUnload(stop);
   <view class="screen">
     <view class="row">
       <view class="title">我的订单</view>
-      <text class="tap" @click="refresh">重新加载</text>
+      <view class="order-header-actions">
+        <button class="secondary small-button" @click="openMessages">站内消息</button>
+        <text class="tap" @click="refresh">重新加载</text>
+      </view>
     </view>
     <view class="subtitle"
       >合单支付，店铺分别履约。{{
@@ -454,53 +476,64 @@ onUnload(stop);
         </button>
       </view>
     </view>
-    <view class="card" v-for="o in orders" :key="o.id">
-      <view class="row">
-        <text>{{ o.campusName }} · {{ o.storeName }}</text>
-        <text class="tag">{{ orderStatus[o.status] }}</text>
-      </view>
-      <view class="muted">{{ o.number }} · {{ o.fulfillment === 'PICKUP' ? '自取' : '配送' }}</view>
-      <view v-for="d in o.details" :key="d.id" style="margin-top: 14rpx"
-        >{{ d.name }} × {{ d.number }}</view
-      >
-      <view class="row" style="margin-top: 20rpx">
-        <text>应付 ¥{{ o.amount }}</text>
-        <text v-if="Number(o.refundedCents)">已退 ¥{{ cents(o.refundedCents) }}</text>
-      </view>
-      <view class="notice" v-if="o.pickupCode && o.status === 3"
-        >取餐码：<text style="font-size: 40rpx; font-weight: bold">{{ o.pickupCode }}</text>
-        <view>到店后向员工出示，核销后完成订单。</view>
-      </view>
-      <view class="row" style="margin-top: 24rpx; flex-wrap: wrap; gap: 12rpx">
-        <button
-          v-if="[2, 3, 4].includes(o.status)"
-          class="secondary small-button"
-          @click="remind(o)"
-          >催单</button
+    <view v-for="group in orderGroups" :key="group.key" :class="{ 'order-group': group.checkoutId }">
+      <view v-if="group.checkoutId" class="section-title">合并订单 · {{ group.checkoutId }}</view>
+      <view v-for="o in group.orders" :key="o.id" class="card order-store">
+        <view class="row">
+          <text>{{ o.campusName }} · {{ o.storeName }}</text>
+          <text class="tag">{{ (o.stage && fulfillmentStageLabels[o.stage]) || orderStatus[o.status] }}</text>
+        </view>
+        <view class="muted">{{ o.number }} · {{ o.fulfillment === 'PICKUP' ? '自取' : '配送' }}</view>
+        <view v-for="d in o.details" :key="d.id" style="margin-top: 14rpx"
+          >{{ d.name }} × {{ d.number }}</view
         >
-        <button v-if="[5, 6].includes(o.status)" class="secondary small-button" @click="reorder(o)"
-          >再来一单</button
+        <view class="row" style="margin-top: 20rpx">
+          <text>应付 ¥{{ o.amount }}</text>
+          <text v-if="Number(o.refundedCents)">已退 ¥{{ cents(o.refundedCents) }}</text>
+        </view>
+        <view class="notice" v-if="o.stageOverdue && o.stage && fulfillmentStageLabels[o.stage]">
+          {{ o.stage === 'SELF_PICKUP' ? '已超过取餐时限，可先向店铺确认' : fulfillmentStageLabels[o.stage] + ' · 已超时' }}
+        </view>
+        <view v-if="o.fulfillment === 'PICKUP' && !(o.pickupCode && o.status === 3)" class="muted">
+          取餐点：{{ o.pickupPoint || '取餐点未配置' }}
+        </view>
+        <view class="notice" v-if="o.pickupCode && o.status === 3"
+          >取餐码：<text style="font-size: 40rpx; font-weight: bold">{{ o.pickupCode }}</text>
+          <view>取餐点：{{ o.pickupPoint || '取餐点未配置' }}</view>
+          <view>到店后向员工出示，核销后完成订单。</view>
+        </view>
+        <view class="row" style="margin-top: 24rpx; flex-wrap: wrap; gap: 12rpx">
+          <button
+            v-if="[2, 3, 4].includes(o.status)"
+            class="secondary small-button"
+            @click="remind(o)"
+            >催单</button
+          >
+          <button v-if="[5, 6].includes(o.status)" class="secondary small-button" @click="reorder(o)"
+            >再来一单</button
+          >
+          <button v-if="o.status === 2" class="secondary small-button" @click="show(o, 'DIRECT')">
+            取消订单</button
+          >
+          <button v-if="o.status === 3" class="secondary small-button" @click="show(o, 'CANCEL')">
+            申请取消</button
+          >
+          <template v-if="o.status === 5">
+            <button class="secondary small-button" @click="show(o, 'PARTIAL')">部分退款</button>
+            <button class="secondary small-button" @click="show(o, 'FULL')">整单退款</button>
+            <text v-if="o.reviewed" class="muted">已评价</text>
+            <button v-else class="secondary small-button" @click="show(o, 'REVIEW')">
+              评价订单
+            </button>
+          </template>
+        </view>
+        <view class="muted" v-for="r in o.refunds" :key="r.id"
+          >退款 ¥{{ cents(r.amountCents) }} · {{ states[r.state] || r.state }}</view
         >
-        <button v-if="o.status === 2" class="secondary small-button" @click="show(o, 'DIRECT')">
-          取消订单</button
-        >
-        <button v-if="o.status === 3" class="secondary small-button" @click="show(o, 'CANCEL')">
-          申请取消</button
-        >
-        <template v-if="o.status === 5">
-          <button class="secondary small-button" @click="show(o, 'PARTIAL')">部分退款</button>
-          <button class="secondary small-button" @click="show(o, 'FULL')">整单退款</button>
-          <text v-if="o.reviewed" class="muted">已评价</text>
-          <button v-else class="secondary small-button" @click="show(o, 'REVIEW')">
-            评价订单
-          </button>
-        </template>
       </view>
-      <view class="muted" v-for="r in o.refunds" :key="r.id"
-        >退款 ¥{{ cents(r.amountCents) }} · {{ states[r.state] || r.state }}</view
-      >
     </view>
-    <view v-if="!orders.length" class="empty">还没有订单，先去看看校园好店吧。</view>
+    <view v-if="sessionError" class="notice">{{ sessionError }}</view>
+    <view v-else-if="!orders.length" class="empty">还没有订单，先去看看校园好店吧。</view>
     <button v-if="hasMore" class="secondary" :disabled="loading" @click="loadMore"
       >加载更早订单与结算单</button
     >
@@ -632,3 +665,19 @@ onUnload(stop);
     </view>
   </view>
 </template>
+
+
+<style scoped>
+.order-header-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 16rpx;
+}
+.order-group {
+  border-left: 4rpx solid #c9d9ce;
+  padding-left: 16rpx;
+  margin: 24rpx 0;
+}
+</style>

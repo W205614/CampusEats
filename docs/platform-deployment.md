@@ -1,18 +1,21 @@
 # 多校区版本部署与恢复
 
-本文包含首次镜像部署与已有数据环境的升级、恢复。启动路线见[项目首页](../README.md)，前端开发和微信小程序配置见[开发指南](development.md)。以下新增指南随 master 维护，所用 Compose、Dockerfile 和安全配置工具均包含在 v1.0.4 Tag 中。
+本文包含首次镜像部署与已有数据环境的升级、恢复。启动路线见[项目首页](../README.md)，前端开发和微信小程序配置见[开发指南](development.md)。首次部署使用同一正式版本的 Compose、Dockerfile、配置示例和安全配置工具。
 
 <a id="ghcr-start"></a>
 
 ## 从 GHCR 首次部署
 
-适用于全新独立演示，不用于覆盖现有日常实例。先按首页取得 `v1.0.4` 源码，在项目根目录的 PowerShell 7 中执行一次配置生成：
+适用于全新独立演示，不用于覆盖现有日常实例。先取得 [v1.1.0 源码](https://github.com/W205614/CampusEats/tree/v1.1.0)，从 [v1.1.0 Release](https://github.com/W205614/CampusEats/releases/tag/v1.1.0) 的镜像清单复制 Java 和 Web 的对应摘要，在项目根目录的 PowerShell 7 中执行一次配置生成：
 
 ```powershell
 . ./scripts/secure-files.ps1
 $demoDirectory = New-SecureDirectory -Path (Join-Path $PWD '.local/ghcr-demo')
 $demoEnvironment = Join-Path $demoDirectory 'demo.env'
 if (Test-Path -LiteralPath $demoEnvironment) { throw '配置已存在；保留原凭据，直接使用原配置启动。' }
+$serverDigest = Read-Host 'Java 镜像摘要（sha256:…）'
+$webDigest = Read-Host 'Web 镜像摘要（sha256:…）'
+if ($serverDigest -cnotmatch '^sha256:[0-9a-f]{64}$' -or $webDigest -cnotmatch '^sha256:[0-9a-f]{64}$') { throw '请填写 Release 列出的完整摘要。' }
 $demoConfiguration = Get-Content .env.example -Raw
 foreach ($purpose in @('root-password','app-password','redis-password','admin-signing-key','demo-password')) {
   $random = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
@@ -20,9 +23,9 @@ foreach ($purpose in @('root-password','app-password','redis-password','admin-si
 }
 $demoConfiguration = $demoConfiguration.Replace('WEB_PORT=18083', 'WEB_PORT=28104')
 $demoConfiguration = $demoConfiguration.Replace('http://localhost:18083,http://127.0.0.1:18083', 'http://localhost:28104,http://127.0.0.1:28104')
-$demoConfiguration = $demoConfiguration.Replace('MYSQL_IMAGE=campuseats-mysql:v1', 'MYSQL_IMAGE=campuseats-mysql:v1.0.4-local-demo')
-$demoConfiguration = $demoConfiguration.Replace('REDIS_IMAGE=campuseats-redis:v1', 'REDIS_IMAGE=campuseats-redis:v1.0.4-local-demo')
-$demoConfiguration += "`nSERVER_IMAGE=ghcr.io/w205614/campuseats-server@sha256:872a8deb7c8512397c8a3d348365af37f7149d4c9c953ddd5d0391e47bfe5e89`nWEB_IMAGE=ghcr.io/w205614/campuseats-web@sha256:ef694b984718c5820a9116c4ac0e938f0610833abebf0d69affce5ae9d255633`n"
+$demoConfiguration = $demoConfiguration.Replace('MYSQL_IMAGE=campuseats-mysql:v1', 'MYSQL_IMAGE=campuseats-mysql:v1.1.0-local-demo')
+$demoConfiguration = $demoConfiguration.Replace('REDIS_IMAGE=campuseats-redis:v1', 'REDIS_IMAGE=campuseats-redis:v1.1.0-local-demo')
+$demoConfiguration += "`nSERVER_IMAGE=ghcr.io/w205614/campuseats-server@$serverDigest`nWEB_IMAGE=ghcr.io/w205614/campuseats-web@$webDigest`n"
 Write-SecureTextFile -Path $demoEnvironment -Content $demoConfiguration
 $demoConfiguration = $null
 $random = $null
@@ -30,7 +33,7 @@ $random = $null
 
 然后执行首页[拉取预构建应用镜像](../README.md#拉取预构建应用镜像)的依赖构建、应用拉取及四服务启动命令。不要对这个镜像环境调用会重新构建应用的 `start.ps1`。MySQL/Redis 的本地镜像标签与默认源码环境分开；它们需要按当前 Dockerfile 下载固定基础镜像与安全补丁，不能用任意同名第三方镜像替代。
 
-本版本两个应用镜像均公开、支持 `linux/amd64`，上述摘要与 [Release 验证附件](https://github.com/W205614/CampusEats/releases/download/v1.0.4/campuseats-v1.0.4-verification.json)一致。拉取/运行在 Windows Docker Desktop 上实际验收；源码四服务构建及运行由 Ubuntu 24.04 CI 验证。首次演示需要网络获取依赖，宿主不需要 Maven、Java 或 Node.js；macOS、ARM64 未在本轮验证。
+Release 提供两个应用镜像的摘要和验收记录。首次演示需要网络获取依赖，宿主无需安装 Maven、Java 或 Node.js。
 
 四服务健康后访问 `http://127.0.0.1:28104/` 和 `/admin/`。平台账号为 `admin`，初始口令在受保护配置的 `DEMO_ADMIN_PASSWORD` 中；本路线不生成 `demo-credentials.txt`，不要将环境文件或凭据截图提交。重启继续使用原配置，不重新生成数据库口令。其他 demo 员工的首次密码与改密要求见[演示账号](operations.md#演示账号)。
 

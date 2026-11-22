@@ -2,6 +2,8 @@ package com.campuseats.platform;
 
 import static com.campuseats.common.BusinessException.require;
 
+import com.campuseats.common.BusinessException;
+
 import com.campuseats.business.*;
 import com.campuseats.common.Hashes;
 import com.campuseats.infra.*;
@@ -35,6 +37,7 @@ public class CheckoutService {
       String campusName,
       long cartVersion,
       String fulfillment,
+      String pickupPoint,
       Long addressId,
       Map<String, Object> address,
       List<Line> items,
@@ -54,6 +57,13 @@ public class CheckoutService {
       String businessDate,
       String quoteHash,
       List<Map<String, Object>> rules) {}
+
+  public record CheckoutIssue(String storeId, List<String> cartItemIds, String couponId) {}
+
+  private static BusinessException issue(BusinessException error, Long store, List<String> items, Long coupon) {
+    return new BusinessException(error.status(), error.code(), error.getMessage(),
+        new CheckoutIssue(Objects.toString(store, null), items, Objects.toString(coupon, null)));
+  }
 
   private final Db db;
   private final Json json;
@@ -133,102 +143,113 @@ public class CheckoutService {
             409,
             "MERCHANT_PAYMENT_UNAVAILABLE",
             "店铺尚未启用真实收款");
-      var s = scope.store(store, true);
-      require(directory.accepting(s, at), 409, "SHOP_CLOSED", "店铺当前不接单：" + s.get("name"));
-      long version = carts.lock(user, store);
-      require(version == selection.cartVersion(), 409, "CART_CHANGED", "店铺购物车已变化");
-      Map<String, Object> address = Map.of();
-      if (selection.fulfillment().equals("DELIVERY")) {
-        require(selection.addressId() != null, 400, "ADDRESS_REQUIRED", "配送订单须选择地址");
-        address = addresses.resolve(user, selection.addressId(), true);
-        var b =
-            db.one("SELECT campus_id FROM campus_building WHERE id=?", address.get("building_id"));
-        require(
-            Db.id(b, "campus_id") == Db.id(s, "campus_id"),
-            409,
-            "OUTSIDE_DELIVERY",
-            "收货地址与店铺不在同一校区");
-      } else require(selection.addressId() == null, 400, "INVALID_ADDRESS", "自取订单不应携带配送地址");
-      var raw = carts.items(user, store);
-      require(!raw.isEmpty(), 409, "EMPTY_CART", "参与结算的店铺购物车为空");
-      var lines = new ArrayList<Line>();
-      long subtotal = 0;
-      int count = 0;
-      for (var item : raw) {
-        String type = item.get("item_type").toString();
-        long id = Db.id(item, "item_id");
-        @SuppressWarnings("unchecked")
-        var flavor = (Map<String, String>) item.get("flavors");
-        String canonical = validation.validate(type, id, flavor);
-        if (type.equals("SETMEAL"))
-          for (var component :
-              db.rows("SELECT dish_id FROM setmeal_dish WHERE setmeal_id=? ORDER BY dish_id", id))
-            catalog.product(store, "DISH", Db.id(component, "dish_id"), true);
-        int quantity = Db.integer(item, "quantity");
-        long normal = Money.cents(item.get("price"));
-        var activityRule = marketing.activity(store, type, id, at);
-        long activity =
-            activityRule == null ? normal : Math.min(normal, Db.id(activityRule, "price_cents"));
-        if (activityRule != null) rules.add(activityRule);
-        subtotal = Math.addExact(subtotal, activity * quantity);
-        count += quantity;
-        lines.add(
-            new Line(
-                Db.id(item, "id"),
-                type,
-                id,
-                item.get("name").toString(),
-                Objects.toString(item.get("image"), ""),
-                canonical,
-                quantity,
-                normal,
-                activity,
-                activity * quantity));
+      try {
+        var s = scope.store(store, true);
+        require(directory.accepting(s, at), 409, "SHOP_CLOSED", "店铺当前不接单：" + s.get("name"));
+        long version = carts.lock(user, store);
+        require(version == selection.cartVersion(), 409, "CART_CHANGED", "店铺购物车已变化");
+        Map<String, Object> address = Map.of();
+        if (selection.fulfillment().equals("DELIVERY")) {
+          require(selection.addressId() != null, 400, "ADDRESS_REQUIRED", "配送订单须选择地址");
+          address = addresses.resolve(user, selection.addressId(), true);
+          var b =
+              db.one("SELECT campus_id FROM campus_building WHERE id=?", address.get("building_id"));
+          require(
+              Db.id(b, "campus_id") == Db.id(s, "campus_id"),
+              409,
+              "OUTSIDE_DELIVERY",
+              "收货地址与店铺不在同一校区");
+        } else require(selection.addressId() == null, 400, "INVALID_ADDRESS", "自取订单不应携带配送地址");
+        var raw = carts.items(user, store);
+        require(!raw.isEmpty(), 409, "EMPTY_CART", "参与结算的店铺购物车为空");
+        var lines = new ArrayList<Line>();
+        long subtotal = 0;
+        int count = 0;
+        for (var item : raw) {
+          String type = item.get("item_type").toString();
+          long id = Db.id(item, "item_id");
+          @SuppressWarnings("unchecked")
+          var flavor = (Map<String, String>) item.get("flavors");
+          String canonical;
+          try {
+            canonical = validation.validate(type, id, flavor);
+          if (type.equals("SETMEAL"))
+            for (var component :
+                db.rows("SELECT dish_id FROM setmeal_dish WHERE setmeal_id=? ORDER BY dish_id", id))
+              catalog.product(store, "DISH", Db.id(component, "dish_id"), true);
+          } catch (BusinessException error) {
+            throw issue(error, store, List.of(item.get("id").toString()), null);
+          }
+          int quantity = Db.integer(item, "quantity");
+          long normal = Money.cents(item.get("price"));
+          var activityRule = marketing.activity(store, type, id, at);
+          long activity =
+              activityRule == null ? normal : Math.min(normal, Db.id(activityRule, "price_cents"));
+          if (activityRule != null) rules.add(activityRule);
+          subtotal = Math.addExact(subtotal, activity * quantity);
+          count += quantity;
+          lines.add(
+              new Line(
+                  Db.id(item, "id"),
+                  type,
+                  id,
+                  item.get("name").toString(),
+                  Objects.toString(item.get("image"), ""),
+                  canonical,
+                  quantity,
+                  normal,
+                  activity,
+                  activity * quantity));
+        }
+        if (selection.couponId() != null)
+          require(coupons.add(selection.couponId()), 400, "DUPLICATE_COUPON", "同一张券不能重复使用");
+        long shopDiscount = checkoutDiscount(user, selection.couponId(), store, subtotal, at);
+        if (selection.couponId() != null) rules.add(marketing.couponSnapshot(selection.couponId()));
+        long[] discounts =
+            Money.allocate(shopDiscount, lines.stream().mapToLong(Line::paidCents).toArray());
+        var adjusted = new ArrayList<Line>();
+        for (int i = 0; i < lines.size(); i++) {
+          var l = lines.get(i);
+          adjusted.add(
+              new Line(
+                  l.cartId,
+                  l.itemType,
+                  l.itemId,
+                  l.name,
+                  l.image,
+                  l.flavors,
+                  l.quantity,
+                  l.normalCents,
+                  l.activityCents,
+                  l.paidCents - discounts[i]));
+        }
+        long delivery =
+            selection.fulfillment().equals("DELIVERY") ? Money.cents(s.get("delivery_fee")) : 0;
+        long packaging = Money.cents(s.get("packaging_fee")) * count;
+        parts.add(
+            new Part(
+                store,
+                Db.id(s, "campus_id"),
+                s.get("name").toString(),
+                s.get("campus_name").toString(),
+                version,
+                selection.fulfillment(),
+                selection.fulfillment().equals("PICKUP") ? (String) s.get("pickup_point") : null,
+                selection.addressId(),
+                address,
+                adjusted,
+                subtotal,
+                shopDiscount,
+                0,
+                delivery,
+                packaging,
+                subtotal - shopDiscount + delivery + packaging,
+                selection.couponId(),
+                Db.id(s, "version")));
+      } catch (BusinessException error) {
+        if (error.data() != null) throw error;
+        throw issue(error, store, List.of(), null);
       }
-      if (selection.couponId() != null)
-        require(coupons.add(selection.couponId()), 400, "DUPLICATE_COUPON", "同一张券不能重复使用");
-      long shopDiscount = marketing.discount(user, selection.couponId(), store, subtotal, at);
-      if (selection.couponId() != null) rules.add(marketing.couponSnapshot(selection.couponId()));
-      long[] discounts =
-          Money.allocate(shopDiscount, lines.stream().mapToLong(Line::paidCents).toArray());
-      var adjusted = new ArrayList<Line>();
-      for (int i = 0; i < lines.size(); i++) {
-        var l = lines.get(i);
-        adjusted.add(
-            new Line(
-                l.cartId,
-                l.itemType,
-                l.itemId,
-                l.name,
-                l.image,
-                l.flavors,
-                l.quantity,
-                l.normalCents,
-                l.activityCents,
-                l.paidCents - discounts[i]));
-      }
-      long delivery =
-          selection.fulfillment().equals("DELIVERY") ? Money.cents(s.get("delivery_fee")) : 0;
-      long packaging = Money.cents(s.get("packaging_fee")) * count;
-      parts.add(
-          new Part(
-              store,
-              Db.id(s, "campus_id"),
-              s.get("name").toString(),
-              s.get("campus_name").toString(),
-              version,
-              selection.fulfillment(),
-              selection.addressId(),
-              address,
-              adjusted,
-              subtotal,
-              shopDiscount,
-              0,
-              delivery,
-              packaging,
-              subtotal - shopDiscount + delivery + packaging,
-              selection.couponId(),
-              Db.id(s, "version")));
     }
     if (input.platformCouponId() != null)
       require(coupons.add(input.platformCouponId()), 400, "DUPLICATE_COUPON", "同一张券不能重复使用");
@@ -245,7 +266,7 @@ public class CheckoutService {
             "JOINT_COUPON_SCOPE",
             "跨店联合优惠仅限参与商家使用");
     long available = parts.stream().mapToLong(p -> p.subtotalCents - p.shopDiscountCents).sum();
-    long platformDiscount = marketing.discount(user, input.platformCouponId(), null, available, at);
+    long platformDiscount = checkoutDiscount(user, input.platformCouponId(), null, available, at);
     if (input.platformCouponId() != null)
       rules.add(marketing.couponSnapshot(input.platformCouponId()));
     var flat = parts.stream().flatMap(p -> p.items.stream()).toList();
@@ -280,6 +301,7 @@ public class CheckoutService {
               p.campusName,
               p.cartVersion,
               p.fulfillment,
+              p.pickupPoint,
               p.addressId,
               p.address,
               adjusted,
@@ -305,6 +327,22 @@ public class CheckoutService {
                     date,
                     rules)));
     return new Quote(result, input.platformCouponId(), total, date, hash, rules);
+  }
+
+  private long checkoutDiscount(long user, Long coupon, Long store, long subtotal, LocalDateTime at) {
+    try {
+      return marketing.discount(user, coupon, store, subtotal, at);
+    } catch (BusinessException error) {
+      throw issue(error, store, List.of(), coupon);
+    }
+  }
+
+  private void reserveCoupon(long user, Long coupon, Long store, long checkout) {
+    try {
+      marketing.reserve(user, coupon, checkout);
+    } catch (BusinessException error) {
+      throw issue(error, store, List.of(), coupon);
+    }
   }
 
   @Transactional
@@ -345,15 +383,15 @@ public class CheckoutService {
         "UPDATE checkout SET payment_provider=? WHERE id=?",
         paymentProvider.equals("wechat") ? "WECHAT" : "MOCK",
         checkout);
-    marketing.reserve(user, q.platformCouponId, checkout);
+    reserveCoupon(user, q.platformCouponId, null, checkout);
     for (var p : q.stores) {
-      marketing.reserve(user, p.couponId, checkout);
+      reserveCoupon(user, p.couponId, p.storeId, checkout);
       Map<String, Object> a = p.address;
       long order =
           db.insert(
               "INSERT INTO"
-                  + " orders(number,status,user_id,address_book_id,order_time,amount,remark,phone,address,consignee,request_id,request_hash,business_date,snapshot_source,building_name,room,delivery_fee,packaging_fee,pay_expires_at,store_id,campus_id,checkout_id,fulfillment,shop_discount_cents,platform_discount_cents)"
-                  + " VALUES(?,1,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                  + " orders(number,status,user_id,address_book_id,order_time,amount,remark,phone,address,consignee,request_id,request_hash,business_date,snapshot_source,building_name,room,delivery_fee,packaging_fee,pay_expires_at,store_id,campus_id,checkout_id,fulfillment,pickup_point,shop_discount_cents,platform_discount_cents)"
+                  + " VALUES(?,1,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
               "CE-" + checkout + "-" + p.storeId,
               user,
               p.addressId == null ? 0 : p.addressId,
@@ -378,9 +416,11 @@ public class CheckoutService {
               p.campusId,
               checkout,
               p.fulfillment,
+              p.pickupPoint,
               p.shopDiscountCents,
               p.platformDiscountCents);
       var quantities = new TreeMap<Long, Integer>();
+      var affected = new HashMap<String, List<String>>();
       for (var l : p.items) {
         db.update(
             "INSERT INTO"
@@ -395,16 +435,27 @@ public class CheckoutService {
             l.quantity,
             Money.decimal(l.activityCents),
             l.paidCents);
-        if (l.itemType.equals("DISH")) quantities.merge(l.itemId, l.quantity, Integer::sum);
-        else
+        if (l.itemType.equals("DISH")) {
+          quantities.merge(l.itemId, l.quantity, Integer::sum);
+          affected.computeIfAbsent(Long.toString(l.itemId), ignored -> new ArrayList<>())
+              .add(Long.toString(l.cartId));
+        } else {
           for (var c :
               db.rows(
                   "SELECT dish_id,copies FROM setmeal_dish WHERE setmeal_id=? ORDER BY dish_id",
-                  l.itemId))
-            quantities.merge(
-                Db.id(c, "dish_id"), l.quantity * Db.integer(c, "copies"), Integer::sum);
+                  l.itemId)) {
+            long dish = Db.id(c, "dish_id");
+            quantities.merge(dish, l.quantity * Db.integer(c, "copies"), Integer::sum);
+            affected.computeIfAbsent(Long.toString(dish), ignored -> new ArrayList<>())
+                .add(Long.toString(l.cartId));
+          }
+        }
       }
-      quotas.reserve(order, at.toLocalDate(), quantities);
+      try {
+        quotas.reserve(order, at.toLocalDate(), quantities);
+      } catch (BusinessException error) {
+        throw issue(error, p.storeId, affected.getOrDefault(error.data(), List.of()), null);
+      }
       carts.clear(user, p.storeId);
       scope.event(order, "ORDER_SUBMIT");
       scope.audit("ORDER_SUBMIT", order, p.storeId, "创建店铺子订单");

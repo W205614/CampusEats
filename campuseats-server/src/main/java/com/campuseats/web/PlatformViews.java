@@ -34,6 +34,7 @@ public final class PlatformViews {
       String version,
       String campusName,
       Boolean accepting,
+      String pickupPoint,
       @JsonIgnore @Schema(hidden = true) Set<String> presentFields)
       implements Projected {}
 
@@ -144,6 +145,13 @@ public final class PlatformViews {
       String createdAt,
       String succeededAt,
       String successTimeSource,
+      List<RefundItemResponse> items,
+      @JsonIgnore @Schema(hidden = true) Set<String> presentFields)
+      implements Projected {}
+
+  public record RefundItemResponse(
+      String name,
+      Integer quantity,
       @JsonIgnore @Schema(hidden = true) Set<String> presentFields)
       implements Projected {}
 
@@ -196,6 +204,10 @@ public final class PlatformViews {
       String shopDiscountCents,
       String platformDiscountCents,
       String pickupCode,
+      String pickupPoint,
+      String stage,
+      String stageDeadlineAt,
+      Boolean stageOverdue,
       Integer pickupAttempts,
       String storeName,
       String campusName,

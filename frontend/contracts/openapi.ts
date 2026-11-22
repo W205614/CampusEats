@@ -3063,6 +3063,7 @@ export interface components {
             packagingFeeCents?: string;
             hours: string[];
             phone?: string;
+            pickupPoint?: string;
         };
         Policy: {
             /** Format: int32 */
@@ -3178,6 +3179,17 @@ export interface components {
             addressId?: string;
             couponId?: string;
         };
+        CheckoutError: {
+            code?: string;
+            message?: string;
+            data?: components["schemas"]["CheckoutIssue"];
+            requestId?: string;
+        };
+        CheckoutIssue: {
+            storeId?: string;
+            cartItemIds?: string[];
+            couponId?: string;
+        };
         Create: {
             channel: string;
             version?: string;
@@ -3215,6 +3227,7 @@ export interface components {
             campusName?: string;
             cartVersion?: string;
             fulfillment?: string;
+            pickupPoint?: string;
             addressId?: string;
             address?: {
                 [key: string]: unknown;
@@ -3436,6 +3449,7 @@ export interface components {
             version?: string;
             campusName?: string;
             accepting?: boolean;
+            pickupPoint?: string;
         };
         StorePageResponse: {
             records?: components["schemas"]["StoreResponse"][];
@@ -3604,6 +3618,10 @@ export interface components {
             shopDiscountCents?: string;
             platformDiscountCents?: string;
             pickupCode?: string;
+            pickupPoint?: string;
+            stage?: string;
+            stageDeadlineAt?: string;
+            stageOverdue?: boolean;
             /** Format: int32 */
             pickupAttempts?: number;
             storeName?: string;
@@ -3613,6 +3631,11 @@ export interface components {
             aftersales?: components["schemas"]["OrderAftersaleResponse"][];
             refunds?: components["schemas"]["RefundResponse"][];
             reviewed?: boolean;
+        };
+        RefundItemResponse: {
+            name?: string;
+            /** Format: int32 */
+            quantity?: number;
         };
         RefundResponse: {
             id?: string;
@@ -3629,6 +3652,7 @@ export interface components {
             createdAt?: string;
             succeededAt?: string;
             successTimeSource?: string;
+            items?: components["schemas"]["RefundItemResponse"][];
         };
         SubscriptionTemplates: {
             enabled?: boolean;
@@ -3643,6 +3667,7 @@ export interface components {
             orderId?: string;
             storeId?: string;
             eventType?: string;
+            refundId?: string;
             summary?: string;
             /** Format: date-time */
             createdAt?: string;
@@ -5113,6 +5138,15 @@ export interface operations {
                     };
                 };
             };
+            /** @description 结算条件变化 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckoutError"];
+                };
+            };
         };
     };
     create: {
@@ -5243,6 +5277,15 @@ export interface operations {
                         /** Format: uuid */
                         requestId: string;
                     };
+                };
+            };
+            /** @description 结算条件变化 */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CheckoutError"];
                 };
             };
         };
@@ -7434,6 +7477,8 @@ export interface operations {
                 query?: string;
                 categoryId?: string;
                 open?: boolean;
+                inStock?: boolean;
+                maxPriceCents?: string;
                 cursor?: string;
                 limit?: number;
             };

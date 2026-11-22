@@ -4,6 +4,9 @@ import com.campuseats.api.Commands;
 import com.campuseats.business.AddressService;
 import com.campuseats.platform.*;
 import com.campuseats.security.Actor;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import jakarta.validation.Valid;
 import java.util.*;
 import org.springframework.web.bind.annotation.*;
@@ -15,6 +18,9 @@ import org.springframework.web.bind.annotation.*;
     matchIfMissing = true)
 @RequestMapping("/api/v1")
 public class PlatformCheckoutController {
+  public record CheckoutError(
+      String code, String message, CheckoutService.CheckoutIssue data, String requestId) {}
+
   private final StoreCart cart;
   private final CheckoutService checkout;
   private final AddressService addresses;
@@ -83,11 +89,17 @@ public class PlatformCheckoutController {
   }
 
   @PostMapping("/user/checkouts/preview")
+  @ApiResponse(responseCode = "200", useReturnTypeSchema = true, description = "OK")
+  @ApiResponse(responseCode = "409", description = "结算条件变化",
+      content = @Content(mediaType = "application/json", schema = @Schema(implementation = CheckoutError.class)))
   public CheckoutService.Quote preview(@Valid @RequestBody PlatformCommands.Checkout input) {
     return checkout.preview(input);
   }
 
   @PostMapping("/user/checkouts")
+  @ApiResponse(responseCode = "200", useReturnTypeSchema = true, description = "OK")
+  @ApiResponse(responseCode = "409", description = "结算条件变化",
+      content = @Content(mediaType = "application/json", schema = @Schema(implementation = CheckoutError.class)))
   public Object submit(
       @RequestHeader("Idempotency-Key") String key,
       @Valid @RequestBody PlatformCommands.Checkout input) {

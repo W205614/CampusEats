@@ -31,7 +31,7 @@ export type Store = Fields<
   | 'packagingFee'
   | 'phone'
   | 'version'
->;
+> & Pick<components['schemas']['StoreResponse'], 'pickupPoint'>;
 export type Product = Fields<
   components['schemas']['ProductResponse'],
   | 'id'
@@ -95,6 +95,7 @@ export interface QuotePart {
   storeName: string;
   campusName: string;
   fulfillment: string;
+  pickupPoint?: string | null;
   subtotalCents: Id;
   shopDiscountCents: Id;
   platformDiscountCents: Id;
@@ -137,7 +138,7 @@ export type Order = Fields<
 > &
   Pick<
     components['schemas']['OrderResponse'],
-    'reviewed' | 'pickupCode' | 'phone' | 'courierId'
+    'reviewed' | 'pickupCode' | 'phone' | 'courierId' | 'checkoutId' | 'pickupPoint' | 'stage' | 'stageDeadlineAt' | 'stageOverdue'
   > & {
     details: Detail[];
     aftersales: components['schemas']['OrderAftersaleResponse'][];
@@ -173,7 +174,7 @@ export interface Task {
 export type Refund = Fields<
   components['schemas']['RefundResponse'],
   'id' | 'orderId' | 'amountCents' | 'state' | 'attempts' | 'lastError'
->;
+> & Pick<components['schemas']['RefundResponse'], 'items'>;
 export interface OutboxEvent extends Task {
   aggregateId: Id;
   eventType: string;
@@ -258,6 +259,14 @@ export interface Staff {
 }
 export const cents = (value: string | number | undefined) =>
   ((Number(value) || 0) / 100).toFixed(2);
+export const fulfillmentStageLabels: Record<string, string> = {
+  WAIT_ACCEPT: '待接单',
+  PREPARING: '备餐中',
+  SELF_PICKUP: '可取餐',
+  WAIT_DISPATCH: '待安排配送',
+  WAIT_PICKUP: '等待配送员取餐',
+  DELIVERING: '配送中',
+};
 export const orderStatus: Record<number, string> = {
   1: '待支付',
   2: '待接单',

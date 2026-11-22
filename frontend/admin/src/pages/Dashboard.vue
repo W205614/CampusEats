@@ -47,6 +47,7 @@ const form = ref({
     packagingFeeCents: 1,
     hours: ['08:00-22:00'],
     phone: '',
+    pickupPoint: '',
   }),
   hours = ref('08:00-22:00');
 async function load() {
@@ -88,6 +89,7 @@ function edit(s?: Store) {
     packagingFeeCents: Number(s?.packagingFee ?? 1),
     hours: s?.hours || ['08:00-22:00'],
     phone: s?.phone || '',
+    pickupPoint: s?.pickupPoint || '',
   };
   hours.value = form.value.hours.join(',');
   dialog.value = true;
@@ -195,6 +197,9 @@ onMounted(load);
       </el-form-item>
       <el-form-item label="营业时段，多个用逗号分隔">
         <el-input v-model="hours" placeholder="08:00-12:00,17:00-22:00" />
+      </el-form-item>
+      <el-form-item label="取餐点">
+        <el-input v-model="form.pickupPoint" maxlength="160" placeholder="如东区二食堂 2 楼 6 号窗口" />
       </el-form-item>
       <el-form-item label="每单配送费（元）">
         <el-input-number v-model="form.deliveryFeeCents" :min="0" :max="100" :precision="2" />

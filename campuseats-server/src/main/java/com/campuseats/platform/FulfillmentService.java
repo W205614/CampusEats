@@ -81,8 +81,30 @@ public class FulfillmentService {
 
   public Map<String, Object> detail(long id) {
     var row = scope.order(id, false);
-    row.put("store_name", scope.store(Db.id(row, "store_id"), false).get("name"));
-    decorateAll(List.of(row), Actor.current());
+    var store = scope.store(Db.id(row, "store_id"), false);
+    row.put("store_name", store.get("name"));
+    var actor = Actor.current();
+    decorateAll(List.of(row), actor);
+    if (actor.type().equals("USER")) {
+      row.put("campus_name", store.get("campus_name"));
+      var items = db.rows(
+          "SELECT i.request_id,d.name,i.quantity FROM aftersale_item i"
+              + " JOIN order_detail d ON d.id=i.detail_id WHERE d.order_id=? ORDER BY d.id",
+          id);
+      @SuppressWarnings("unchecked")
+      var refunds = (List<Map<String, Object>>) row.get("refunds");
+      for (var refund : refunds) {
+        var requestId = refund.get("aftersale_id");
+        refund.put("items", requestId == null
+            ? ((List<?>) row.get("details")).stream().map(detail -> {
+                var fields = (Map<?, ?>) detail;
+                return Map.of("name", fields.get("name"), "quantity", fields.get("number"));
+              }).toList()
+            : items.stream().filter(item -> requestId.equals(item.get("request_id")))
+                .map(item -> Map.of("name", item.get("name"), "quantity", item.get("quantity")))
+                .toList());
+      }
+    }
     return row;
   }
 
@@ -94,11 +116,30 @@ public class FulfillmentService {
     var aftersales = grouped("aftersale", ids);
     var refunds = grouped("refund_request", ids);
     var reviews = grouped("review", ids);
+    boolean student = a.type().equals("USER");
+    var stages = student
+        ? db.named.queryForList(
+            "SELECT order_id,stage,deadline_at FROM order_stage WHERE order_id IN (:ids)",
+            Map.of("ids", ids)).stream()
+            .collect(java.util.stream.Collectors.toMap(r -> Db.id(r, "order_id"), r -> r))
+        : Map.<Long, Map<String, Object>>of();
+    var at = LocalDateTime.now(clock);
     for (var row : rows) {
       long id = Db.id(row, "id");
       row.remove("pickup_hash");
       row.remove("request_hash");
-      if (!a.type().equals("USER")) row.remove("pickup_code");
+      if (student) {
+        var stage = stages.get(id);
+        if (stage != null) {
+          var deadline = stage.get("deadline_at") == null ? null : Db.time(stage.get("deadline_at"));
+          row.put("stage", stage.get("stage"));
+          row.put("stage_deadline_at", deadline);
+          row.put("stage_overdue", deadline != null && !at.isBefore(deadline));
+        }
+      } else {
+        row.remove("pickup_code");
+        row.remove("pickup_point");
+      }
       row.put("details", details.getOrDefault(id, List.of()));
       var own = deliveries.getOrDefault(id, List.of());
       row.put("delivery", own.isEmpty() ? null : own.getFirst());
