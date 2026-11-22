@@ -150,6 +150,8 @@ jobs:
           ./scripts/scan-images.ps1 -ServerImage campuseats-server:v1 -WebImage campuseats-web:v1 -MySqlImage $mysql -RedisImage $redis -OutputDirectory '.local/security'
       - name: Collect matching application runtime sources and notices
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        env:
+          CAMPUS_SOURCE_GITHUB_TOKEN: ${{ github.token }}
         run: |
           python3 scripts/collect-image-sources.py --server campuseats-server:v1 --web campuseats-web:v1 --output .local/runtime-sources
           tar -czf .local/runtime-sources.tar.gz -C .local/runtime-sources .

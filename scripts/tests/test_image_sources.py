@@ -64,6 +64,26 @@ class SourceCollectionTest(unittest.TestCase):
                 collector.collect_aport(("fixture", "main"), self.output, "v3.24")
             fetch.assert_not_called()
 
+    def test_metadata_token_is_scoped_and_not_forwarded_on_redirects(self):
+        response = MagicMock()
+        response.__enter__.return_value = response
+        response.status = 200
+        response.headers = {}
+        response.read.return_value = b"{}"
+        urls = (
+            "https://api.github.com/repos/alpinelinux/aports/contents/main/example",
+            "https://api.github.com/repos/adoptium/temurin21-binaries/releases/tags/example",
+            "https://raw.githubusercontent.com/alpinelinux/aports/main/example",
+        )
+        with patch.dict(collector.os.environ, {"CAMPUS_SOURCE_GITHUB_TOKEN": "test-token"}):
+            with patch.object(collector.urllib.request, "urlopen", return_value=response) as request:
+                for url in urls:
+                    self.assertEqual(collector.download(url), b"{}")
+        for call in request.call_args_list[:2]:
+            self.assertEqual(call.args[0].get_header("Authorization"), "Bearer test-token")
+            self.assertNotIn("Authorization", call.args[0].headers)
+        self.assertFalse(request.call_args_list[2].args[0].has_header("Authorization"))
+
     def test_interrupted_transfer_resumes_only_its_verified_range(self):
         first = MagicMock()
         first.__enter__.return_value = first

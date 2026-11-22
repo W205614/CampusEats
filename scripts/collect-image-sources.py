@@ -9,6 +9,7 @@ import hashlib
 import http.client
 import io
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -31,6 +32,11 @@ def download(url):
         else:
             data.clear()
         request = urllib.request.Request(url, headers=headers)
+        if url.startswith((
+            "https://api.github.com/repos/alpinelinux/aports/contents/",
+            "https://api.github.com/repos/adoptium/temurin21-binaries/releases/tags/",
+        )) and (token := os.environ.get("CAMPUS_SOURCE_GITHUB_TOKEN")):
+            request.add_unredirected_header("Authorization", f"Bearer {token}")
         try:
             with urllib.request.urlopen(request, timeout=120) as response:
                 if response.status == 206:
