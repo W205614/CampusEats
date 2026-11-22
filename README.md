@@ -8,14 +8,14 @@ CampusEats 面向校园点餐与食堂店铺管理：学生可以跨店选餐、
 
 它解决的是多店重复下单、优惠与费用难以核对、履约和售后分散的问题。当前定位为个人开发、学习和本机演示，默认监听回环地址，付款与退款使用模拟渠道。微信、腾讯云和多实例适配已有代码，真实商户、云端生产和小程序真机仍需单独验收。
 
-推荐稳定版为 **[v1.0.4](https://github.com/W205614/CampusEats/releases/tag/v1.0.4)**。Java/Web 的公开 Docker/OCI 镜像来自源码 [`b88b67a`](https://github.com/W205614/CampusEats/commit/b88b67ae074fb2cb27decebde03a1eeaff9a6d5e) 的同次成功 CI，已实际匿名拉取并运行。`master` 可包含后续文档更新；镜像来源按 Release 与摘要核对。
+推荐稳定版为 **[v1.1.0](https://github.com/W205614/CampusEats/releases/tag/v1.1.0)**。学生可按库存和价格筛选商品，逐店核对报价变化，并从订单或消息查看自取点、履约和退款结果。Java 与 Web 的公开镜像来自同次成功 CI，已按不可变摘要匿名拉取并通过隔离业务验收。[镜像来源 966b306](https://github.com/W205614/CampusEats/commit/966b306d1f6f77cca0d565b65a49ef3532124153)。
 
 ## 可以完成什么
 
 | 使用者 | 操作与结果 |
 | --- | --- |
-| 点餐用户 | 选校区和店铺、加购、领取优惠、合并报价；核对各店费用后模拟付款，查看履约与退款进度、提交评价 |
-| 店长与运营 | 维护商品、配额、营业状态和优惠；按店接单、备餐、安排配送或核销自取码，处理售后与经营报表 |
+| 点餐用户 | 按营业状态、库存和价格选餐。按店选配送或自取，核对各店费用或报价差额后模拟付款，查看订单、消息与按商品退款的结果 |
+| 店长与运营 | 维护商品、配额、营业状态、优惠和自取点。按店接单、备餐、安排配送或核销自取码，处理售后与经营报表 |
 | 配送员 | 在所属校区领取或接受任务，完成取餐与送达；订单字段和后续访问随权限及履约状态收敛 |
 | 平台管理员 | 管理校区、店铺、员工和独立体验账号，处理履约异常、售后介入、审计及模拟账务核对 |
 
@@ -33,25 +33,25 @@ flowchart LR
 
 ## 真实界面
 
-以下画面来自 **v1.0.4 公开镜像的隔离业务验收**，使用合成校区、店铺、优惠和订单，支付与退款均为模拟。左图为优惠后报价，右图为履约完成及两次退款的结果。当前没有在线演示站点。
+以下画面来自 **v1.1.0 公开镜像的隔离业务验收**，使用合成校区、店铺、优惠和订单。左图展示配送店的报价上涨 ¥1.00、自取店金额保持不变。右图展示两店履约完成、订单消息入口和模拟退款记录。
 
 <p>
-  <img src='docs/images/v1.0.4-h5-checkout.png' alt='合成订单的优惠、配送费用与合并报价' width='300'>
-  <img src='docs/images/v1.0.4-h5-refunds.png' alt='合成订单已完成，16元与24元退款均已完成' width='300'>
+  <img src='docs/images/v1.1.0-h5-requote.png' alt='跨校区合单报价变化，配送店多付 1 元，自取点与费用保持' width='300'>
+  <img src='docs/images/v1.1.0-h5-orders.png' alt='已完成的配送和自取订单，页面提供自取点、站内消息和退款明细' width='300'>
 </p>
 
-本轮镜像实际通过选餐、配送、分次退款、平台介入和评价的页面旅程，见[验证记录](docs/verification/current.md)。
+同一隔离旅程核对了优惠分摊、配送与自取、按商品分次退款及跨角色访问边界。[验证记录](docs/verification/current.md)。
 
 ## 选择启动方式
 
 命令在项目根目录的 **PowerShell 7** 中执行；Windows 与 Linux 都使用 `pwsh`，无需切换 Bash 环境变量语法。先取得稳定版的 Compose、配置示例和脚本：
 
 ```powershell
-git clone --depth 1 --branch v1.0.4 https://github.com/W205614/CampusEats.git
+git clone --depth 1 --branch v1.1.0 https://github.com/W205614/CampusEats.git
 cd CampusEats
 ```
 
-`v1.0.4` 是固定版本；需要开发中源码时再选择 `master`，不能把开发分支当成已发布镜像来源。各路线选择其一，已有数据环境先读[升级与恢复](docs/platform-deployment.md)，不要重建空库替代升级。
+`v1.1.0` 固定应用源码、Compose 和依赖镜像配方，`master` 用于继续开发。已有数据环境请按文档保留原卷并执行升级。[升级与恢复](docs/platform-deployment.md)。
 
 | 路线 | 适合谁 | 宿主依赖与入口 |
 | --- | --- | --- |
@@ -74,10 +74,10 @@ docker @composeArgs up -d --no-build --wait --wait-timeout 300
 
 | 项目发布的应用镜像 | 已验证平台与职责 |
 | --- | --- |
-| `ghcr.io/w205614/campuseats-server:v1.0.4` | `linux/amd64`，Java 服务 |
-| `ghcr.io/w205614/campuseats-web:v1.0.4` | `linux/amd64`，Nginx、员工工作台与用户 H5 |
+| `ghcr.io/w205614/campuseats-server:v1.1.0` | `linux/amd64`，Java 服务 |
+| `ghcr.io/w205614/campuseats-web:v1.1.0` | `linux/amd64`，Nginx、员工工作台与用户 H5 |
 
-两者已公开，精确摘要见 [Release 验证附件](https://github.com/W205614/CampusEats/releases/download/v1.0.4/campuseats-v1.0.4-verification.json)，历史见 [Packages](https://github.com/W205614/CampusEats/packages)。MySQL 8.4.13 和 Redis 7.4.12 是必需依赖，使用项目固定且带补丁的 Dockerfile，本项目不向 GHCR 重新发布它们。依赖构建仍需 Docker、Alpine、Oracle 的网络下载，两个应用镜像不能替代完整部署。
+两个应用镜像均可匿名拉取。MySQL 8.4.13 和 Redis 7.4.12 由 Compose 按项目配方在本地构建，首次构建需访问 Docker Hub、Alpine 和 Oracle 下载源。[版本及镜像摘要](https://github.com/W205614/CampusEats/releases/tag/v1.1.0) · [验证附件](https://github.com/W205614/CampusEats/releases/download/v1.1.0/campuseats-v1.1.0-verification.json)。
 
 ### 从源码构建 Docker 镜像
 
@@ -148,7 +148,7 @@ flowchart LR
 
 ## 环境、配置与外部服务
 
-本轮验证包括 Windows / PowerShell **7.6.9** / Docker Desktop WSL2（Compose **5.6.1**）的本机运行，以及 Ubuntu 24.04 CI 的源码构建、测试和 `linux/amd64` 容器。宿主 Java 开发使用 Java 21、Maven 3.9.9，前端使用 Node.js 24.19.0。macOS、ARM64 和其他工具版本未逐项验证，不承诺多架构镜像。
+本轮使用 Windows、PowerShell **7.6.9** 与 Docker Desktop WSL2（Compose **5.7.0**）验收公开镜像和日常升级。Ubuntu 24.04 CI 构建并验证 `linux/amd64` 镜像。宿主开发使用 Java 21、Maven 3.9 和 Node.js 24.19.0。
 
 必要变量见 [.env.example](.env.example)，以下五项均需独立随机生成，不能保留占位符：
 
@@ -166,7 +166,7 @@ flowchart LR
 
 ## 验证、排错与数据维护
 
-v1.0.4 的 master / Tag CI 各通过后端 **360** 项、浏览器 **95** 项，失败、错误和跳过均为 0。它们包括单元、Docker 集成、真实页面和隔离传输边界测试；真实微信、云服务和小程序真机没有因此获得验收。CodeQL、Dependabot、秘密扫描的当前未解决告警为 0，保留 **9 条已审阅的原始 CodeQL 发现**，见[安全审阅边界](docs/security-review.md)和[本轮证据](docs/verification/current.md)。
+v1.1.0 对应的 master CI 通过后端 **361** 项、浏览器 **95** 项、独立恢复和四镜像扫描。CodeQL、Dependabot、秘密扫描的未解决告警为 0，原始 CodeQL 报告保留 9 条已审阅发现。微信真实渠道、腾讯云和小程序真机按各自的接入流程验收。[安全审阅说明](docs/security-review.md) · [版本验证记录](docs/verification/current.md)。
 
 常用源码检查从根目录执行，按改动选择范围；Java 集成测试需要 Docker，写入式浏览器测试使用独立数据库：
 
@@ -190,11 +190,11 @@ CI、浏览器凭据与隔离测试步骤见[贡献指南](CONTRIBUTING.md)。�
 | 能登录但不能下单 | 店铺是否营业接单、配额/地址/校区是否匹配，是否完成报价与模拟付款 |
 | 开发 API 失败 | `API_PROXY`、允许的 Origin、宿主数据库映射是否一致，前端是否误连日常后端 |
 
-MySQL、Redis 和上传分别持久化到 Compose 的 `mysql-data`、`redis-data`、`uploads` 命名卷。备份需包含数据库、上传与匹配配置，并独立验证恢复；升级保留原卷和已执行迁移，v1.0.4 仍为 **V24**。详细[备份、升级与恢复](docs/platform-deployment.md)和[日常排障](docs/operations.md)集中维护，不把核验元数据当作完整恢复负载。
+MySQL、Redis 和上传分别持久化到 Compose 的 `mysql-data`、`redis-data`、`uploads` 命名卷。v1.1.0 新增 Flyway **V25**，为店铺和订单增加自取点，为消息增加退款关联。升级前备份数据库、上传与配置并独立验证恢复，随后沿用原卷迁移。[备份、升级与恢复](docs/platform-deployment.md) · [日常排障](docs/operations.md)。
 
 ## 版本、参与与许可
 
-[Tags](https://github.com/W205614/CampusEats/tags)、[Releases](https://github.com/W205614/CampusEats/releases)和[变更记录](CHANGELOG.md)用于核对正常历史版本；应用 GHCR 分发从 v1.0.3 开始。源码、镜像摘要、对应源码材料与本轮验收在 [v1.0.4 Release](https://github.com/W205614/CampusEats/releases/tag/v1.0.4)对应，应用 Package 明确采用容器镜像。
+源码、镜像与第三方对应源码材料集中在本版本的 Release。历史版本和变更见 [Tags](https://github.com/W205614/CampusEats/tags) · [Releases](https://github.com/W205614/CampusEats/releases) · [变更记录](CHANGELOG.md)。
 
 使用问题与脱敏缺陷通过 [Issues](https://github.com/W205614/CampusEats/issues)反馈，修改按[贡献指南](CONTRIBUTING.md)提交 Pull Request；安全问题按[安全政策](SECURITY.md)报告。更多主题见[文档目录](docs/README.md)。
 

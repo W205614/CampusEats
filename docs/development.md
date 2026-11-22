@@ -89,8 +89,8 @@ foreach ($purpose in @('root-password','app-password','redis-password','admin-si
   $random = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
   $devConfiguration = $devConfiguration.Replace("replace-with-random-$purpose", $random)
 }
-$devConfiguration = $devConfiguration.Replace('MYSQL_IMAGE=campuseats-mysql:v1', 'MYSQL_IMAGE=campuseats-mysql:v1.0.4-source-dev')
-$devConfiguration = $devConfiguration.Replace('REDIS_IMAGE=campuseats-redis:v1', 'REDIS_IMAGE=campuseats-redis:v1.0.4-source-dev')
+$devConfiguration = $devConfiguration.Replace('MYSQL_IMAGE=campuseats-mysql:v1', 'MYSQL_IMAGE=campuseats-mysql:v1.1.0-source-dev')
+$devConfiguration = $devConfiguration.Replace('REDIS_IMAGE=campuseats-redis:v1', 'REDIS_IMAGE=campuseats-redis:v1.1.0-source-dev')
 Write-SecureTextFile -Path $devEnvironment -Content $devConfiguration
 Write-SecureTextFile -Path (Join-Path $devDirectory 'ports.yaml') -Content "services:`n  mysql:`n    ports: ['127.0.0.1:13384:3306']`n  redis:`n    ports: ['127.0.0.1:16384:6379']`n"
 $devConfiguration = $null
