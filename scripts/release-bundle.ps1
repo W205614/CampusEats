@@ -101,7 +101,11 @@ function Confirm-ReleaseWorkflow {
   if ($SourceSha -notmatch '^[a-f0-9]{40}$' -or $RunId -notmatch '^[0-9]+$') {
     throw 'Invalid workflow identity.'
   }
-  $workflow = Invoke-RestMethod -Uri ('https://api.github.com/repos/W205614/CampusEats/actions/runs/' + $RunId) -Headers @{Accept = 'application/vnd.github+json' } -TimeoutSec 20
+  $headers = @{Accept = 'application/vnd.github+json'}
+  if ($env:GH_TOKEN) {
+    $headers.Authorization = 'Bearer ' + $env:GH_TOKEN
+  }
+  $workflow = Invoke-RestMethod -Uri ('https://api.github.com/repos/W205614/CampusEats/actions/runs/' + $RunId) -Headers $headers -TimeoutSec 20
   if ($workflow.head_sha -cne $SourceSha -or $workflow.run_attempt -ne $RunAttempt -or $workflow.status -cne 'completed' -or $workflow.conclusion -cne 'success' -or $workflow.repository.full_name -cne 'W205614/CampusEats' -or $workflow.event -cne 'push' -or $workflow.head_branch -cne 'master') {
     throw 'Only the matching successful origin/master push workflow attempt may be deployed.'
   }
