@@ -166,7 +166,7 @@ flowchart LR
 
 ## 验证、排错与数据维护
 
-v1.1.0 对应的 master CI 通过后端 **361** 项、浏览器 **95** 项、独立恢复和四镜像扫描。CodeQL、Dependabot、秘密扫描的未解决告警为 0，原始 CodeQL 报告保留 9 条已审阅发现。微信真实渠道、腾讯云和小程序真机按各自的接入流程验收。[安全审阅说明](docs/security-review.md) · [版本验证记录](docs/verification/current.md)。
+v1.1.0 对应的 master CI 通过后端 **361** 项、浏览器 **95** 项、独立恢复和四镜像扫描。CodeQL、Dependabot、秘密扫描的未解决告警为 0，原始 CodeQL 报告保留 9 条已审阅发现。发布后补验通过了员工保存取餐点、缺货和优惠门槛变化、逐店跳过与恢复结算，以及合计不变时的逐店差额。微信真实渠道、腾讯云和小程序真机按各自的接入流程验收。[安全审阅说明](docs/security-review.md) · [版本验证记录](docs/verification/current.md)。
 
 常用源码检查从根目录执行，按改动选择范围；Java 集成测试需要 Docker，写入式浏览器测试使用独立数据库：
 
