@@ -26,7 +26,7 @@ Java 包名为 `com.campuseats`，应用入口为 `CampusEatsApplication`。模�
 | `campuseats-server/src/main/resources/`                            | 应用配置和 `db/migration/` 中的 Flyway 迁移                                                                                        |
 | `campuseats-server/src/test/`                                      | 集成测试、并发及边界测试，与生产代码分开                                                                                           |
 
-平台五类原控制器默认启用：`PlatformController`（目录发现）、`PlatformCheckoutController`、`PlatformFulfillmentController`、`PlatformAftersaleController`、`PlatformManagementController`；另有身份、支付、通知、存储及运维入口。旧交易控制器由 `campus.legacy-api=true` 条件启用，部分集成测试仍覆盖旧交易路径；账务 HTTP 入口与当前平台模式配套启用。`business/` 提供复用服务及旧接口实现，`platform/` 负责多校区流程。数据库变更使用新增 Flyway 迁移；V13—V17为业务能力追加，V18—V19补充余额对账索引，V20—V23增加生产接入及多实例数据，V24补充期间流水汇总覆盖索引。
+平台五类原控制器默认启用：`PlatformController`（目录发现）、`PlatformCheckoutController`、`PlatformFulfillmentController`、`PlatformAftersaleController`、`PlatformManagementController`；另有身份、支付、通知、存储及运维入口。旧交易控制器由 `campus.legacy-api=true` 条件启用，部分集成测试仍覆盖旧交易路径；账务 HTTP 入口与当前平台模式配套启用。`business/` 提供复用服务及旧接口实现，`platform/` 负责多校区流程。数据库变更使用新增 Flyway 迁移；V13—V17为业务能力追加，V18—V19补充余额对账索引，V20—V23增加生产接入及多实例数据，V24 补充期间流水汇总覆盖索引，V25 增加取餐点及消息与退款的关联字段。
 
 控制器只协调 HTTP 与服务。`ArchitectureBoundaryTest` 检查控制器不持有 `Db`，并检查指定核心服务不依赖 `web` 视图。配额、金额和退款算法继续复用现有服务。
 
@@ -127,9 +127,9 @@ mvn -B -ntp -DskipTests install
 mvn -B -ntp -f campuseats-server/pom.xml spring-boot:run
 ```
 
-`install` 只在本机 Maven 仓库解析源码模块依赖，不向远端发布应用包；此处跳过测试，完整检查另见贡献指南。首次 Java 启动执行 Flyway V1—V24，演示种子仅在相应模式初始化。数据库名 `sky_take_out` 是保留标识，不重命名现有数据库。
+`install` 只在本机 Maven 仓库解析源码模块依赖，不向远端发布应用包；此处跳过测试，完整检查另见贡献指南。全新数据库首次启动 Java 时执行 Flyway V1—V25，演示种子仅在相应模式初始化。数据库名 `sky_take_out` 是保留标识，不重命名现有数据库。
 
-在另一终端检查 `http://127.0.0.1:18084/actuator/health/readiness` 与 `/api/v1/user/auth/capabilities`，应分别为 `UP`、`DEMO` / `MOCK`。本轮实际执行了安装、源码启动、健康、管理员与演示用户登录及菜单读取，确认 V24 与 69 张表；复用了同配方的既有精确依赖镜像，没有宣称本次在 Windows 重新构建这两个依赖镜像。
+在另一终端检查 `http://127.0.0.1:18084/actuator/health/readiness` 与 `/api/v1/user/auth/capabilities`，应分别为 `UP`、`DEMO` / `MOCK`。此前基于 V24 的 Windows 宿主源码验收覆盖安装、启动、健康、管理员与演示用户登录及菜单读取，并确认了 69 张表。该次验收复用已有的 MySQL 和 Redis 依赖镜像。
 
 本地 JDBC 示例的非 TLS 连接仅适用于此回环隔离开发环境。Java 在前台运行，以 Ctrl+C 停止；IDE 可导入根 POM、配置同组环境变量并从 `CampusEatsApplication` 调试。IDE 调试器本轮未单独验收。数据库暂停使用 `docker @devCompose stop --timeout 60`，保留开发数据卷；清理或重置另行决定，不删除日常卷。
 
