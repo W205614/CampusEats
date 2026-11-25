@@ -44,6 +44,12 @@ public class AddressService {
 
   @Transactional
   public long save(long user, Long id, Address input) {
+    // Use the same user row lock as account closure before writing addresses.
+    require(
+        db.one("SELECT id FROM user WHERE id=? AND status=1 FOR UPDATE", user) != null,
+        401,
+        "ACCOUNT_DISABLED",
+        "账号已停用");
     var building =
         db.one(
             "SELECT b.*,c.enabled campus_enabled FROM campus_building b JOIN campus c ON"

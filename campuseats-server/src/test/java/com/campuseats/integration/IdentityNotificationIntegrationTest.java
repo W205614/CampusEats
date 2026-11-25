@@ -3,6 +3,8 @@ package com.campuseats.integration;
 import static com.campuseats.TestIds.requireId;
 import static org.junit.jupiter.api.Assertions.*;
 
+import com.campuseats.api.Commands.Address;
+import com.campuseats.business.AddressService;
 import com.campuseats.common.BusinessException;
 import com.campuseats.infra.*;
 import com.campuseats.security.*;
@@ -224,6 +226,7 @@ class IdentityNotificationIntegrationTest {
   }
 
   @Autowired UserIdentityService identities;
+  @Autowired AddressService addresses;
   @Autowired PhoneChallenges challenges;
   @Autowired ExternalNotifications notifications;
   @Autowired AuthService auth;
@@ -613,6 +616,12 @@ class IdentityNotificationIntegrationTest {
     assertEquals(
         "COMPLETED",
         db.one("SELECT state FROM account_closure WHERE user_id=?", user).get("state"));
+    assertEquals(
+        "ACCOUNT_DISABLED",
+        assertThrows(
+                BusinessException.class,
+                () -> addresses.save(user, null, new Address(building, "307", "测试用户", phone)))
+            .code());
     assertEquals(0, db.count("SELECT COUNT(*) FROM address_book WHERE user_id=?", user));
     var snapshot = db.one("SELECT building_name,room FROM orders WHERE id=?", order);
     assertEquals("注销测试楼", snapshot.get("building_name"));
