@@ -2,6 +2,17 @@
 
 本地点餐、合单、履约、售后、权限和账务功能已完成回归，当前进入按需维护阶段。出现可复现问题、依赖升级或新业务需求时再修改；微信与腾讯云接入按专题指南另行安排。
 
+## v1.1.1 · 日常维护补丁
+
+2026-11-25 发布 v1.1.1。Java 和 Web 镜像来自应用提交 `fe43ac026be284b423112159f18c5d6293427425`，验证平台为 `linux/amd64`。[版本与镜像摘要](https://github.com/W205614/CampusEats/releases/tag/v1.1.1)。
+
+| 范围 | 验证结果 |
+| --- | --- |
+| 源码与构建 | 应用 CI 通过 361 项后端测试、96 项浏览器测试，失败和跳过均为 0。管理端、H5、微信小程序构建，实时接口契约、双实例和独立恢复检查通过。[master CI](https://github.com/W205614/CampusEats/actions/runs/45537243332) · [Tag CI](https://github.com/W205614/CampusEats/actions/runs/45540183153)。 |
+| 安全与质量 | CodeQL 工作流和四镜像扫描通过。发布时三类未解决告警均为 0，原有 9 条已审阅发现继续保留。[安全质量 CI](https://github.com/W205614/CampusEats/actions/runs/45537243322) · [审阅说明](../security-review.md)。 |
+| 公开镜像 | Java、Web 以不可变摘要匿名拉取，配置摘要和解压层顺序与 CI 制品一致。用空测试卷启动四服务后通过 8 项浏览器检查，其中包含取餐码重置、刷新和核销、跨店配送、退款及异常提示。测试使用合成数据和模拟资金。[镜像推广](https://github.com/W205614/CampusEats/actions/runs/45540432832) · [验证附件](https://github.com/W205614/CampusEats/releases/download/v1.1.1/campuseats-v1.1.1-verification.json)。 |
+| 本机日常 | 使用同次 CI 制品更新，Flyway 继续使用 V25。沿用三个业务卷，核对 69 张历史表字段和主键记录以及 10 个上传文件。四服务通过健康及界面入口检查，随后恢复停止。 |
+
 ## v1.1.0 · 学生点餐体验与 V25 迁移
 
 2026-11-22 发布 v1.1.0，应用镜像来自 `966b306d1f6f77cca0d565b65a49ef3532124153` 的同一次成功构建，验证平台为 `linux/amd64`。[版本与镜像摘要](https://github.com/W205614/CampusEats/releases/tag/v1.1.0)。
