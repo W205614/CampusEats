@@ -394,8 +394,7 @@ public class UserIdentityService {
                   + " name='已注销用户',phone=NULL,openid=NULL,avatar=NULL,id_number=NULL,sex=NULL,status=0,default_address_id=NULL,auth_version=auth_version+1"
                   + " WHERE id=?",
               user);
-          db.update(
-              "UPDATE address_book SET consignee='已注销',phone='',detail='' WHERE user_id=?", user);
+          db.update("DELETE FROM address_book WHERE user_id=?", user);
           db.update(
               "UPDATE auth_session SET revoked=true WHERE subject_type='USER' AND subject_id=?",
               user);

@@ -21,11 +21,11 @@ onShow(async () => {
   <view class="screen" v-if="policy">
     <view class="title">隐私政策与用户协议</view>
     <view class="muted">版本 {{ policy.version }} · {{ policy.operator }}</view>
+    <view class="muted">联系方式：{{ policy.contact }}</view>
     <view class="section-title">隐私政策</view
     ><view class="card policy-text">{{ policy.privacyText }}</view>
     <view class="section-title">用户协议</view
     ><view class="card policy-text">{{ policy.termsText }}</view>
-    <view class="muted">联系方式：{{ policy.contact }}</view>
   </view>
 </template>
 <style scoped>

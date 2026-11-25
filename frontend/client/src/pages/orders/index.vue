@@ -493,6 +493,7 @@ onUnload(stop);
         </view>
         <view class="notice" v-if="o.stageOverdue && o.stage && fulfillmentStageLabels[o.stage]">
           {{ o.stage === 'SELF_PICKUP' ? '已超过取餐时限，可先向店铺确认' : fulfillmentStageLabels[o.stage] + ' · 已超时' }}
+          <navigator v-if="o.stage === 'SELF_PICKUP'" url="/pages/privacy/index" class="tap">运营方联系方式</navigator>
         </view>
         <view v-if="o.fulfillment === 'PICKUP' && !(o.pickupCode && o.status === 3)" class="muted">
           取餐点：{{ o.pickupPoint || '取餐点未配置' }}

@@ -587,6 +587,14 @@ class IdentityNotificationIntegrationTest {
     long user = login(phone);
     actor(user);
     long order = order(user, 3);
+    long building = db.insert(
+        "INSERT INTO campus_building(name,campus_id) VALUES('注销测试楼',1)");
+    long address = db.insert(
+        "INSERT INTO address_book(user_id,consignee,phone,building_id,room) VALUES(?,?,?,?,?)",
+        user, "测试用户", phone, building, "305");
+    db.update(
+        "UPDATE orders SET address_book_id=?,building_name=?,room=? WHERE id=?",
+        address, "注销测试楼", "305", order);
     var session = auth.issue("USER", user);
     String token = session.get("token").toString();
     redis.delete("campus:otp:cooldown:" + com.campuseats.common.Hashes.sha256(phone));
@@ -595,6 +603,7 @@ class IdentityNotificationIntegrationTest {
     assertEquals(
         "ACCOUNT_HAS_ACTIVE_BUSINESS",
         assertThrows(BusinessException.class, () -> identities.close(phone, code)).code());
+    assertEquals(1, db.count("SELECT COUNT(*) FROM address_book WHERE id=?", address));
     db.update("UPDATE orders SET status=5 WHERE id=?", order);
     redis.delete("campus:otp:cooldown:" + com.campuseats.common.Hashes.sha256(phone));
     challenges.send(phone, "CLOSE", user, "fixture-ip");
@@ -604,7 +613,10 @@ class IdentityNotificationIntegrationTest {
     assertEquals(
         "COMPLETED",
         db.one("SELECT state FROM account_closure WHERE user_id=?", user).get("state"));
-    assertEquals(1, db.count("SELECT COUNT(*) FROM orders WHERE id=?", order));
+    assertEquals(0, db.count("SELECT COUNT(*) FROM address_book WHERE user_id=?", user));
+    var snapshot = db.one("SELECT building_name,room FROM orders WHERE id=?", order);
+    assertEquals("注销测试楼", snapshot.get("building_name"));
+    assertEquals("305", snapshot.get("room"));
   }
 
   @Test

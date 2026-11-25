@@ -47,6 +47,8 @@ export async function startPayment(id: string, version: string): Promise<Payment
   }
   if (payment.state === 'SUCCEEDED' || payment.closeRequested || !payment.action.type)
     return payment;
+  if (payment.channel !== channel)
+    throw new Error('该订单已在其他支付场景发起付款。请回原场景继续，或取消并确认关闭后重新下单。');
   const action = payment.action;
   if (action.type === 'requestPayment') {
     // #ifdef MP-WEIXIN

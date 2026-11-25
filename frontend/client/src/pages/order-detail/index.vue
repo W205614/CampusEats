@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue';
-import { onLoad } from '@dcloudio/uni-app';
+import { onLoad, onShow } from '@dcloudio/uni-app';
 import { api, loggedIn } from '../../api';
 import { useSession } from '../../stores/session';
 import { cents, fulfillmentStageLabels, orderStatus, states, type Order } from '../../../../contracts/platform';
@@ -49,6 +49,8 @@ onLoad((query) => {
   id = query?.id || '';
   target.value = query?.target || '';
   refundId.value = query?.refundId || '';
+});
+onShow(() => {
   void load();
 });
 </script>
@@ -69,6 +71,7 @@ onLoad((query) => {
           <view>取餐点：{{ order.pickupPoint || '取餐点未配置' }}</view>
           <view v-if="order.pickupCode && order.status === 3">取餐码：<text class="pickup-code">{{ order.pickupCode }}</text></view>
         </view>
+        <button class="secondary" @click="load">刷新订单</button>
       </view>
       <view v-if="target === 'refund' || displayedRefunds.length" class="card">
         <view class="section-title">{{ focusedRefund ? '本次退款' : '退款记录' }}</view>

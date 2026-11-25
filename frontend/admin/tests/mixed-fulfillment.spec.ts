@@ -590,7 +590,14 @@ test('browser cross-campus mixed fulfillment preserves coupon cents, repeated pa
       .filter({ has: customer.getByText('订单 ID：' + bId, { exact: true }) })
       .filter({ hasText: '餐品已备好' }).getByText('查看订单', { exact: true }).click();
     await expect(customer.getByText('取餐点：' + names.pickupPoint, { exact: true })).toBeVisible();
-    await expect(customer.getByText('取餐码：', { exact: false })).toBeVisible();
+    const pickupCode = customer.locator('.pickup-code');
+    await expect(pickupCode).toHaveText(/^\d{8}$/);
+    const originalPickupCode = await pickupCode.textContent();
+    await call(request, '/platform/orders/' + bId + '/reset-pickup', token, 'POST');
+    const updatedPickupCode = (await getB()).pickupCode;
+    expect(updatedPickupCode).not.toBe(originalPickupCode);
+    await customer.getByText('刷新订单', { exact: true }).click();
+    await expect(pickupCode).toHaveText(updatedPickupCode!);
     await denied(managerA.page, managerA.session, '/merchant/orders/' + bId, 403);
     await denied(managerB.page, managerB.session, '/merchant/orders/' + aId, 403);
     await denied(managerA.page, managerA.session, '/merchant/stores/' + storeB.id + '/orders', 403);
@@ -664,13 +671,8 @@ test('browser cross-campus mixed fulfillment preserves coupon cents, repeated pa
     expect(await getA()).toMatchObject({ status: 5, courierId: staff.courierA.id });
     expect((await getB()).status).toBe(3);
     await capture(courierA.page, '02-north-campus-delivered');
-    await customer.goto('/app/pages/orders/index');
-    const codeText = await orderCard(customer, bOrder.number)
-      .getByText('取餐码：', { exact: false })
-      .innerText();
-    const code = codeText.match(/\d{8}/)?.[0];
-    expect(code).toMatch(/^\d{8}$/);
-    await managerB.page.getByPlaceholder('输入用户出示的8位核销码', { exact: true }).fill(code!);
+    const code = await pickupCode.innerText();
+    await managerB.page.getByPlaceholder('输入用户出示的8位核销码', { exact: true }).fill(code);
     await postUI(managerB.page, '/merchant/orders/' + bId + '/actions/verify', () =>
       managerB.page.getByRole('button', { name: '核销', exact: true }).click(),
     );

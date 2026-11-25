@@ -101,3 +101,22 @@ test('mini-program payment compilation removes the browser QR dependency', () =>
   assert.doesNotMatch(compile('payments.ts', 'mp-weixin'), /qrcode|navigator|window/);
   assert.match(compile('payments.ts', 'h5'), /qrcode/);
 });
+
+for (const [platform, globals, channel, action] of [
+  ['h5', { navigator: { userAgent: 'Android Mobile' } }, 'MINI_PROGRAM', 'requestPayment'],
+  ['mp-weixin', {}, 'H5', 'redirect'],
+]) {
+  test(`${platform} explains how to continue a payment started on the other platform`, async () => {
+    const calls = [];
+    const payment = execute(compile('payments.ts', platform), globals, {
+      './api': {
+        async api(path, method) {
+          calls.push([path, method]);
+          return { channel, state: 'PENDING', action: { type: action } };
+        },
+      },
+    });
+    await assert.rejects(payment.startPayment('checkout', 'version'), /请回原场景继续/);
+    assert.deepEqual(calls, [['/checkouts/checkout/payment', undefined]]);
+  });
+}

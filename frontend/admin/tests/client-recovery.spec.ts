@@ -28,6 +28,8 @@ const order = {
   version: '1',
   status: 3,
   fulfillment: 'PICKUP',
+  stage: 'SELF_PICKUP',
+  stageOverdue: false,
   pickupCode: 'PRIVATE-CODE-1',
   amount: '10.00',
   paidCents: '1000',
@@ -45,6 +47,7 @@ async function fixture(page: Page) {
     release: undefined as (() => void) | undefined,
     previewFailure: false,
     aftersales: [] as object[],
+    order,
   };
   await page.addInitScript((session) => {
     sessionStorage.setItem('campus-user', JSON.stringify(session));
@@ -77,12 +80,23 @@ async function fixture(page: Page) {
         ? route.fulfill({ status: 409, json: { code: 'QUOTE_CHANGED', message: '请重新计算报价' } })
         : ok(quote);
     if (path === '/carts') return ok(token === 'Bearer client-1' ? [cart] : []);
-    if (path === '/orders') return ok(token === 'Bearer client-1' ? [order] : []);
+    if (path === '/orders') return ok(token === 'Bearer client-1' ? [state.order] : []);
     if (path === '/aftersales') return ok(state.aftersales);
     return ok([]);
   });
   return state;
 }
+
+test('overdue pickup links to the operator contact on the existing policy page', async ({ page }) => {
+  const state = await fixture(page);
+  state.order = { ...order, stageOverdue: true };
+  await page.route('**/api/v1/user/auth/privacy-policy', (route) =>
+    route.fulfill({ json: { code: 'OK', data: { version: '1', operator: '验收运营方', contact: '校园服务台' } } }),
+  );
+  await page.goto('/app/pages/orders/index');
+  await page.getByText('运营方联系方式', { exact: true }).click();
+  await expect(page.getByText('联系方式：校园服务台', { exact: true })).toBeVisible();
+});
 
 test('checkout discards a delayed quote when the user changes their remark', async ({ page }) => {
   const state = await fixture(page);
