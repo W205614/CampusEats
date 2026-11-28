@@ -8,7 +8,7 @@ CampusEats 面向校园点餐与食堂店铺管理：学生可以跨店选餐、
 
 它解决的是多店重复下单、优惠与费用难以核对、履约和售后分散的问题。当前定位为个人开发、学习和本机演示，默认监听回环地址，付款与退款使用模拟渠道。微信、腾讯云和多实例适配已有代码，真实商户、云端生产和小程序真机仍需单独验收。
 
-推荐稳定版为 **v1.1.1**。这个维护补丁修复注销后的地址簿残留和订单详情的取餐码刷新问题。自取超时可查看运营方联系方式，跨端继续付款时会提示回原支付场景。Java 与 Web 镜像来自同一次成功 CI，已按不可变摘要匿名拉取并通过隔离业务验收。[v1.1.1 发布](https://github.com/W205614/CampusEats/releases/tag/v1.1.1) · [镜像来源 fe43ac0](https://github.com/W205614/CampusEats/commit/fe43ac026be284b423112159f18c5d6293427425)。
+推荐稳定版为 **v1.1.2**。Web 镜像更新至 Nginx 1.30.8，修复 CVE-2026-132779。Java 与 Web 直接推广已通过 CI 的制品，应用和小程序构建元数据仍为 1.1.1。公开镜像已按不可变摘要匿名拉取并完成隔离业务验收。[v1.1.2 发布](https://github.com/W205614/CampusEats/releases/tag/v1.1.2) · [镜像来源 6b33aa4](https://github.com/W205614/CampusEats/commit/6b33aa4f8ccd78e4d93067b6d296f73cffa7a0a4)。
 
 ## 可以完成什么
 
@@ -48,11 +48,11 @@ flowchart LR
 命令在项目根目录的 **PowerShell 7** 中执行；Windows 与 Linux 都使用 `pwsh`，无需切换 Bash 环境变量语法。先取得稳定版的 Compose、配置示例和脚本：
 
 ```powershell
-git clone --depth 1 --branch v1.1.1 https://github.com/W205614/CampusEats.git
+git clone --depth 1 --branch v1.1.2 https://github.com/W205614/CampusEats.git
 cd CampusEats
 ```
 
-`v1.1.1` 固定应用源码、Compose 和依赖镜像配方。克隆后继续按本页选择启动路线。源码归档内的 README 随标签保存，里面仍有 v1.1.0 的示例。也可以从 [v1.1.1 Release](https://github.com/W205614/CampusEats/releases/tag/v1.1.1) 顶部进入对应的上手说明。已有数据环境请按[升级与恢复](docs/platform-deployment.md)保留原卷并执行升级。
+`v1.1.2` 固定应用源码、Compose 和依赖镜像配方。克隆后继续按本页操作。源码归档携带打标签时的 README，其中仍有 v1.1.1 启动示例。也可以从 [v1.1.2 Release](https://github.com/W205614/CampusEats/releases/tag/v1.1.2) 顶部进入本版上手说明。已有数据环境请按[升级与恢复](docs/platform-deployment.md)保留原卷并执行升级。
 
 | 路线 | 适合谁 | 宿主依赖与入口 |
 | --- | --- | --- |
@@ -75,10 +75,10 @@ docker @composeArgs up -d --no-build --wait --wait-timeout 300
 
 | 项目发布的应用镜像 | 已验证平台与职责 |
 | --- | --- |
-| `ghcr.io/w205614/campuseats-server:v1.1.1` | `linux/amd64`，Java 服务 |
-| `ghcr.io/w205614/campuseats-web:v1.1.1` | `linux/amd64`，Nginx、员工工作台与用户 H5 |
+| `ghcr.io/w205614/campuseats-server:v1.1.2` | `linux/amd64`，Java 服务 |
+| `ghcr.io/w205614/campuseats-web:v1.1.2` | `linux/amd64`，Nginx、员工工作台与用户 H5 |
 
-两个应用镜像均可匿名拉取。MySQL 8.4.13 和 Redis 7.4.12 由 Compose 按项目配方在本地构建，首次构建需访问 Docker Hub、Alpine 和 Oracle 下载源。[版本及镜像摘要](https://github.com/W205614/CampusEats/releases/tag/v1.1.1) · [验证附件](https://github.com/W205614/CampusEats/releases/download/v1.1.1/campuseats-v1.1.1-verification.json)。
+两个应用镜像均可匿名拉取。MySQL 8.4.13 和 Redis 7.4.12 由 Compose 按项目配方在本地构建，首次构建需访问 Docker Hub、Alpine 和 Oracle 下载源。[版本及镜像摘要](https://github.com/W205614/CampusEats/releases/tag/v1.1.2) · [验证附件](https://github.com/W205614/CampusEats/releases/download/v1.1.2/campuseats-v1.1.2-verification.json)。
 
 ### 从源码构建 Docker 镜像
 
@@ -167,7 +167,7 @@ flowchart LR
 
 ## 验证、排错与数据维护
 
-v1.1.1 的应用 CI 通过后端 **361** 项、浏览器 **96** 项、独立恢复及四镜像扫描。正式镜像在独立空卷环境通过 **8** 项针对性浏览器检查，覆盖取餐码刷新和核销、跨店履约、模拟退款及订单异常提示。微信真实渠道、腾讯云和小程序真机按各自的接入流程验收。[安全审阅说明](docs/security-review.md) · [版本验证记录](docs/verification/current.md)。
+v1.1.2 的应用 CI 通过后端 **361** 项、浏览器 **96** 项、独立恢复及四镜像扫描。正式镜像在独立空卷环境通过 **8** 项针对性浏览器检查，覆盖取餐码刷新和核销、跨店履约、模拟退款及订单异常提示。微信真实渠道、腾讯云和小程序真机按各自的接入流程验收。[安全审阅说明](docs/security-review.md) · [版本验证记录](docs/verification/current.md)。
 
 常用源码检查从根目录执行，按改动选择范围；Java 集成测试需要 Docker，写入式浏览器测试使用独立数据库：
 
@@ -191,7 +191,7 @@ CI、浏览器凭据与隔离测试步骤见[贡献指南](CONTRIBUTING.md)。�
 | 能登录但不能下单 | 店铺是否营业接单、配额/地址/校区是否匹配，是否完成报价与模拟付款 |
 | 开发 API 失败 | `API_PROXY`、允许的 Origin、宿主数据库映射是否一致，前端是否误连日常后端 |
 
-MySQL、Redis 和上传分别持久化到 Compose 的 `mysql-data`、`redis-data`、`uploads` 命名卷。v1.1.1 继续使用 Flyway **V25**，沿用已有的取餐点和退款消息关联字段。升级前备份数据库、上传与配置并独立验证恢复，随后沿用原卷。[备份、升级与恢复](docs/platform-deployment.md) · [日常排障](docs/operations.md)。
+MySQL、Redis 和上传分别持久化到 Compose 的 `mysql-data`、`redis-data`、`uploads` 命名卷。v1.1.2 继续使用 Flyway **V25**，沿用已有的取餐点和退款消息关联字段。升级前备份数据库、上传与配置并独立验证恢复，随后沿用原卷。[备份、升级与恢复](docs/platform-deployment.md) · [日常排障](docs/operations.md)。
 
 ## 版本、参与与许可
 

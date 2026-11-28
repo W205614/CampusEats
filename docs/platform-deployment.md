@@ -6,7 +6,7 @@
 
 ## 从 GHCR 首次部署
 
-这一路线用于全新独立演示。按[首页的克隆命令](../README.md#选择启动方式)取得 v1.1.1 源码，从 [v1.1.1 Release](https://github.com/W205614/CampusEats/releases/tag/v1.1.1) 复制 Java 和 Web 的镜像摘要，再在项目根目录的 PowerShell 7 中按本节生成配置。
+这一路线用于全新独立演示。按[首页的克隆命令](../README.md#选择启动方式)取得 v1.1.2 源码，从 [v1.1.2 Release](https://github.com/W205614/CampusEats/releases/tag/v1.1.2) 复制 Java 和 Web 的镜像摘要，再在项目根目录的 PowerShell 7 中按本节生成配置。
 
 ```powershell
 . ./scripts/secure-files.ps1
@@ -23,8 +23,8 @@ foreach ($purpose in @('root-password','app-password','redis-password','admin-si
 }
 $demoConfiguration = $demoConfiguration.Replace('WEB_PORT=18083', 'WEB_PORT=28104')
 $demoConfiguration = $demoConfiguration.Replace('http://localhost:18083,http://127.0.0.1:18083', 'http://localhost:28104,http://127.0.0.1:28104')
-$demoConfiguration = $demoConfiguration.Replace('MYSQL_IMAGE=campuseats-mysql:v1', 'MYSQL_IMAGE=campuseats-mysql:v1.1.1-local-demo')
-$demoConfiguration = $demoConfiguration.Replace('REDIS_IMAGE=campuseats-redis:v1', 'REDIS_IMAGE=campuseats-redis:v1.1.1-local-demo')
+$demoConfiguration = $demoConfiguration.Replace('MYSQL_IMAGE=campuseats-mysql:v1', 'MYSQL_IMAGE=campuseats-mysql:v1.1.2-local-demo')
+$demoConfiguration = $demoConfiguration.Replace('REDIS_IMAGE=campuseats-redis:v1', 'REDIS_IMAGE=campuseats-redis:v1.1.2-local-demo')
 $demoConfiguration += "`nSERVER_IMAGE=ghcr.io/w205614/campuseats-server@$serverDigest`nWEB_IMAGE=ghcr.io/w205614/campuseats-web@$webDigest`n"
 Write-SecureTextFile -Path $demoEnvironment -Content $demoConfiguration
 $demoConfiguration = $null

@@ -1,6 +1,16 @@
 # 当前版本验证与维护记录
 
-v1.1.1 是个人日常使用、学习和本机演示的正式版。点餐、合单、履约、售后、权限和账务已完成回归，后续按可复现故障、安全问题或明确需求维护。首次部署从 [v1.1.1 Release](https://github.com/W205614/CampusEats/releases/tag/v1.1.1) 的上手入口开始。
+v1.1.2 是个人日常使用、学习和本机演示的正式版。点餐、合单、履约、售后、权限和账务已完成回归，后续按可复现故障、安全问题或明确需求维护。首次部署从 [v1.1.2 Release](https://github.com/W205614/CampusEats/releases/tag/v1.1.2) 的上手入口开始。
+
+## v1.1.2 · Web 安全补丁
+
+2026-11-28 发布 v1.1.2。Web 镜像包含 `nginx 1.30.8-r1`，修复 CVE-2026-132779。Flyway 继续使用 V25。Java 和 Web 直接使用应用提交 `6b33aa4f8ccd78e4d93067b6d296f73cffa7a0a4` 的已通过 CI 制品，应用和小程序构建元数据仍为 1.1.1。[Release](https://github.com/W205614/CampusEats/releases/tag/v1.1.2)。
+
+| 范围 | 验证结果 |
+| --- | --- |
+| 源码与构建 | 361 项后端、96 项浏览器测试、双实例、独立恢复和四镜像扫描通过，Web 漏洞扫描发现数为 0。[master CI](https://github.com/W205614/CampusEats/actions/runs/46132028906) · [Tag CI](https://github.com/W205614/CampusEats/actions/runs/46134117734) |
+| 安全与质量 | [master 安全质量](https://github.com/W205614/CampusEats/actions/runs/46132028845)和 [Tag 安全质量](https://github.com/W205614/CampusEats/actions/runs/46134117716)通过。 |
+| 公开镜像 | `linux/amd64` 的 Java 和 Web 镜像按不可变摘要匿名拉取，配置摘要和有序解压层匹配原 CI，在空测试卷上通过冒烟和 8 项浏览器检查，订单和资金使用模拟演示数据。[镜像推广](https://github.com/W205614/CampusEats/actions/runs/46134839744) · [验证附件](https://github.com/W205614/CampusEats/releases/download/v1.1.2/campuseats-v1.1.2-verification.json) |
 
 ## v1.1.1 · 日常维护补丁
 
