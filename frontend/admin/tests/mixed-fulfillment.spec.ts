@@ -671,6 +671,13 @@ test('browser cross-campus mixed fulfillment preserves coupon cents, repeated pa
     expect(await getA()).toMatchObject({ status: 5, courierId: staff.courierA.id });
     expect((await getB()).status).toBe(3);
     await capture(courierA.page, '02-north-campus-delivered');
+    // The platform reset increments the order version, so reopen it from a fresh merchant list.
+    await managerB.page.reload();
+    await managerB.page
+      .locator('.el-table__body tr')
+      .filter({ hasText: bOrder.number })
+      .getByRole('button', { name: '处理订单', exact: true })
+      .click();
     const code = await pickupCode.innerText();
     await managerB.page.getByPlaceholder('输入用户出示的8位核销码', { exact: true }).fill(code);
     await postUI(managerB.page, '/merchant/orders/' + bId + '/actions/verify', () =>
