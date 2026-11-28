@@ -6,7 +6,7 @@
 
 ## 从 GHCR 首次部署
 
-这一路线用于全新独立演示。取得 v1.1.1 源码并复制 Release 中 Java 和 Web 的镜像摘要，然后在项目根目录的 PowerShell 7 中生成配置。[v1.1.1 源码](https://github.com/W205614/CampusEats/tree/v1.1.1) · [镜像摘要](https://github.com/W205614/CampusEats/releases/tag/v1.1.1)。
+这一路线用于全新独立演示。按[首页的克隆命令](../README.md#选择启动方式)取得 v1.1.1 源码，从 [v1.1.1 Release](https://github.com/W205614/CampusEats/releases/tag/v1.1.1) 复制 Java 和 Web 的镜像摘要，再在项目根目录的 PowerShell 7 中按本节生成配置。
 
 ```powershell
 . ./scripts/secure-files.ps1

@@ -89,15 +89,15 @@ foreach ($purpose in @('root-password','app-password','redis-password','admin-si
   $random = [Convert]::ToHexString([Security.Cryptography.RandomNumberGenerator]::GetBytes(32))
   $devConfiguration = $devConfiguration.Replace("replace-with-random-$purpose", $random)
 }
-$devConfiguration = $devConfiguration.Replace('MYSQL_IMAGE=campuseats-mysql:v1', 'MYSQL_IMAGE=campuseats-mysql:v1.1.0-source-dev')
-$devConfiguration = $devConfiguration.Replace('REDIS_IMAGE=campuseats-redis:v1', 'REDIS_IMAGE=campuseats-redis:v1.1.0-source-dev')
+$devConfiguration = $devConfiguration.Replace('MYSQL_IMAGE=campuseats-mysql:v1', 'MYSQL_IMAGE=campuseats-mysql:source-dev')
+$devConfiguration = $devConfiguration.Replace('REDIS_IMAGE=campuseats-redis:v1', 'REDIS_IMAGE=campuseats-redis:source-dev')
 Write-SecureTextFile -Path $devEnvironment -Content $devConfiguration
 Write-SecureTextFile -Path (Join-Path $devDirectory 'ports.yaml') -Content "services:`n  mysql:`n    ports: ['127.0.0.1:13384:3306']`n  redis:`n    ports: ['127.0.0.1:16384:6379']`n"
 $devConfiguration = $null
 $random = $null
 ```
 
-启动依赖，只启动 MySQL/Redis 两个服务，不启动容器中的 Java/Web：
+启动 MySQL 和 Redis。`source-dev` 是本节独立环境的本地标签，镜像由当前检出的源码配方构建。已有开发环境继续使用原配置：
 
 ```powershell
 $devCompose = @('compose', '--env-file', '.local/source-dev/dev.env', '-p', 'campuseats-source-dev', '-f', 'compose.yaml', '-f', '.local/source-dev/ports.yaml')

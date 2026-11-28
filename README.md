@@ -52,7 +52,7 @@ git clone --depth 1 --branch v1.1.1 https://github.com/W205614/CampusEats.git
 cd CampusEats
 ```
 
-`v1.1.1` 固定应用源码、Compose 和依赖镜像配方，`master` 提供当前维护文档。已有数据环境请按文档保留原卷并执行升级。[升级与恢复](docs/platform-deployment.md)。
+`v1.1.1` 固定应用源码、Compose 和依赖镜像配方。克隆后继续按本页选择启动路线。源码归档内的 README 随标签保存，里面仍有 v1.1.0 的示例。也可以从 [v1.1.1 Release](https://github.com/W205614/CampusEats/releases/tag/v1.1.1) 顶部进入对应的上手说明。已有数据环境请按[升级与恢复](docs/platform-deployment.md)保留原卷并执行升级。
 
 | 路线 | 适合谁 | 宿主依赖与入口 |
 | --- | --- | --- |

@@ -1,6 +1,6 @@
 # 当前版本验证与维护记录
 
-本地点餐、合单、履约、售后、权限和账务功能已完成回归，当前进入按需维护阶段。出现可复现问题、依赖升级或新业务需求时再修改；微信与腾讯云接入按专题指南另行安排。
+v1.1.1 是个人日常使用、学习和本机演示的正式版。点餐、合单、履约、售后、权限和账务已完成回归，后续按可复现故障、安全问题或明确需求维护。首次部署从 [v1.1.1 Release](https://github.com/W205614/CampusEats/releases/tag/v1.1.1) 的上手入口开始。
 
 ## v1.1.1 · 日常维护补丁
 
@@ -56,13 +56,13 @@
 
 本机升级的临时恢复资料经过独立恢复；其具体保留/回收由本机清单与维护者确认管理，禁用指针和历史核验元数据不是可用恢复负载。真实微信支付/身份、腾讯云、生产多实例和小程序真机仍未在本轮验收，亦未新增生产容量认证。
 
-首页的两张 v1.0.4 图片来自上述公开镜像隔离旅程，均为合成订单和模拟金额。历史截图继续保留在源码中，不冒充本轮新画面。
+v1.0.4 当时的两张合成订单截图保留在[当时的 README 快照](https://github.com/W205614/CampusEats/blob/68ec2be3056abd8a5439edf5fdc71380b7bc79e7/README.md)。当前首页展示 v1.1.1 的隔离验收截图。
 
 ## v1.0.3 发布准备修复
 
 2026-11-09 的维护源码版本为 `1.0.3`。修复 `release.ps1` 在升级前数据指纹采集失败时未恢复原应用状态、未保存失败回执的问题；此阶段没有启动候选或迁移。运行中的应用会请求恢复，已停止的应用继续停止，已验证备份及 `capture_failed` 回执保留。迁移后失败仍保持停写。
 
-本地故障注入已先复现旧行为，再验证运行中与已停止两种应用状态、配置不变、候选未启动、恢复引用和失败时间记录；现有发布编排回归通过。没有新增依赖、业务接口或 V1—V24 迁移。最终 CI、发布物获取、四服务镜像及日常升级结果在 `.local/release-1.0.3-20261109/final-validation.json` 中分别记录，未完成步骤不视为通过。远端入口为 [Actions](https://github.com/W205614/CampusEats/actions/workflows/verify.yml) 与 [Releases](https://github.com/W205614/CampusEats/releases)。
+本地故障注入已先复现旧行为，再验证运行中与已停止两种应用状态、配置不变、候选未启动、恢复引用和失败时间记录；现有发布编排回归通过。没有新增依赖、业务接口或 V1—V24 迁移。当时的本机收尾回执已退役。公开版本状态可查 [v1.0.3 源码](https://github.com/W205614/CampusEats/tree/v1.0.3)、[Actions](https://github.com/W205614/CampusEats/actions/workflows/verify.yml) 与 [Releases](https://github.com/W205614/CampusEats/releases)。
 
 ## v1.0.2 源码与本地验证
 
@@ -70,7 +70,7 @@
 
 本地 Node.js 24.19.0 / PowerShell 7 验证：管理端 2 项和用户端 7 项工具链测试、管理端构建、用户端类型检查、H5 与微信小程序构建通过；两端真实开发服务器的 2 项 HTTP 回归通过。隔离 Nginx 容器使用生产模板验证图片及三份许可文件可访问、缺失资源和内部端点返回 404。该容器只使用独立端口与临时配置，不挂载业务卷，测试后自动退出。
 
-上述结果属于提交前的本地验证；最终提交的 CI、Tag、Release 和附件状态应从 [Actions](https://github.com/W205614/CampusEats/actions/workflows/verify.yml) 与 [Releases](https://github.com/W205614/CampusEats/releases) 分别核对。本机本轮收尾入口为 `.local/release-1.0.2-20261109/final-validation.json`。本轮未部署日常环境，运行制品仍按下面的 v1.0.1 部署记录核对；历史业务与容量结果不视为本轮重新执行。
+上述结果属于提交前的本地验证；公开版本状态可查 [v1.0.2 源码](https://github.com/W205614/CampusEats/tree/v1.0.2)、[Actions](https://github.com/W205614/CampusEats/actions/workflows/verify.yml) 与 [Releases](https://github.com/W205614/CampusEats/releases)。当时的本机回执已退役，日常环境在该次验证后继续使用 v1.0.1。
 
 初始候选 `cf28b36` 的两次 CI 分别因 Trivy 和 age 下载返回 504 失败，不能视作完整通过。追加工具下载修复后，本地真实 HTTP 的重试上限、404/摘要失败、缓存保留回归通过；现有真实 age 加密往返与损坏拒绝、运维 runner 和扫描编排回归通过。最终发布以包含该修复的后续提交及其 CI 为准。
 
@@ -80,7 +80,7 @@
 
 2026-11-07 发布的 [v1.0.1](https://github.com/W205614/CampusEats/releases/tag/v1.0.1) 为当时日常部署版本，后端模块为 `campuseats-common`、`campuseats-api` 和 `campuseats-server`，Java 包名为 `com.campuseats`，入口为 `CampusEatsApplication`。该版本后端与两端应用均为 `1.0.1`，没有改变 HTTP 契约或 V1—V24 迁移内容；数据库标识和业务卷保持原样。
 
-使用 `git rev-parse v1.0.1` 核对发布提交，按该提交的[CI 结果](https://github.com/W205614/CampusEats/actions/workflows/verify.yml)和 Release 附件验证源码与制品。本机完整收尾回执位于 `.local/release-1.0.1-20261107/final-validation.json`，其中记录本地与远端、Tag、Release、四个运行镜像的对应关系，以及数据核验、临时恢复负载回收和最终容器状态；实际部署记录仍保存在 `.local/releases/artifact-*/release.json`。
+该版的公开证据见 [v1.0.1 源码](https://github.com/W205614/CampusEats/tree/v1.0.1)、[CI 记录](https://github.com/W205614/CampusEats/actions/workflows/verify.yml) 和 [Release](https://github.com/W205614/CampusEats/releases/tag/v1.0.1)。当时的本机收尾回执已退役。
 
 下文是 2026-11-06 的历史业务基线、容量测量和当时的收尾统计；不将历史容量数字当成本轮重新执行的容量测试。各次发布和部署状态以对应版本回执为准。
 
@@ -97,7 +97,7 @@
 | 数据与文件       | 独立恢复通过；日常升级时原 49 张表的旧字段与主键核对通过，10 个上传文件摘要一致 |
 | 安全与制品       | 依赖审计、四服务镜像扫描及制品内容核验通过                                      |
 
-本机证据目录为 `.local/enterprise-release-20261106/`：`final-validation.json` 为最终回执，`ci-final-success.json` 为 CI 记录，`artifact-qa-final/summary.json` 为最终制品验收。早期候选阶段另见[历史留档](production-upgrade.md)。
+早期候选阶段另见[历史留档](production-upgrade.md)。本节保留当时的结果摘要，原始本机验收目录已退役。
 
 ## 容量测量
 
@@ -112,11 +112,11 @@
 | 完整交易 P95                          | 5,219.08 ms       |
 | 任务积压、业务约束、OOM、异常重启检查 | 通过              |
 
-资源条件为 Windows / Docker Desktop / WSL2 共享开发主机，MySQL 内存上限 2 GiB、memory+swap 上限 4 GiB、InnoDB 缓冲池 512 MiB；Java 768 MiB、Redis 160 MiB、Web 128 MiB。结果对应本机合成数据与模拟资金场景。原始报告为 `performance-provisioned/report.json`，资源依据为同目录 `resource-decision.md`；前两轮未达标报告保留在 `performance/` 和 `performance-final/`。
+资源条件为 Windows / Docker Desktop / WSL2 共享开发主机，MySQL 内存上限 2 GiB、memory+swap 上限 4 GiB、InnoDB 缓冲池 512 MiB；Java 768 MiB、Redis 160 MiB、Web 128 MiB。结果对应本机合成数据与模拟资金场景。前两轮未达标。原始本机报告已退役，上表保留最终场景结果与适用条件。
 
 ## 源码、CI 与运行实例
 
-上述提交是本轮业务验收基线。收尾整理统一了新增页面、脚本与配置的排版，并将订单页的支付状态名称映射移入脚本区；应用制品按后续成功 CI 更新，实际提交与镜像以 `.local/releases/artifact-*/release.json` 为准。收尾检查记录在 `.local/maintenance-closeout-20261106/`。
+上述提交是 2026-11-06 的业务验收基线。后续整理统一了新增页面、脚本和配置的排版，并将订单页的支付状态名称映射移入脚本区。实际部署随后采用对应的成功 CI 制品，当前日常版本见本页顶部。
 
 - 使用 `git rev-parse HEAD`、`git status --short` 和 `git ls-remote origin refs/heads/master` 核对本地与远端。
 - [Verify CampusEats](https://github.com/W205614/CampusEats/actions/workflows/verify.yml) 保存各提交的完整自动验证结果。
